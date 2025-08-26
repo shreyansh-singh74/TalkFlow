@@ -26,7 +26,7 @@ import { useState } from "react";
 
 const formSchema = z.object({
   name : z.string().min(1,{message : "Name is required"}),
-  email: z.string().email(),
+  email: z.email(),
   password : z.string().min(1, { message: "Password is required" }),
   confirmPassword : z.string().min(1, { message: "Password is required" })
 })
@@ -202,7 +202,7 @@ export const SignUpView = () => {
                         </Button>
                     </div>
                     <div className="text-center text-sm">
-                        Don&apos;t have an account? {" "}
+                        Already have an account? {" "}
                         <Link href={"/sign-up"} className="underline underline-offset-4">
                             Sign up
                         </Link>
