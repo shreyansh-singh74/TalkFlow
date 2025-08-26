@@ -26,7 +26,7 @@ import { useState } from "react";
 
 const formSchema = z.object({
   name : z.string().min(1,{message : "Name is required"}),
-  email: z.email(),
+  email: z.string().email(),
   password : z.string().min(1, { message: "Password is required" }),
   confirmPassword : z.string().min(1, { message: "Password is required" })
 })
@@ -203,15 +203,15 @@ export const SignUpView = () => {
                     </div>
                     <div className="text-center text-sm">
                         Already have an account? {" "}
-                        <Link href={"/sign-up"} className="underline underline-offset-4">
-                            Sign up
+                        <Link href={"/sign-in"} className="underline underline-offset-4">
+                            Sign in
                         </Link>
                     </div>
 
                 </div>
             </form>
           </Form>
-          <div className="bg-radial from-green-600 to-green-900 p-10 relative hidden md:flex flex-col gap-y-4 items-center justify-center">
+          <div className="bg-radial from-green-600 to-green-900 p-10 relative hidden md:flex flex-col gap-y-4 items-center justify-center">  
             <img src="/logo.svg" alt="Image" className="h-[92px] w-[92px]" />
             <p className="text2xl font-semibold text-white">Meet.Ai</p>
           </div>
