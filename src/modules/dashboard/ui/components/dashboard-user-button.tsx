@@ -36,15 +36,6 @@ export default function DashboardUserButton() {
 
   const user = data.user;
 
-  // Debug: Log user data to see what we're getting
-  console.log("User data:", {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    image: user.image,
-    hasImage: !!user.image,
-  });
-
   // Get user initials for fallback
   const getInitials = (name: string) => {
     return name
