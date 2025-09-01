@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 
 export default function DashboardUserButton() {
   const router = useRouter();
+  
   const { data, isPending } = authClient.useSession();
 
   const onLogout = () => {
