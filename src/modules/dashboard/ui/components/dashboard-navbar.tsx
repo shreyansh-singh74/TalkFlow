@@ -10,9 +10,9 @@ export const DashboardNavbar = () => {
   const { state, toggleSidebar, isMobile } = useSidebar();
   const [ commandOpen,setCommandOpen ] = useState(false);
 
-  useEffect(()=>{
-    const down = (e:KeyboardEvent)=>{
-      if(e.key == "k" && (e.metaKey || e.ctrlKey)){
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setCommandOpen((open)=>!open);
       }
