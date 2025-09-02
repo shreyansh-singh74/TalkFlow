@@ -230,7 +230,7 @@ function CommandShortcut({
 export {
   Command,
   CommandDialog,
-  CommandResposiveDialog,
+  CommandResponsiveDialog,
   CommandInput,
   CommandList,
   CommandEmpty,
