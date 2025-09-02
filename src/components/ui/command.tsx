@@ -68,7 +68,7 @@ function CommandDialog({
   );
 }
 
-function CommandResposiveDialog({
+function CommandResponsiveDialog({
   title = "Command Palette",
   description = "Search for a command to run...",
   children,
