@@ -11,11 +11,10 @@ export const AgentsView = () => {
 };
 
 export const AgentsViewLoading = () => {
-    return(
-        <LoadingState 
-            title="Loading Agents"
-            description="This may take few seconds"
-        />
-
-    )
+  return (
+    <LoadingState
+      title="Loading Agents"
+      description="This may take few seconds"
+    />
+  );
 };
