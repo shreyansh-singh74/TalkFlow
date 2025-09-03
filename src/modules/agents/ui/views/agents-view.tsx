@@ -17,7 +17,7 @@ export const AgentsView = () => {
       {data.length === 0 && (
         <EmptyState 
           title="Create Your First Agent"
-          description="Create an agent to join your meeings. Each agent will follow your instrucions and can interac with participants during the call."
+          description="Create an agent to join your meetings. Each agent will follow your instructions and can interact with participants during the call."
         />
       )}
     </div>
