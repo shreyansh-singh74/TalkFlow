@@ -2,8 +2,8 @@
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "./ui/drawer";
-import { Dialog } from "@radix-ui/react-dialog";
-import { DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
+
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 
 interface ResponsiveDialogProps {
   title: string;
