@@ -17,9 +17,9 @@ import {
 } from "@/constants";
 
 export const agentsRouter = createTRPCRouter({
-  getOne: protectedProcedure
+  getOne: protectedProcedure 
     .input(z.object({ id: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input,ctx }) => {
       try {
         const [existingAgent] = await db
           .select({
@@ -28,11 +28,27 @@ export const agentsRouter = createTRPCRouter({
             ...getTableColumns(agents),
           })
           .from(agents)
-          .where(eq(agents.id, input.id));
-        return existingAgent || null;
+          .where(and(
+            eq(agents.id, input.id),
+            eq(agents.userId, ctx.auth.user.id)
+          ));
+
+          if(!existingAgent){
+            throw new TRPCError({code : "NOT_FOUND", message: "Agent not found"})
+          }
+
+        return existingAgent;
       } catch (error) {
         console.error("Database error:", error);
-        return null;
+        // Re-throw tRPC errors
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        // For other database errors, throw internal server error
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch agent"
+        });
       }
     }),
   getMany: protectedProcedure
