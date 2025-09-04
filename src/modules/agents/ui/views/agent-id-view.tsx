@@ -88,7 +88,7 @@ export const AgentsIdViewError = () => {
   return (
     <ErrorState
       title="Error Loading Agents"
-      description="Something went worng"
+      description="Something went wrong"
     />
   );
 };
