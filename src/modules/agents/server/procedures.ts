@@ -87,7 +87,7 @@ export const agentsRouter = createTRPCRouter({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to fetch agent",
-        });
+          });
       }
     }),
   getMany: protectedProcedure
