@@ -6,7 +6,7 @@ import {
   protectedProcedure,
 } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
-import { agentsInsertSchema } from "../schemas";
+import { agentsInsertSchema, agentsUpdateSchema } from "../schemas";
 import { z } from "zod";
 import { and, count, desc, eq, getTableColumns, ilike, sql } from "drizzle-orm";
 import {
@@ -17,9 +17,46 @@ import {
 } from "@/constants";
 
 export const agentsRouter = createTRPCRouter({
-  getOne: protectedProcedure 
+  update: protectedProcedure
+    .input(agentsUpdateSchema)
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...updateData } = input;
+      const [updatedAgent] = await db
+        .update(agents)
+        .set(updateData)
+        .where(
+          and(eq(agents.id, id), eq(agents.userId, ctx.auth.user.id))
+        )
+        .returning();
+      if (!updatedAgent) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Agent not found",
+        });
+      }
+      return updatedAgent;
+    }),
+
+  remove: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ input,ctx }) => {
+    .mutation(async ({ input, ctx }) => {
+      const [removedAgent] = await db
+        .delete(agents)
+        .where(
+          and(eq(agents.id, input.id), eq(agents.userId, ctx.auth.user.id))
+        )
+        .returning();
+      if (!removedAgent) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Agent not found",
+        });
+      }
+      return removedAgent;
+    }),
+  getOne: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input, ctx }) => {
       try {
         const [existingAgent] = await db
           .select({
@@ -28,14 +65,16 @@ export const agentsRouter = createTRPCRouter({
             ...getTableColumns(agents),
           })
           .from(agents)
-          .where(and(
-            eq(agents.id, input.id),
-            eq(agents.userId, ctx.auth.user.id)
-          ));
+          .where(
+            and(eq(agents.id, input.id), eq(agents.userId, ctx.auth.user.id))
+          );
 
-          if(!existingAgent){
-            throw new TRPCError({code : "NOT_FOUND", message: "Agent not found"})
-          }
+        if (!existingAgent) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Agent not found",
+          });
+        }
 
         return existingAgent;
       } catch (error) {
@@ -47,7 +86,7 @@ export const agentsRouter = createTRPCRouter({
         // For other database errors, throw internal server error
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch agent"
+          message: "Failed to fetch agent",
         });
       }
     }),
