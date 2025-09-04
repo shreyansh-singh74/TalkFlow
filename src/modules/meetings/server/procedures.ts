@@ -46,7 +46,7 @@ export const meetingsRouter = createTRPCRouter({
         // For other database errors, throw internal server error
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch agent",
+          message: "Failed to fetch meeting",
           });
       }
     }),
