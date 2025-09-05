@@ -22,17 +22,17 @@ import { CommandSelect } from "@/components/command-select";
 import { NameAvatar } from "@/components/name-avatar";
 import { NewAgentDialog } from "@/modules/agents/ui/components/new-agent-dialog";
 
-interface MettingFormProps {
+interface MeetingFormProps {
   onSuccess?: (id?: string) => void;
   onCancel?: () => void;
   initialValues?: MeetingGetOne;
 }
 
-export const MettingForm = ({
+export const MeetingForm = ({
   onSuccess,
   onCancel,
   initialValues,
-}: MettingFormProps) => {
+}: MeetingFormProps) => {
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
