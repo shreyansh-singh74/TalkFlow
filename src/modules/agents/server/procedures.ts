@@ -24,9 +24,7 @@ export const agentsRouter = createTRPCRouter({
       const [updatedAgent] = await db
         .update(agents)
         .set(updateData)
-        .where(
-          and(eq(agents.id, id), eq(agents.userId, ctx.auth.user.id))
-        )
+        .where(and(eq(agents.id, id), eq(agents.userId, ctx.auth.user.id)))
         .returning();
       if (!updatedAgent) {
         throw new TRPCError({
@@ -87,7 +85,7 @@ export const agentsRouter = createTRPCRouter({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to fetch agent",
-          });
+        });
       }
     }),
   getMany: protectedProcedure

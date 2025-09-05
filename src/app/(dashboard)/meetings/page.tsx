@@ -1,5 +1,9 @@
 import { auth } from "@/lib/auth";
-import { MeetingsView, MeetingsViewLoading } from "@/modules/meetings/ui/views/meetings-view";
+import { MeetingsListHeader } from "@/modules/meetings/ui/components/meetings-list-header";
+import {
+  MeetingsView,
+  MeetingsViewLoading,
+} from "@/modules/meetings/ui/views/meetings-view";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -19,9 +23,12 @@ const Page = async () => {
   }
 
   return (
-    <Suspense fallback={<MeetingsViewLoading />}>
-      <MeetingsView />
-    </Suspense>
+    <>
+      <MeetingsListHeader />
+      <Suspense fallback={<MeetingsViewLoading />}>
+        <MeetingsView />
+      </Suspense>
+    </>
   );
 };
 
