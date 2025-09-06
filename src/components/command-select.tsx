@@ -2,7 +2,11 @@ import { ReactNode, useState } from "react";
 import { Button } from "./ui/button";
 import { ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CommandInput, CommandItem, CommandResponsiveDialog } from "./ui/command";
+import {
+  CommandInput,
+  CommandItem,
+  CommandResponsiveDialog,
+} from "./ui/command";
 import { CommandEmpty, CommandList } from "cmdk";
 
 interface Props {
@@ -31,10 +35,15 @@ export const CommandSelect = ({
   const [open, setOpen] = useState(false);
   const selectedOption = options.find((option) => option.value === value);
 
+  const handleOpenChange = (open: boolean) => {
+    onSearch?.("");
+    setOpen(open);
+  };
+
   return (
     <>
       <Button
-        onClick={()=>setOpen(true)}
+        onClick={() => setOpen(true)}
         type="button"
         variant="outline"
         className={cn(
@@ -48,25 +57,29 @@ export const CommandSelect = ({
         </div>
         <ChevronDownIcon />
       </Button>
-      <CommandResponsiveDialog open={open} onOpenChange={setOpen} shouldFilter={!onSearch}>
+      <CommandResponsiveDialog
+        open={open}
+        onOpenChange={handleOpenChange}
+        shouldFilter={!onSearch}
+      >
         <CommandInput placeholder="Search..." onValueChange={onSearch} />
         <CommandList>
-            <CommandEmpty>
-                <span className="text-muted-foreground text-sm">
-                    No Options Found
-                </span>
-            </CommandEmpty>
-            {options.map((option)=>(
-                <CommandItem 
-                    key={option.id}
-                    onSelect={()=>{
-                        onSelect(option.value)
-                        setOpen(false);
-                    }}
-                    >
-                    {option.children}
-                </CommandItem>
-            ))}
+          <CommandEmpty>
+            <span className="text-muted-foreground text-sm">
+              No Options Found
+            </span>
+          </CommandEmpty>
+          {options.map((option) => (
+            <CommandItem
+              key={option.id}
+              onSelect={() => {
+                onSelect(option.value);
+                setOpen(false);
+              }}
+            >
+              {option.children}
+            </CommandItem>
+          ))}
         </CommandList>
       </CommandResponsiveDialog>
     </>
