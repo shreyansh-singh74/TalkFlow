@@ -1,0 +1,14 @@
+{
+  "name": "meet-ai",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["web"],
+  "scripts": {
+    "web": "cd web && pnpm dev",
+    "lint": "cd web && pnpm lint",
+    "format": "cd web && pnpm format"
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0"
+  }
+}
