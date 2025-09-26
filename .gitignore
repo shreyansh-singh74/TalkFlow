@@ -1,0 +1,14 @@
+node_modules/
+.vscode/
+__pycache__/
+*.pyc
+.env
+.idea/
+.DS_Store
+*.log
+*.sqlite3
+*.db
+*.egg-info/
+dist/
+build/
+.venv/
