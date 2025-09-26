@@ -4,7 +4,6 @@ import { streamVideo } from "@/lib/stream-video";
 import { CallSessionStartedEvent } from "@stream-io/node-sdk";
 import { and, eq, not } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
-import { unknown } from "zod";
 
 function verifySignatureWithSDK(body: string, signature: string): boolean {
   return streamVideo.verifyWebhook(body, signature);
