@@ -5,7 +5,6 @@ import {
   MeetingsView,
   MeetingsViewLoading,
 } from "@/modules/meetings/ui/views/meetings-view";
-import { getQueryClient, trpc } from "@/trpc/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SearchParams } from "nuqs";
@@ -25,13 +24,6 @@ const Page = async ({ searchParams }: Props) => {
   if (!session) {
     redirect("/sign-in");
   }
-
-  const queryClient = getQueryClient();
-  void queryClient.prefetchQuery(
-    trpc.meetings.getMany.queryOptions({
-      ...filters,
-    })
-  );
 
   return (
     <>

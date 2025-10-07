@@ -1,9 +1,45 @@
-import { inferRouterOutputs } from "@trpc/server";
-import type { AppRouter } from "@/trpc/routers/_app";
+// Direct type definitions instead of tRPC inference
+export type MeetingGetMany = Array<{
+  id: string;
+  name: string;
+  status: MeetingStatus;
+  agentId: string;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  startedAt: Date | null;
+  endedAt: Date | null;
+  agent: {
+    id: string;
+    name: string;
+    instructions: string;
+    userId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  duration: number | null;
+}>;
 
-export type MeetingGetMany =
-  inferRouterOutputs<AppRouter>["meetings"]["getMany"]["items"];
-export type MeetingGetOne = inferRouterOutputs<AppRouter>["meetings"]["getOne"];
+export type MeetingGetOne = {
+  id: string;
+  name: string;
+  status: MeetingStatus;
+  agentId: string;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  startedAt: Date | null;
+  endedAt: Date | null;
+  agent: {
+    id: string;
+    name: string;
+    instructions: string;
+    userId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  duration: number | null;
+};
 export enum MeetingStatus {
   Upcoming = "upcoming",
   Completed = "completed",

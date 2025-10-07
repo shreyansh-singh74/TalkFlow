@@ -2,8 +2,7 @@
 
 import { LoadingState } from "@/components/loading-state";
 import { ErrorState } from "@/components/error-state";
-import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
+import { useMeetings } from "@/hooks/use-api";
 import { DataTable } from "@/components/data-table";
 import { columns } from "../components/columns";
 import { EmptyState } from "@/components/empty-state";
@@ -13,14 +12,9 @@ import { DataPagination } from "@/components/data-pagination";
 
 export const MeetingsView = () => {
   const router = useRouter();
-  const trpc = useTRPC();
   const [filters, setFilters] = useMeetingsFilter();
 
-  const { data, isLoading, error } = useQuery(
-    trpc.meetings.getMany.queryOptions({
-      ...filters,
-    })
-  );
+  const { data, isLoading, error } = useMeetings(filters);
 
   if (isLoading) {
     return <MeetingsViewLoading />;

@@ -1,4 +1,3 @@
-import { StreamTheme, useCall } from "@stream-io/video-react-sdk";
 import { useState } from "react";
 import { CallLobby } from "./call-loby";
 import { CallActive } from "./call-active";
@@ -9,25 +8,25 @@ interface Props {
 }
 
 export const CallUI = ({ meetingName }: Props) => {
-  const call = useCall();
   const [show, setShow] = useState<"lobby" | "call" | "ended">("lobby");
 
   const handleJoin = async () => {
-    if (!call) return;
-    await call.join();
+    // TODO: Implement custom WebRTC join logic
+    console.log("Joining WebRTC call");
     setShow("call");
   };
+  
   const handleLeave = async () => {
-    if (!call) return;
-
-    call.endCall();
+    // TODO: Implement custom WebRTC leave logic
+    console.log("Leaving WebRTC call");
     setShow("ended");
   };
+  
   return (
-    <StreamTheme className="h-full">
+    <div className="h-full">
       {show == "lobby" && <CallLobby onJoin={handleJoin} />}
       {show == "call" && <CallActive onLeave={handleLeave} meetingName={meetingName} />}
       {show == "ended" && <CallEnded />} 
-    </StreamTheme>
+    </div>
   );
 };

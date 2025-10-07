@@ -1,7 +1,5 @@
-import { useTRPC } from "@/trpc/client";
 import { AgentGetOne } from "../../types";
 import { useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { agentsInsertSchema } from "../../schemas";
@@ -19,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { NameAvatar } from "@/components/name-avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useCreateAgent, useUpdateAgent } from "@/hooks/use-api";
 
 interface AgentFormProps {
   onSuccess?: () => void;
@@ -31,40 +30,26 @@ export const AgentForm = ({
   onCancel,
   initialValues,
 }: AgentFormProps) => {
-  const trpc = useTRPC();
   const router = useRouter();
-  const queryClient = useQueryClient();
 
-  const createAgent = useMutation(
-    trpc.agents.create.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(trpc.agents.getMany.queryOptions({}));
-        onSuccess?.();
-      },
-      onError: (error) => {
-        toast.error(error.message);
-        console.error("Failed to create agent:", error);
-      },
-    })
-  );
+  const createAgent = useCreateAgent();
+  const updateAgent = useUpdateAgent();
 
-  const updateAgent = useMutation(
-    trpc.agents.update.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(trpc.agents.getMany.queryOptions({}));
-        if (initialValues?.id) {
-          queryClient.invalidateQueries(
-            trpc.agents.getOne.queryOptions({ id: initialValues.id })
-          );
-        }
-        onSuccess?.();
-      },
-      onError: (error) => {
-        toast.error(error.message);
-        console.error("Failed to update agent:", error);
-      },
-    })
-  );
+  // Handle success and error for create
+  if (createAgent.isSuccess) {
+    onSuccess?.();
+  }
+  if (createAgent.isError) {
+    toast.error(createAgent.error?.message || "Failed to create agent");
+  }
+
+  // Handle success and error for update
+  if (updateAgent.isSuccess) {
+    onSuccess?.();
+  }
+  if (updateAgent.isError) {
+    toast.error(updateAgent.error?.message || "Failed to update agent");
+  }
 
   const form = useForm<z.infer<typeof agentsInsertSchema>>({
     resolver: zodResolver(agentsInsertSchema),

@@ -1,7 +1,6 @@
 "use client";
 import { LoadingState } from "@/components/loading-state";
-import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
+import { useAgents } from "@/hooks/use-api";
 import { columns } from "../components/columns";
 import { EmptyState } from "@/components/empty-state";
 import { useAgentsFilter } from "../../hooks/use-agents-filter";
@@ -13,12 +12,7 @@ export const AgentsView = () => {
   const router = useRouter();
   const [filters, setFilters] = useAgentsFilter();
 
-  const trpc = useTRPC();
-  const { data, isLoading, isError } = useQuery(
-    trpc.agents.getMany.queryOptions({
-      ...filters,
-    })
-  );
+  const { data, isLoading, isError } = useAgents(filters);
 
   if (isLoading) {
     return <AgentsViewLoading />;

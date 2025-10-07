@@ -1,20 +1,16 @@
-import { useTRPC } from "@/trpc/client";
+import { useAgents } from "@/hooks/use-api";
 import { useMeetingsFilter } from "../../hooks/use-meetings-filter";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { CommandSelect } from "@/components/command-select";
 import { NameAvatar } from "@/components/name-avatar";
 
 export const AgentIdFilter = () => {
     const [filters,setFilters] = useMeetingsFilter();
-    const trpc = useTRPC();
     const [agentSearch, setAgentSearch] = useState("");
-    const {data} = useQuery(
-        trpc.agents.getMany.queryOptions({
-            pageSize: 100,
-            search: agentSearch,
-        })
-    );
+    const {data} = useAgents({
+        pageSize: 100,
+        search: agentSearch,
+    });
 
     return(
         <CommandSelect 

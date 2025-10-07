@@ -1,5 +1,20 @@
-import { inferRouterOutputs } from "@trpc/server";
-import type { AppRouter } from "@/trpc/routers/_app";
+// Direct type definitions instead of tRPC inference
+export type AgentGetMany = Array<{
+  id: string;
+  name: string;
+  instructions: string;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  meetingCount: number;
+}>;
 
-export type AgentGetMany = inferRouterOutputs<AppRouter>["agents"]["getMany"]["items"];
-export type AgentGetOne = inferRouterOutputs<AppRouter>["agents"]["getOne"];
+export type AgentGetOne = {
+  id: string;
+  name: string;
+  instructions: string;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  meetingCount: number;
+};

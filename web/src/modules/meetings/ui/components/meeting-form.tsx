@@ -1,4 +1,3 @@
-import { useTRPC } from "@/trpc/client";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -21,6 +20,7 @@ import { useState } from "react";
 import { CommandSelect } from "@/components/command-select";
 import { NameAvatar } from "@/components/name-avatar";
 import { NewAgentDialog } from "@/modules/agents/ui/components/new-agent-dialog";
+import { useAgents, useCreateMeeting, useUpdateMeeting } from "@/hooks/use-api";
 
 interface MeetingFormProps {
   onSuccess?: (id?: string) => void;
@@ -33,50 +33,35 @@ export const MeetingForm = ({
   onCancel,
   initialValues,
 }: MeetingFormProps) => {
-  const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const [openNewAgentDialog, setOpenNewAgentDialog] = useState(false);
   const [agentSearch, setAgentSearch] = useState("");
 
-  const agents = useQuery(
-    trpc.agents.getMany.queryOptions({
-      pageSize: 100,
-      search: agentSearch,
-    })
-  );
+  const agents = useAgents({
+    pageSize: 100,
+    search: agentSearch,
+  });
 
-  const createMeeting = useMutation(
-    trpc.meetings.create.mutationOptions({
-      onSuccess: async (data) => {
-        queryClient.invalidateQueries(trpc.meetings.getMany.queryOptions({}));
-        onSuccess?.(data.id);
-      },
-      onError: (error) => {
-        toast.error(error.message);
-        console.error("Failed to create meeting:", error);
-      },
-    })
-  );
+  const createMeeting = useCreateMeeting();
+  const updateMeeting = useUpdateMeeting();
 
-  const updateMeeting = useMutation(
-    trpc.meetings.update.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(trpc.meetings.getMany.queryOptions({}));
-        if (initialValues?.id) {
-          queryClient.invalidateQueries(
-            trpc.meetings.getOne.queryOptions({ id: initialValues.id })
-          );
-        }
-        onSuccess?.();
-      },
-      onError: (error) => {
-        toast.error(error.message);
-        console.error("Failed to update Meeting:", error);
-      },
-    })
-  );
+  // Handle success and error for create
+  if (createMeeting.isSuccess) {
+    onSuccess?.(createMeeting.data?.id);
+  }
+  if (createMeeting.isError) {
+    toast.error(createMeeting.error?.message || "Failed to create meeting");
+  }
+
+  // Handle success and error for update
+  if (updateMeeting.isSuccess) {
+    onSuccess?.();
+  }
+  if (updateMeeting.isError) {
+    toast.error(updateMeeting.error?.message || "Failed to update meeting");
+  }
 
   const form = useForm<z.infer<typeof meetingsInsertSchema>>({
     resolver: zodResolver(meetingsInsertSchema),

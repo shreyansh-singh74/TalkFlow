@@ -1,12 +1,7 @@
 "use client";
 
 import { LoadingState } from "@/components/loading-state";
-import { useTRPC } from "@/trpc/client";
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useMeeting, useDeleteMeeting } from "@/hooks/use-api";
 import { MeetingIdViewHeader } from "../components/meeting-id-view-header";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "../../hooks/use-confirm";
@@ -16,35 +11,49 @@ import { UpcomingState } from "../components/upcoming-state";
 import { ActiveState } from "../components/active-state";
 import { CancelledState } from "../components/cancelled-state";
 import { ProcessingState } from "../components/processing-state";
+import { toast } from "sonner";
 
 interface Props {
   meetingId: string;
 }
 
 export const MeetingIdView = ({ meetingId }: Props) => {
-  const trpc = useTRPC();
   const router = useRouter();
-  const { data } = useSuspenseQuery(
-    trpc.meetings.getOne.queryOptions({ id: meetingId })
-  );
+  const { data, isLoading, error } = useMeeting(meetingId);
   const [updateMeetingDialogOpen, setUpdateMeetingDialogOpen] = useState(false);
+  const removeMeeting = useDeleteMeeting();
 
+  // Always call hooks unconditionally at the top-level
   const [RemoveConfirmation, confirmRemove] = useConfirm(
     "Are you sure?",
     "The following action will remove this meeting"
   );
 
-  const queryClient = useQueryClient();
+  // Handle success and error for delete
+  if (removeMeeting.isSuccess) {
+    router.push("/meetings");
+    toast.success("Meeting deleted successfully");
+  }
+  if (removeMeeting.isError) {
+    toast.error(removeMeeting.error?.message || "Failed to delete meeting");
+  }
 
-  const removeMeeting = useMutation(
-    trpc.meetings.remove.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(trpc.meetings.getMany.queryOptions({}));
-        // TODO: Invalidate free tier usage
-        router.push("/meetings");
-      },
-    })
-  );
+  if (isLoading) {
+    return <LoadingState title="Loading Meeting" description="This may take a few seconds" />;
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold">Failed to Load Meeting</h2>
+          <p className="text-gray-600">Could not load the meeting details. Please try again.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // removeMeeting is already defined above with useDeleteMeeting
 
   const handleRemoveMeeting = async () => {
     const ok = await confirmRemove();

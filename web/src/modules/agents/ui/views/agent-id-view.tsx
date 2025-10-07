@@ -1,8 +1,7 @@
 "use client";
 import { ErrorState } from "@/components/error-state";
 import { LoadingState } from "@/components/loading-state";
-import { useTRPC } from "@/trpc/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAgent, useDeleteAgent } from "@/hooks/use-api";
 import { AgentIdViewHeader } from "../components/agent-id-view-header";
 import { NameAvatar } from "@/components/name-avatar";
 import { Badge } from "@/components/ui/badge";
@@ -20,25 +19,17 @@ interface Props {
 export const AgentIdView = ({ agentId }: Props) => {
   const [updateAgentDialogOpen,setUpdateAgentDialogOpen] = useState(false);
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const trpc = useTRPC();
-  const { data, isLoading, error } = useQuery(
-    trpc.agents.getOne.queryOptions({ id: agentId })
-  );
+  const { data, isLoading, error } = useAgent(agentId);
+  const removeAgent = useDeleteAgent();
 
-  const removeAgent = useMutation(
-    trpc.agents.remove.mutationOptions({
-      onSuccess: async () => {
-        await queryClient.invalidateQueries(
-          trpc.agents.getMany.queryOptions({})
-        );
-        router.push("/agents");
-      },
-      onError: (error) => {
-        toast.error(error?.message);
-      },
-    })
-  );
+  // Handle success and error for delete
+  if (removeAgent.isSuccess) {
+    router.push("/agents");
+    toast.success("Agent deleted successfully");
+  }
+  if (removeAgent.isError) {
+    toast.error(removeAgent.error?.message || "Failed to delete agent");
+  }
 
   const [RemoveConfirmation, confirmRemove] = useConfirm(
     "Are you sure",

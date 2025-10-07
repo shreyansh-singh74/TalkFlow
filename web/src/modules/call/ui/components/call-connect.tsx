@@ -1,15 +1,6 @@
-import { useTRPC } from "@/trpc/client";
-import {
-  Call,
-  CallingState,
-  StreamCall,
-  StreamVideo,
-  StreamVideoClient,
-} from "@stream-io/video-react-sdk";
-import { useMutation } from "@tanstack/react-query";
 import { LoaderIcon } from "lucide-react";
-import { useEffect, useState } from "react";
 import { CallUI } from "./call-ui";
+import { useGenerateToken } from "@/hooks/use-api";
 
 interface Props {
   meetingId: string;
@@ -26,61 +17,20 @@ export const CallConnect = ({
   userName,
   userImage,
 }: Props) => {
-  const trpc = useTRPC();
-  const { mutateAsync: generateToken } = useMutation(
-    trpc.meetings.generateToken.mutationOptions()
-  );
-  const [client, setClient] = useState<StreamVideoClient>();
-
-  useEffect(() => {
-    const _client = new StreamVideoClient({
-      apiKey: process.env.NEXT_PUBLIC_STREAM_VIDEO_API_KEY!,
-      user: {
-        id: userId,
-        name: userName,
-        image: userImage,
-      },
-      tokenProvider: generateToken,
-    });
-    setClient(_client);
-
-    return () => {
-      _client.disconnectUser();
-      setClient(undefined);
-    };
-  }, [userId, userName, userImage, generateToken]);
-
-  const [call, setCall] = useState<Call>();
-
-  useEffect(() => {
-    if (!client) return;
-    const _call = client.call("default", meetingId);
-    _call.camera.disable();
-    _call.microphone.disable();
-    setCall(_call);
-
-    return () => {
-      if (_call.state.callingState !== CallingState.LEFT) {
-        _call.leave();
-        _call.endCall();
-        setCall(undefined);
-      }
-    };
-  }, [client, meetingId]);
-
-  if (!client || !call) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <LoaderIcon className="animate-spin" />
-      </div>
-    );
-  }
-
+  const generateToken = useGenerateToken();
+  
+  // TODO: Implement custom WebRTC connection logic
+  // This will be replaced with your own WebRTC implementation
+  
   return (
-    <StreamVideo client={client}>
-      <StreamCall call={call}>
-        <CallUI meetingName={meetingName} />
-      </StreamCall>
-    </StreamVideo>
+    <div className="flex flex-col h-full">
+      <div className="p-4 bg-gray-100">
+        <h3 className="text-lg font-semibold">WebRTC Call</h3>
+        <p className="text-sm text-gray-600">Meeting: {meetingName}</p>
+        <p className="text-sm text-gray-600">User: {userName}</p>
+        <p className="text-sm text-gray-600">Meeting ID: {meetingId}</p>
+      </div>
+      <CallUI meetingName={meetingName} />
+    </div>
   );
 };
