@@ -2,19 +2,27 @@
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import { GeneratedAvatarUri } from "@/lib/avatar";
-import { LogInIcon } from "lucide-react";
+import { LogInIcon, Mic, MicOff, Camera, CameraOff, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { useWebRTC } from "@/hooks/use-webrtc";
 
 interface Props {
   onJoin: () => void;
+  attachLocalStream: (el: HTMLVideoElement | null) => void;
+  requestMedia: () => Promise<void>;
+  localStream: MediaStream | null;
+  isFetching: boolean;
+  error: string | null;
+  isCameraOn: boolean;
+  isMicOn: boolean;
+  toggleCamera: () => void;
+  toggleMic: () => void;
 }
 
-export const CallLobby = ({ onJoin }: Props) => {
+export const CallLobby = ({ onJoin, attachLocalStream, requestMedia, localStream, isFetching, error, isCameraOn, isMicOn, toggleCamera, toggleMic }: Props) => {
   const { data } = authClient.useSession();
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const { attachLocalStream, isFetching, error, requestMedia, localStream } = useWebRTC({ video: true, audio: true });
 
   useEffect(() => {
     attachLocalStream(videoRef.current);
@@ -29,14 +37,29 @@ export const CallLobby = ({ onJoin }: Props) => {
             <p className="text-sm">Set up your call before joining</p>
           </div>
           
-          <div className="w-64 h-48 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-              autoPlay
-            />
+          <div className="w-64 h-48 bg-black rounded-lg flex items-center justify-center overflow-hidden relative">
+            {localStream && isCameraOn ? (
+              <video
+                ref={videoRef}
+                className="w-full h-full object-cover"
+                muted
+                playsInline
+                autoPlay
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center text-white/80">
+                <CameraOff className="w-10 h-10 mb-2" />
+                <p className="text-xs">Camera is off</p>
+              </div>
+            )}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-3 py-1">
+              <Button variant="ghost" size="icon" onClick={toggleMic} className="h-8 w-8 text-white">
+                {isMicOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+              </Button>
+              <Button variant="ghost" size="icon" onClick={toggleCamera} className="h-8 w-8 text-white">
+                {isCameraOn ? <Camera className="h-4 w-4" /> : <CameraOff className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
           {error && (
             <p className="text-sm text-red-500">{error}</p>
@@ -44,7 +67,9 @@ export const CallLobby = ({ onJoin }: Props) => {
           
           <div className="flex gap-x-2">
             <Button variant="outline" size="sm" onClick={() => requestMedia()} disabled={isFetching}>
-              {localStream ? "Refresh Preview" : "Allow Camera & Mic"}
+              {!localStream ? "Allow Camera & Mic" : (
+                <span className="inline-flex items-center gap-2"><RefreshCw className="h-4 w-4" /> Refresh Preview</span>
+              )}
             </Button>
           </div>
           

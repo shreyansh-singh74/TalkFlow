@@ -74,12 +74,7 @@ export function useWebRTC(options: UseWebRTCOptions = {}): UseWebRTCReturn {
     };
   }, [stopTracks]);
 
-  // When constraints change (toggle camera/mic), refresh only if we already have a stream
-  useEffect(() => {
-    if (streamRef.current) {
-      void refreshStream();
-    }
-  }, [isCameraOn, isMicOn, refreshStream]);
+  // Do NOT re-request media on toggle; only (re)request when explicitly asked
 
   const requestMedia = useCallback(async () => {
     await refreshStream();
@@ -94,11 +89,29 @@ export function useWebRTC(options: UseWebRTCOptions = {}): UseWebRTCReturn {
   }, [localStream]);
 
   const toggleCamera = useCallback(() => {
-    setIsCameraOn((v) => !v);
+    setIsCameraOn((v) => {
+      const next = !v;
+      const stream = streamRef.current;
+      if (stream) {
+        stream.getVideoTracks().forEach((t) => {
+          t.enabled = next;
+        });
+      }
+      return next;
+    });
   }, []);
 
   const toggleMic = useCallback(() => {
-    setIsMicOn((v) => !v);
+    setIsMicOn((v) => {
+      const next = !v;
+      const stream = streamRef.current;
+      if (stream) {
+        stream.getAudioTracks().forEach((t) => {
+          t.enabled = next;
+        });
+      }
+      return next;
+    });
   }, []);
 
   const stopAll = useCallback(() => {
