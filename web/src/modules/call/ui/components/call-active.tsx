@@ -104,15 +104,14 @@ export const CallActive = ({
             )}
           </div>
 
-          <div className="flex flex-col gap-y-4 h-40 bg-[#1a1a1a] rounded-lg p-4 w-[900px]">
-            <h1 className="text-lg font-medium">Here The Correct Pronounciation will come</h1>
-            <p className="text-sm">Here The Correct Pronounciation will come</p>
+          <div className="flex flex-col items-center justify-center gap-y-4 h-40 bg-[#1a1a1a] rounded-lg p-4 w-[900px] mt-4">
+            <h1 className="text-lg font-medium text-center">Here The Correct Pronounciation will come</h1>
+            <p className="text-sm text-center">Here The Correct Pronounciation will come</p>
           </div>
-        
         </div>
 
         {/* Right: Meta pane */}
-        <div className="flex-1 flex items-center justify-center bg-white/10 rounded-lg relative px-4 py-4 mt-4 ">
+        <div className="flex-1 flex items-center justify-center bg-white/10 rounded-lg relative px-4 py-4 mt-4">
           <div className="flex flex-col items-center justify-center">
             <h4 className="text-base">{meetingName}</h4>
             <p className="text-sm">{meetingName}</p>
