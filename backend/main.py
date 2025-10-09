@@ -9,7 +9,7 @@ from faster_whisper import WhisperModel
 import google.generativeai as genai
 from typing import Optional
 
-app = FastAPI(title="LinguaLive Backend", version="1.0.0")
+app = FastAPI(title="TalkFlow Backend", version="1.0.0")
 
 # Configure CORS
 app.add_middleware(
@@ -45,7 +45,7 @@ def ffmpeg_to_wav(in_path: str, out_path: str):
 
 @app.get("/")
 async def root():
-    return {"message": "LinguaLive Backend is running!", "status": "healthy"}
+    return {"message": "TalkFlow Backend is running!", "status": "healthy"}
 
 @app.get("/health")
 async def health_check():
