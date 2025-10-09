@@ -127,19 +127,20 @@ Choose the right model for your needs:
 
 ## Screenshots
 
-*Images will be added here showing the application interface, dashboard, and key features.*
-
 ### Dashboard Overview
-![Dashboard](docs/screenshots/dashboard.png)
+![Dashboard](web/images/dashboard.png)
 
-### AI Tutor Creation
-![Create Agent](docs/screenshots/create-agent.png)
+### AI Tutors Management
+![AI Tutors](web/images/agents.png)
 
-### Pronunciation Practice
-![Practice Session](docs/screenshots/practice-session.png)
+### Meetings & Sessions
+![Meetings](web/images/meetings.png)
 
-### Progress Tracking
-![Progress Analytics](docs/screenshots/progress-analytics.png)
+### Sign In
+![Sign In](web/images/login.png)
+
+### Sign Up
+![Sign Up](web/images/signup.png)
 
 ## Troubleshooting
 
