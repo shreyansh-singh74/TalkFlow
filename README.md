@@ -142,24 +142,6 @@ Choose the right model for your needs:
 ### Sign Up
 ![Sign Up](web/images/signup.png)
 
-## Troubleshooting
-
-### Common Issues
-
-**Audio not recording:**
-- Ensure microphone permissions are granted
-- Check browser compatibility (Chrome/Firefox recommended)
-- Verify HTTPS in production environments
-
-**Transcription errors:**
-- Speak clearly and at moderate pace
-- Reduce background noise
-- Try different Whisper models
-
-**API errors:**
-- Verify your Gemini API key is correct
-- Check rate limits (15 requests/minute for free tier)
-- Ensure stable internet connection
 
 ## Project Structure
 
@@ -199,9 +181,6 @@ We welcome contributions! Please follow these steps:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 
@@ -210,11 +189,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [FastAPI](https://fastapi.tiangolo.com/) for the backend framework
 - [Next.js](https://nextjs.org/) for the frontend framework
 
-## Support
-
-- Email: support@talkflow.com
-- Documentation: [docs.talkflow.com](https://docs.talkflow.com)
-
----
 
 Start your language learning journey today!
