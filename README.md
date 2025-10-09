@@ -1,44 +1,43 @@
 # TalkFlow
 
-> **AI-Powered Language Learning Platform** - Practice pronunciation with personalized AI tutors and track your progress through interactive meetings.
+> AI-Powered Language Learning Platform - Practice pronunciation with personalized AI tutors and track your progress through interactive meetings.
 
-## 🌟 Overview
+## Overview
 
 TalkFlow is a comprehensive language learning platform that combines AI-powered pronunciation feedback with an intuitive dashboard for managing learning sessions. Create custom AI tutors, schedule practice meetings, and get real-time feedback on your pronunciation using advanced speech recognition and AI technology.
 
-## ✨ Key Features
+## Features
 
-- 🤖 **Custom AI Tutors** - Create personalized language learning agents with custom instructions
-- 🎤 **Real-time Pronunciation Feedback** - Get instant feedback using OpenAI Whisper and Google Gemini
-- 📅 **Meeting Management** - Schedule, track, and manage your learning sessions
-- 📊 **Progress Tracking** - Monitor your improvement with detailed session analytics
-- 🔐 **User Authentication** - Secure login and user management system
-- 📱 **Responsive Design** - Works seamlessly on desktop and mobile devices
+- **Custom AI Tutors** - Create personalized language learning agents with custom instructions
+- **Real-time Pronunciation Feedback** - Get instant feedback using OpenAI Whisper and Google Gemini
+- **Meeting Management** - Schedule, track, and manage your learning sessions
+- **Progress Tracking** - Monitor your improvement with detailed session analytics
+- **User Authentication** - Secure login and user management system
+- **Responsive Design** - Works seamlessly on desktop and mobile devices
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
-- **Next.js 15** with React 19
-- **TypeScript** for type safety
-- **Tailwind CSS** for styling
-- **Radix UI** components
-- **Better Auth** for authentication
-- **Drizzle ORM** for database management
+- Next.js 15 with React 19
+- TypeScript for type safety
+- Tailwind CSS for styling
+- Radix UI components
+- Better Auth for authentication
+- Drizzle ORM for database management
 
 ### Backend
-- **FastAPI** for API development
-- **OpenAI Whisper** for speech-to-text transcription
-- **Google Gemini** for AI-powered feedback
-- **Python 3.12** with async support
+- FastAPI for API development
+- OpenAI Whisper for speech-to-text transcription
+- Google Gemini for AI-powered feedback
+- Python 3.12 with async support
 
-## 🚀 Quick Start
+## Prerequisites
 
-### Prerequisites
 - Node.js 18+ and npm
 - Python 3.12+
 - ffmpeg (for audio processing)
 
-### Installation
+## Installation
 
 1. **Clone the repository**
    ```bash
@@ -46,15 +45,26 @@ TalkFlow is a comprehensive language learning platform that combines AI-powered 
    cd TalkFlow
    ```
 
-2. **Run the setup script**
+2. **Install dependencies**
+   
+   **Backend:**
    ```bash
-   chmod +x setup.sh
-   ./setup.sh
+   cd backend
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+   
+   **Frontend:**
+   ```bash
+   cd web
+   npm install
    ```
 
 3. **Configure environment variables**
+   
+   Create a `.env` file in the root directory:
    ```bash
-   # Create .env file in the root directory
    GEMINI_API_KEY="your-gemini-api-key-here"
    WHISPER_MODEL="tiny"  # Options: tiny, base, small, medium, large
    ```
@@ -64,7 +74,7 @@ TalkFlow is a comprehensive language learning platform that combines AI-powered 
    **Backend:**
    ```bash
    cd backend
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   source venv/bin/activate
    python main.py
    ```
    
@@ -78,7 +88,7 @@ TalkFlow is a comprehensive language learning platform that combines AI-powered 
    - Main app: http://localhost:3000
    - Test recorder: http://localhost:3000/test-recorder
 
-## 📖 How It Works
+## How It Works
 
 1. **Create an Account** - Sign up and create your profile
 2. **Build AI Tutors** - Create custom language learning agents with specific instructions
@@ -86,7 +96,7 @@ TalkFlow is a comprehensive language learning platform that combines AI-powered 
 4. **Practice Pronunciation** - Record audio and receive real-time feedback
 5. **Track Progress** - Monitor your improvement over time
 
-## 🎯 Getting Started Guide
+## Getting Started
 
 ### Creating Your First AI Tutor
 1. Navigate to the Agents section
@@ -101,7 +111,7 @@ TalkFlow is a comprehensive language learning platform that combines AI-powered 
 4. Stop recording to receive AI feedback
 5. Review pronunciation tips and practice suggestions
 
-## 🔧 Configuration
+## Configuration
 
 ### Whisper Models
 Choose the right model for your needs:
@@ -115,7 +125,23 @@ Choose the right model for your needs:
 - **Gemini API**: Get your free API key from [Google AI Studio](https://ai.google.dev/)
 - **Rate Limits**: Free tier includes 15 requests per minute
 
-## 🐛 Troubleshooting
+## Screenshots
+
+*Images will be added here showing the application interface, dashboard, and key features.*
+
+### Dashboard Overview
+![Dashboard](docs/screenshots/dashboard.png)
+
+### AI Tutor Creation
+![Create Agent](docs/screenshots/create-agent.png)
+
+### Pronunciation Practice
+![Practice Session](docs/screenshots/practice-session.png)
+
+### Progress Tracking
+![Progress Analytics](docs/screenshots/progress-analytics.png)
+
+## Troubleshooting
 
 ### Common Issues
 
@@ -134,7 +160,7 @@ Choose the right model for your needs:
 - Check rate limits (15 requests/minute for free tier)
 - Ensure stable internet connection
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 TalkFlow/
@@ -150,33 +176,19 @@ TalkFlow/
 │   │   ├── lib/          # Utilities and configurations
 │   │   └── db/           # Database schema
 │   └── package.json
-├── setup.sh               # Automated setup script
+├── docs/                   # Documentation and screenshots
+│   └── screenshots/       # UI screenshots
 └── README.md
 ```
 
-## 🚀 Deployment
-
-### Production Setup
-1. Set up environment variables for production
-2. Configure HTTPS for microphone access
-3. Use a production-grade database
-4. Implement proper error handling and logging
-5. Set up monitoring and analytics
-
-### Docker Support
-```bash
-# Build and run with Docker Compose
-docker-compose up --build
-```
-
-## 📊 Performance
+## Performance
 
 - **Transcription Speed**: ~2-5 seconds for 10-second audio
 - **API Response Time**: <500ms for feedback generation
 - **Supported Audio Formats**: WebM, MP3, WAV
 - **Browser Support**: Chrome, Firefox, Safari, Edge
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please follow these steps:
 
@@ -186,23 +198,22 @@ We welcome contributions! Please follow these steps:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [OpenAI Whisper](https://github.com/openai/whisper) for speech recognition
 - [Google Gemini](https://ai.google.dev/) for AI-powered feedback
 - [FastAPI](https://fastapi.tiangolo.com/) for the backend framework
 - [Next.js](https://nextjs.org/) for the frontend framework
 
-## 📞 Support
+## Support
 
-- 📧 Email: support@lingualive.com
-- 💬 Discord: [Join our community](https://discord.gg/lingualive)
-- 📖 Documentation: [docs.lingualive.com](https://docs.lingualive.com)
+- Email: support@talkflow.com
+- Documentation: [docs.talkflow.com](https://docs.talkflow.com)
 
 ---
 
-**Start your language learning journey today! 🎓**
+Start your language learning journey today!
