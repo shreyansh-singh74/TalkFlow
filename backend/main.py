@@ -14,7 +14,7 @@ app = FastAPI(title="TalkFlow Backend", version="1.0.0")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3002"],  # Add your frontend URLs
+    allow_origins=["http://localhost:3000", "http://localhost:3002", "http://localhost:3001"],  # Add your frontend URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -22,10 +22,12 @@ app.add_middleware(
 
 # Configure Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY environment variable is required")
-
-genai.configure(api_key=GEMINI_API_KEY)
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    print("Gemini AI configured successfully!")
+else:
+    print("⚠️  GEMINI_API_KEY not found. AI feedback features will be disabled.")
+    print("   Get your API key from: https://ai.google.dev/")
 
 # Load faster-whisper model once at startup (CPU-friendly)
 # Options: tiny, base, small, medium, large-v3. Prefer tiny/base for CPU.
@@ -94,6 +96,14 @@ async def transcribe_and_reply(audio: UploadFile = File(...)):
             }
         
         # Call Gemini (chat) to generate a reply
+        if not GEMINI_API_KEY:
+            return {
+                "transcript": transcript,
+                "reply": "✨ Great job! I transcribed your speech successfully. To get AI-powered pronunciation feedback, please add your GEMINI_API_KEY to the .env file. Get your free API key from: https://ai.google.dev/",
+                "success": True,
+                "info": "AI feedback disabled - no API key"
+            }
+        
         print("Calling Gemini...")
         model = genai.GenerativeModel("gemini-1.5-flash")
         chat = model.start_chat()
@@ -139,4 +149,4 @@ Reply in plain text, be encouraging and helpful."""
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
