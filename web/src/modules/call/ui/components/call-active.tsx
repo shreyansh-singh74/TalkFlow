@@ -2,7 +2,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useWebRTC } from "@/hooks/use-webrtc";
-import { Mic, MicOff, Camera, CameraOff, PhoneOff } from "lucide-react";
+import { Mic, MicOff, Camera, CameraOff, PhoneOff, Radio, Square } from "lucide-react";
+import { useCallTranscription } from "@/hooks/use-call-transcription";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Props {
   onLeave: () => void;
@@ -31,6 +33,32 @@ export const CallActive = ({
   toggleCamera,
   toggleMic,
 }: Props) => {
+  const {
+    recording,
+    processing,
+    transcripts,
+    error: transcriptionError,
+    startRecording,
+    stopRecording,
+    clearTranscripts,
+  } = useCallTranscription();
+
+  const handleTranscriptionToggle = async () => {
+    if (recording) {
+      await stopRecording();
+    } else {
+      await startRecording();
+    }
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
   return (
     <div className="flex flex-col justify-between p-4 h-full text-white">
       <div className="bg-[#101213] rounded-full flex items-center gap-4">
@@ -104,9 +132,89 @@ export const CallActive = ({
             )}
           </div>
 
-          <div className="flex flex-col items-center justify-center gap-y-4 h-40 bg-[#1a1a1a] rounded-lg p-4 w-[900px] mt-4">
-            <h1 className="text-lg font-medium text-center">Here The Correct Pronounciation will come</h1>
-            <p className="text-sm text-center">Here The Correct Pronounciation will come</p>
+          {/* Transcription Section */}
+          <div className="flex flex-col gap-y-4 bg-[#1a1a1a] rounded-lg p-4 w-full max-w-4xl mt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Radio className="h-5 w-5" />
+                <h2 className="text-lg font-medium">Live Transcription</h2>
+                {processing && (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {transcripts.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearTranscripts}
+                    className="text-xs"
+                  >
+                    Clear
+                  </Button>
+                )}
+                <Button
+                  variant={recording ? "destructive" : "secondary"}
+                  size="sm"
+                  onClick={handleTranscriptionToggle}
+                  disabled={processing}
+                  className="flex items-center gap-2"
+                >
+                  {recording ? (
+                    <>
+                      <Square className="h-4 w-4" />
+                      Stop Recording
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="h-4 w-4" />
+                      Start Recording
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {transcriptionError && (
+              <div className="p-2 bg-red-500/20 border border-red-500/50 rounded-md">
+                <p className="text-sm text-red-200">{transcriptionError}</p>
+              </div>
+            )}
+
+            {recording && (
+              <div className="flex items-center gap-2 p-2 bg-red-500/20 border border-red-500/50 rounded-md animate-pulse">
+                <div className="h-2 w-2 bg-red-500 rounded-full" />
+                <p className="text-sm text-red-200">Recording in progress...</p>
+              </div>
+            )}
+
+            <ScrollArea className="h-32 w-full rounded-md border border-white/10 p-3">
+              {transcripts.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-sm text-gray-400">
+                    {recording 
+                      ? "Speak now... Your voice will be transcribed when you stop recording."
+                      : "Click 'Start Recording' to begin transcription"}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {transcripts.map((transcript) => (
+                    <div 
+                      key={transcript.id} 
+                      className="p-2 bg-white/5 rounded-md border border-white/10"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <span className="text-xs text-gray-400">
+                          {formatTime(transcript.timestamp)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-white">{transcript.text}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
           </div>
         </div>
 

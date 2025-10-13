@@ -8,6 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from faster_whisper import WhisperModel
 import google.generativeai as genai
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI(title="LinguaLive Backend", version="1.0.0")
 
@@ -50,6 +53,71 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "whisper_model": WHISPER_MODEL_NAME}
+
+@app.post("/transcribe")
+async def transcribe(audio: UploadFile = File(...)):
+    """
+    Simple transcription endpoint - returns only the transcribed text without AI processing
+    """
+    if not audio.filename:
+        raise HTTPException(status_code=400, detail="No audio file provided")
+    
+    # Generate unique file names
+    uid = str(uuid.uuid4())
+    in_path = f"/tmp/{uid}_in_{audio.filename}"
+    wav_path = f"/tmp/{uid}.wav"
+    
+    try:
+        # Save uploaded file
+        async with aiofiles.open(in_path, "wb") as f:
+            content = await audio.read()
+            await f.write(content)
+        
+        print(f"Saved audio file: {in_path} ({len(content)} bytes)")
+        
+        # Convert to WAV (ffmpeg must be installed)
+        ffmpeg_to_wav(in_path, wav_path)
+        print(f"Converted to WAV: {wav_path}")
+        
+        # Transcribe with faster-whisper
+        print("Starting transcription...")
+        segments, info = whisper_model.transcribe(
+            wav_path,
+            beam_size=1,
+            vad_filter=True,
+        )
+        transcript = "".join(seg.text for seg in segments).strip()
+        print(f"Transcript: {transcript}")
+        
+        if not transcript:
+            return {
+                "transcript": "",
+                "success": False,
+                "error": "No speech detected"
+            }
+        
+        return {
+            "transcript": transcript,
+            "success": True
+        }
+        
+    except Exception as e:
+        print(f"Error processing audio: {str(e)}")
+        return {
+            "transcript": "",
+            "error": str(e),
+            "success": False
+        }
+    
+    finally:
+        # Cleanup temp files
+        try:
+            if os.path.exists(in_path):
+                os.remove(in_path)
+            if os.path.exists(wav_path):
+                os.remove(wav_path)
+        except Exception as e:
+            print(f"Warning: Could not clean up temp files: {e}")
 
 @app.post("/transcribe_and_reply")
 async def transcribe_and_reply(audio: UploadFile = File(...)):
