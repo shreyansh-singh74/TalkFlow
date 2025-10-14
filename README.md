@@ -1,10 +1,13 @@
-# TalkFlow
+# **TalkFlow**
 
-> AI-Powered Language Learning Platform - Practice pronunciation with personalized AI tutors and track your progress through interactive meetings.
+> **AI-Powered Language Learning Platform** — Practice pronunciation with personalized AI tutors and track your progress through interactive sessions.
 
-## Overview
+---
 
-TalkFlow is a comprehensive language learning platform that combines AI-powered pronunciation feedback with an intuitive dashboard for managing learning sessions. Create custom AI tutors, schedule practice meetings, and get real-time feedback on your pronunciation using advanced speech recognition and AI technology.
+## 🚀 Overview
+
+**TalkFlow** is an AI-driven language learning platform that helps you improve pronunciation with real-time feedback.  
+You can create your own AI tutors, schedule practice meetings, and track your progress — all in one place.
 
 ## Features
 
