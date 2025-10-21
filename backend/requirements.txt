@@ -1,7 +1,6 @@
 fastapi
 uvicorn[standard]
 faster-whisper
-google-generativeai
-aiofiles
 python-multipart
-gTTS
+python-dotenv
+google-generativeai

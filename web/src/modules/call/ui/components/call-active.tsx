@@ -2,7 +2,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useWebRTC } from "@/hooks/use-webrtc";
-import { Mic, MicOff, Camera, CameraOff, PhoneOff, Radio, Square } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Camera,
+  CameraOff,
+  PhoneOff,
+  Radio,
+  Square,
+} from "lucide-react";
 import { useCallTranscription } from "@/hooks/use-call-transcription";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -52,10 +60,10 @@ export const CallActive = ({
   };
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      second: '2-digit'
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     });
   };
 
@@ -192,7 +200,7 @@ export const CallActive = ({
               {transcripts.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
                   <p className="text-sm text-gray-400">
-                    {recording 
+                    {recording
                       ? "Speak now... Your voice will be transcribed when you stop recording."
                       : "Click 'Start Recording' to begin transcription"}
                   </p>
@@ -200,8 +208,8 @@ export const CallActive = ({
               ) : (
                 <div className="space-y-3">
                   {transcripts.map((transcript) => (
-                    <div 
-                      key={transcript.id} 
+                    <div
+                      key={transcript.id}
                       className="p-2 bg-white/5 rounded-md border border-white/10"
                     >
                       <div className="flex items-start justify-between gap-2 mb-1">
