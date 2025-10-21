@@ -3,12 +3,16 @@ import os
 import uuid
 import subprocess
 import aiofiles
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from faster_whisper import WhisperModel
 import google.generativeai as genai
-from typing import Optional
+from typing import Optional, Dict, List
 from dotenv import load_dotenv
+from gtts import gTTS
+from datetime import datetime, timedelta
+import asyncio
 
 load_dotenv()
 
@@ -37,6 +41,13 @@ print(f"Loading faster-whisper model: {WHISPER_MODEL_NAME}")
 whisper_model = WhisperModel(WHISPER_MODEL_NAME, device="cpu", compute_type="int8")
 print("faster-whisper model loaded successfully!")
 
+# In-memory conversation storage
+# Format: {conversation_id: {"history": [messages], "last_updated": datetime}}
+conversations: Dict[str, dict] = {}
+
+# Audio files cleanup tracker
+audio_files: Dict[str, datetime] = {}
+
 def ffmpeg_to_wav(in_path: str, out_path: str):
     """Convert audio file to 16k mono WAV using ffmpeg"""
     try:
@@ -45,6 +56,37 @@ def ffmpeg_to_wav(in_path: str, out_path: str):
         ], check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=400, detail=f"Audio conversion failed: {e.stderr.decode()}")
+
+def cleanup_old_audio_files():
+    """Remove audio files older than 1 hour"""
+    try:
+        current_time = datetime.now()
+        files_to_remove = []
+        
+        for filename, created_time in list(audio_files.items()):
+            if current_time - created_time > timedelta(hours=1):
+                file_path = f"/tmp/{filename}"
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"Cleaned up old audio file: {filename}")
+                files_to_remove.append(filename)
+        
+        for filename in files_to_remove:
+            del audio_files[filename]
+    except Exception as e:
+        print(f"Error during audio cleanup: {e}")
+
+def get_or_create_conversation(conversation_id: Optional[str] = None) -> tuple[str, List]:
+    """Get existing conversation or create new one"""
+    if conversation_id and conversation_id in conversations:
+        return conversation_id, conversations[conversation_id]["history"]
+    else:
+        new_id = str(uuid.uuid4())
+        conversations[new_id] = {
+            "history": [],
+            "last_updated": datetime.now()
+        }
+        return new_id, []
 
 @app.get("/")
 async def root():
@@ -120,9 +162,12 @@ async def transcribe(audio: UploadFile = File(...)):
             print(f"Warning: Could not clean up temp files: {e}")
 
 @app.post("/transcribe_and_reply")
-async def transcribe_and_reply(audio: UploadFile = File(...)):
+async def transcribe_and_reply(
+    audio: UploadFile = File(...),
+    conversation_id: Optional[str] = Form(None)
+):
     """
-    Transcribe audio using Whisper and get a reply from Gemini
+    Transcribe audio using Whisper and get a reply from Gemini with conversation context
     """
     if not audio.filename:
         raise HTTPException(status_code=400, detail="No audio file provided")
@@ -131,8 +176,13 @@ async def transcribe_and_reply(audio: UploadFile = File(...)):
     uid = str(uuid.uuid4())
     in_path = f"/tmp/{uid}_in_{audio.filename}"
     wav_path = f"/tmp/{uid}.wav"
+    audio_filename = f"{uid}_reply.mp3"
+    audio_path = f"/tmp/{audio_filename}"
     
     try:
+        # Cleanup old audio files periodically
+        cleanup_old_audio_files()
+        
         # Save uploaded file
         async with aiofiles.open(in_path, "wb") as f:
             content = await audio.read()
@@ -158,31 +208,47 @@ async def transcribe_and_reply(audio: UploadFile = File(...)):
             return {
                 "transcript": "",
                 "reply": "I couldn't hear anything in the audio. Please try speaking more clearly.",
-                "error": "No speech detected"
+                "error": "No speech detected",
+                "conversation_id": conversation_id
             }
         
-        # Call Gemini (chat) to generate a reply
+        # Get or create conversation
+        conv_id, history = get_or_create_conversation(conversation_id)
+        print(f"Using conversation ID: {conv_id}")
+        
+        # Call Gemini with conversation history
         print("Calling Gemini...")
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        chat = model.start_chat()
+        model = genai.GenerativeModel(
+            "gemini-1.5-flash",
+            system_instruction="You are a friendly and helpful conversation partner. Engage in natural, casual conversation. Be concise but engaging. Keep responses to 2-3 sentences unless asked for more detail."
+        )
         
-        # Prompt instructs Gemini to reply like an English tutor
-        user_prompt = f"""You are an English pronunciation tutor. The user said: "{transcript}".
-
-Please provide:
-1) A short correction or feedback (1-2 sentences)
-2) One clear tip to improve pronunciation (with phonetic hint if helpful)
-3) A short example sentence for practice
-
-Reply in plain text, be encouraging and helpful."""
+        # Start chat with history
+        chat = model.start_chat(history=history)
         
-        response = chat.send_message(user_prompt)
+        # Send user message
+        response = chat.send_message(transcript)
         reply_text = response.text
         print(f"Gemini reply: {reply_text}")
+        
+        # Update conversation history
+        conversations[conv_id]["history"] = chat.history
+        conversations[conv_id]["last_updated"] = datetime.now()
+        
+        # Convert reply to speech using gTTS
+        print("Generating TTS audio...")
+        tts = gTTS(text=reply_text, lang='en', slow=False)
+        tts.save(audio_path)
+        print(f"TTS audio saved: {audio_path}")
+        
+        # Track audio file for cleanup
+        audio_files[audio_filename] = datetime.now()
         
         return {
             "transcript": transcript,
             "reply": reply_text,
+            "audio_url": f"/audio/{audio_filename}",
+            "conversation_id": conv_id,
             "success": True
         }
         
@@ -192,6 +258,7 @@ Reply in plain text, be encouraging and helpful."""
             "transcript": "",
             "reply": f"Sorry, there was an error processing your audio: {str(e)}",
             "error": str(e),
+            "conversation_id": conversation_id,
             "success": False
         }
     
@@ -204,6 +271,64 @@ Reply in plain text, be encouraging and helpful."""
                 os.remove(wav_path)
         except Exception as e:
             print(f"Warning: Could not clean up temp files: {e}")
+
+@app.get("/audio/{filename}")
+async def serve_audio(filename: str):
+    """
+    Serve generated TTS audio files
+    """
+    file_path = f"/tmp/{filename}"
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    return FileResponse(
+        file_path,
+        media_type="audio/mpeg",
+        headers={
+            "Content-Disposition": f"inline; filename={filename}",
+            "Cache-Control": "public, max-age=3600"
+        }
+    )
+
+@app.post("/conversation/new")
+async def create_new_conversation():
+    """
+    Create a new conversation and return its ID
+    """
+    conv_id = str(uuid.uuid4())
+    conversations[conv_id] = {
+        "history": [],
+        "last_updated": datetime.now()
+    }
+    return {"conversation_id": conv_id, "success": True}
+
+@app.get("/conversation/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    """
+    Retrieve conversation history
+    """
+    if conversation_id not in conversations:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    conv = conversations[conversation_id]
+    return {
+        "conversation_id": conversation_id,
+        "history": conv["history"],
+        "last_updated": conv["last_updated"].isoformat(),
+        "success": True
+    }
+
+@app.delete("/conversation/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    """
+    Clear/delete conversation history
+    """
+    if conversation_id in conversations:
+        del conversations[conversation_id]
+        return {"message": "Conversation deleted successfully", "success": True}
+    else:
+        raise HTTPException(status_code=404, detail="Conversation not found")
 
 if __name__ == "__main__":
     import uvicorn

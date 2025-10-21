@@ -3,7 +3,7 @@
 import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mic, MicOff, Play, Square } from "lucide-react";
+import { Mic, MicOff, Play, Square, Volume2, RefreshCw } from "lucide-react";
 
 interface AudioRecorderProps {
   onTranscript?: (transcript: string) => void;
@@ -13,13 +13,16 @@ interface AudioRecorderProps {
 export default function AudioRecorder({ onTranscript, onReply }: AudioRecorderProps) {
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [aiSpeaking, setAiSpeaking] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("");
   const [error, setError] = useState("");
+  const [conversationId, setConversationId] = useState<string | null>(null);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -91,6 +94,11 @@ export default function AudioRecorder({ onTranscript, onReply }: AudioRecorderPr
   async function uploadAndProcess(audioBlob: Blob) {
     const formData = new FormData();
     formData.append("audio", audioBlob, "recording.webm");
+    
+    // Include conversation ID if exists
+    if (conversationId) {
+      formData.append("conversation_id", conversationId);
+    }
 
     try {
       const response = await fetch(`${BACKEND_URL}/transcribe_and_reply`, {
@@ -110,9 +118,19 @@ export default function AudioRecorder({ onTranscript, onReply }: AudioRecorderPr
         setReply(data.reply);
         setError("");
         
+        // Update conversation ID
+        if (data.conversation_id) {
+          setConversationId(data.conversation_id);
+        }
+        
         // Call callbacks if provided
         if (onTranscript) onTranscript(data.transcript);
         if (onReply) onReply(data.reply);
+        
+        // Play AI audio response
+        if (data.audio_url) {
+          await playAIResponse(data.audio_url);
+        }
       } else {
         setError(data.error || "Processing failed");
         setTranscript(data.transcript || "");
@@ -124,32 +142,93 @@ export default function AudioRecorder({ onTranscript, onReply }: AudioRecorderPr
     }
   }
 
+  async function playAIResponse(audioUrl: string) {
+    try {
+      setAiSpeaking(true);
+      
+      // Stop any existing audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      
+      const audio = new Audio(`${BACKEND_URL}${audioUrl}`);
+      audioRef.current = audio;
+      
+      audio.onended = () => {
+        setAiSpeaking(false);
+        audioRef.current = null;
+      };
+      
+      audio.onerror = (e) => {
+        console.error("Audio playback error:", e);
+        setAiSpeaking(false);
+        audioRef.current = null;
+        setError("Failed to play AI response audio");
+      };
+      
+      await audio.play();
+      console.log("Playing AI audio response");
+    } catch (err) {
+      console.error("Error playing audio:", err);
+      setAiSpeaking(false);
+      setError("Could not play AI response");
+    }
+  }
+
+  function startNewConversation() {
+    setConversationId(null);
+    setTranscript("");
+    setReply("");
+    setError("");
+    console.log("Started new conversation");
+  }
+
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mic className="h-5 w-5" />
-            Audio Recorder
-          </CardTitle>
-          <CardDescription>
-            Record your speech to get pronunciation feedback from AI
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Mic className="h-5 w-5" />
+                Voice Conversation
+              </CardTitle>
+              <CardDescription>
+                Have a natural conversation with AI
+              </CardDescription>
+            </div>
+            {conversationId && (
+              <Button
+                onClick={startNewConversation}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                New Conversation
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex justify-center">
             <Button
               onClick={recording ? stopRecording : startRecording}
-              disabled={processing}
+              disabled={processing || aiSpeaking}
               size="lg"
               className={`w-32 h-32 rounded-full ${
-                recording 
+                aiSpeaking
+                  ? "bg-purple-500 hover:bg-purple-600"
+                  : recording 
                   ? "bg-red-500 hover:bg-red-600" 
                   : "bg-blue-500 hover:bg-blue-600"
               }`}
             >
               {processing ? (
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
+              ) : aiSpeaking ? (
+                <Volume2 className="h-8 w-8 animate-pulse" />
               ) : recording ? (
                 <Square className="h-8 w-8" />
               ) : (
@@ -160,7 +239,9 @@ export default function AudioRecorder({ onTranscript, onReply }: AudioRecorderPr
           
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
-              {processing 
+              {aiSpeaking
+                ? "AI is speaking..."
+                : processing 
                 ? "Processing your audio..." 
                 : recording 
                   ? "Recording... Click to stop" 
@@ -182,7 +263,7 @@ export default function AudioRecorder({ onTranscript, onReply }: AudioRecorderPr
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Play className="h-5 w-5" />
-              Transcript
+              You said
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -194,13 +275,16 @@ export default function AudioRecorder({ onTranscript, onReply }: AudioRecorderPr
       {reply && (
         <Card>
           <CardHeader>
-            <CardTitle>AI Feedback</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Volume2 className="h-5 w-5" />
+              AI Response
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="prose prose-sm max-w-none">
-              <pre className="whitespace-pre-wrap text-sm bg-blue-50 p-3 rounded-md">
+              <p className="text-sm bg-blue-50 p-3 rounded-md whitespace-pre-wrap">
                 {reply}
-              </pre>
+              </p>
             </div>
           </CardContent>
         </Card>

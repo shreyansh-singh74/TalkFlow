@@ -4,3 +4,4 @@ faster-whisper
 google-generativeai
 aiofiles
 python-multipart
+gTTS
