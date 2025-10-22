@@ -13,3 +13,8 @@ dist/
 build/
 .venv/
 venv/
+
+# Google Cloud credentials
+backend/*-*.json
+backend/*.json
+!backend/package.json
