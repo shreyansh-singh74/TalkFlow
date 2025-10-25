@@ -12,7 +12,7 @@ import {
   Trash2,
   Loader2,
 } from "lucide-react";
-import { useAutoTranscription } from "@/hooks/use-auto-transcription";
+import { useEnhancedAutoTranscription } from "@/hooks/use-enhanced-auto-transcription";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Props {
@@ -49,10 +49,12 @@ export const CallActive = ({
     isAISpeaking,
     transcripts,
     error: transcriptionError,
+    currentAudioLevel,
+    speechThreshold,
     startListening,
     stopListening,
     clearTranscripts,
-  } = useAutoTranscription();
+  } = useEnhancedAutoTranscription();
 
   const handleMicToggle = async () => {
     toggleMic();
@@ -164,6 +166,25 @@ export const CallActive = ({
             )}
           </div>
 
+          {/* Audio Level Meter - Debug Mode */}
+          {isActive && (
+            <div className="w-full max-w-6xl mt-2">
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <span>Audio Level:</span>
+                <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-100 ${
+                      currentAudioLevel > speechThreshold ? 'bg-green-500' : 'bg-blue-500'
+                    }`}
+                    style={{ width: `${(currentAudioLevel / 255) * 100}%` }}
+                  />
+                </div>
+                <span>{currentAudioLevel.toFixed(0)} / {speechThreshold}</span>
+                {isUserSpeaking && <span className="text-green-400">● SPEAKING</span>}
+              </div>
+            </div>
+          )}
+
           {/* Transcript Section Below Video */}
           {(transcripts.length > 0 || isActive || isProcessing || transcriptionError) && (
             <div className="w-full max-w-6xl bg-black/80 backdrop-blur-lg border border-white/10 rounded-lg p-4 mt-4">
@@ -211,7 +232,7 @@ export const CallActive = ({
                 {isActive && !isUserSpeaking && !isProcessing && !isAISpeaking && (
                   <div className="flex items-center gap-2 p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                     <div className="h-2 w-2 bg-blue-400 rounded-full animate-pulse" />
-                    <p className="text-xs text-blue-200">Listening... Speak naturally, I'll auto-send after 1s silence</p>
+                    <p className="text-xs text-blue-200">Listening... Speak naturally, I'll capture your complete thoughts</p>
                   </div>
                 )}
 
