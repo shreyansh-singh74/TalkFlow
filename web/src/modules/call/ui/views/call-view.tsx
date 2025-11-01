@@ -13,6 +13,7 @@ export const CallView = ({ meetingId }: Props) => {
   const { data, isLoading, error } = useMeeting(meetingId);
 
   const {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     stop,
     lastResponse,
   } = useSpeechToText({

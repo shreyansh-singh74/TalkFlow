@@ -17,6 +17,7 @@ export class StreamingAudioPlayer {
   /**
    * Add an audio chunk (MP3 bytes) to the playback queue
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async addChunk(audioBytes: Uint8Array, _isFinal: boolean) {
     try {
       // Decode MP3 to AudioBuffer

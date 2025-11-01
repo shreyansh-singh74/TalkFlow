@@ -1,19 +1,23 @@
 import { CallUI } from "./call-ui";
 
 interface Props {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   meetingId: string;
   meetingName: string;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   userId: string;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   userName: string;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   userImage: string;
 }
 
 export const CallConnect = ({
   meetingName,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  meetingId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  userId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  userName,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  userImage,
 }: Props) => {
   
   // TODO: Implement custom WebRTC connection logic
