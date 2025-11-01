@@ -1,5 +1,4 @@
-import { useRouter } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+// Removed unused imports: useRouter, useMutation, useQuery, useQueryClient
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { meetingsInsertSchema } from "../../schemas";
@@ -33,9 +32,6 @@ export const MeetingForm = ({
   onCancel,
   initialValues,
 }: MeetingFormProps) => {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-
   const [openNewAgentDialog, setOpenNewAgentDialog] = useState(false);
   const [agentSearch, setAgentSearch] = useState("");
 

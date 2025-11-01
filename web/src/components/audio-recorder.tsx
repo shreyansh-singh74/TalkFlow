@@ -21,7 +21,7 @@ export default function AudioRecorder({ onTranscript, onReply }: AudioRecorderPr
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://harmonious-heart-production.up.railway.app";
 
   async function startRecording() {
     try {

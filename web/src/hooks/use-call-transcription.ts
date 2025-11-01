@@ -29,8 +29,8 @@ export function useCallTranscription(
 ): UseCallTranscriptionReturn {
   const {
     backendUrl = typeof window !== "undefined" 
-      ? process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
-      : "http://localhost:8000"
+      ? process.env.NEXT_PUBLIC_BACKEND_URL || "https://harmonious-heart-production.up.railway.app"
+      : "https://harmonious-heart-production.up.railway.app"
   } = options;
 
   const [recording, setRecording] = useState(false);

@@ -30,7 +30,7 @@ export interface UsePushToTalkReturn {
 }
 
 export function usePushToTalk(
-  backendUrl: string = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+  backendUrl: string = process.env.NEXT_PUBLIC_BACKEND_URL || "https://harmonious-heart-production.up.railway.app"
 ): UsePushToTalkReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [isTalking, setIsTalking] = useState(false);

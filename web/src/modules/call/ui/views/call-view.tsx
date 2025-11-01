@@ -13,11 +13,6 @@ export const CallView = ({ meetingId }: Props) => {
   const { data, isLoading, error } = useMeeting(meetingId);
 
   const {
-    supported,
-    listening,
-    transcript,
-    error: sttError,
-    start,
     stop,
     lastResponse,
   } = useSpeechToText({
@@ -26,18 +21,8 @@ export const CallView = ({ meetingId }: Props) => {
       : undefined,
   });
 
-  const [sending, setSending] = useState(false);
-  const [autoSpeak, setAutoSpeak] = useState(true);
+  const [autoSpeak] = useState(true);
   const ttsSupported = useMemo(() => typeof window !== "undefined" && !!window.speechSynthesis, []);
-
-  async function handleStop() {
-    setSending(true);
-    try {
-      await stop();
-    } finally {
-      setSending(false);
-    }
-  }
 
   useEffect(() => {
     if (!autoSpeak || !ttsSupported) return;
@@ -47,7 +32,7 @@ export const CallView = ({ meetingId }: Props) => {
       utter.lang = "en-US";
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utter);
-    } catch (_) {
+    } catch {
       // no-op
     }
   }, [lastResponse, autoSpeak, ttsSupported]);
