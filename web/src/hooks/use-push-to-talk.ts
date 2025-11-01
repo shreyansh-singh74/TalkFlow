@@ -19,6 +19,8 @@ export interface UsePushToTalkReturn {
   isAISpeaking: boolean;
   transcripts: TranscriptEntry[];
   partialTranscript: string;
+  streamingAIText: string;
+  conversationStatus: string;
   error: string | null;
   connect: () => Promise<void>;
   disconnect: () => void;
@@ -35,6 +37,7 @@ export function usePushToTalk(
   const [isAISpeaking, setIsAISpeaking] = useState(false);
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [partialTranscript, setPartialTranscript] = useState("");
+  const [streamingAIText, setStreamingAIText] = useState("");
   const [error, setError] = useState<string | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
@@ -67,7 +70,12 @@ export function usePushToTalk(
         ]);
         break;
         
+      case "LLM_TEXT_CHUNK":
+        setStreamingAIText(prev => prev + message.text);
+        break;
+        
       case "AI_RESPONSE":
+        setStreamingAIText(""); // Clear streaming text
         setTranscripts(prev => {
           const updated = [...prev];
           const last = updated[updated.length - 1];
@@ -76,13 +84,18 @@ export function usePushToTalk(
           }
           return updated;
         });
-        setIsAISpeaking(message.has_audio);
+        // Don't set isAISpeaking here - wait for first TTS chunk
         break;
         
       case "TTS_CHUNK":
         // Binary chunk will arrive separately
+        // Set isAISpeaking when first TTS chunk arrives
+        if (message.seq === 0) {
+          setIsAISpeaking(true);
+        }
         if (message.is_final) {
-          setTimeout(() => setIsAISpeaking(false), 500);
+          // Keep isAISpeaking until audio finishes playing
+          setTimeout(() => setIsAISpeaking(false), 1000);
         }
         break;
         
@@ -304,8 +317,20 @@ export function usePushToTalk(
   const clearTranscripts = useCallback(() => {
     setTranscripts([]);
     setPartialTranscript("");
+    setStreamingAIText("");
     setError(null);
   }, []);
+  
+  /**
+   * Get current conversation status
+   */
+  const getConversationStatus = useCallback((): string => {
+    if (!isConnected) return "";
+    if (isAISpeaking) return "AI Speaking...";
+    if (streamingAIText) return "Processing...";
+    if (isTalking) return "Recording...";
+    return "Hold SPACE to talk";
+  }, [isConnected, isAISpeaking, streamingAIText, isTalking]);
   
   // Cleanup on unmount
   useEffect(() => {
@@ -320,6 +345,8 @@ export function usePushToTalk(
     isAISpeaking,
     transcripts,
     partialTranscript,
+    streamingAIText,
+    conversationStatus: getConversationStatus(),
     error,
     connect,
     disconnect,

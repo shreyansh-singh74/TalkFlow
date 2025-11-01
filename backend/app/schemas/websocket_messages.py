@@ -22,6 +22,12 @@ class FinalTranscriptMessage(BaseModel):
     confidence: float
 
 
+class LLMTextChunkMessage(BaseModel):
+    type: Literal["LLM_TEXT_CHUNK"]
+    text: str
+    is_final: bool
+
+
 class AIResponseMessage(BaseModel):
     type: Literal["AI_RESPONSE"]
     text: str

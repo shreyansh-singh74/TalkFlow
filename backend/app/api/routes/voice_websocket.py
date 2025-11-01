@@ -1,19 +1,63 @@
 # app/api/routes/voice_websocket.py
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.deepgram_live_service import DeepgramLiveService
-from app.services.gemini_response import get_gemini_response
+from app.services.gemini_response import get_gemini_response, stream_gemini_response
 from app.services.tts_service import tts_service
 from app.schemas.websocket_messages import ControlMessage
+from app.core.config import settings
 import json
 import uuid
 import asyncio
 import base64
-from typing import Dict, Optional
+import time
+from datetime import datetime
+from typing import Dict, Optional, List
 
 router = APIRouter()
 
 # Session storage: session_id -> session_data
 sessions: Dict[str, dict] = {}
+
+# Session timeout from config
+SESSION_TIMEOUT_SECONDS = settings.SESSION_TIMEOUT_MINUTES * 60
+
+
+async def cleanup_stale_sessions():
+    """Background task to clean up inactive sessions"""
+    while True:
+        try:
+            await asyncio.sleep(60)  # Check every minute
+            
+            current_time = time.time()
+            stale_session_ids = []
+            
+            for session_id, session in sessions.items():
+                if isinstance(session, VoiceSession):
+                    time_since_activity = current_time - session.last_activity
+                    
+                    if time_since_activity > SESSION_TIMEOUT_SECONDS:
+                        print(f"🧹 Session {session_id} inactive for {time_since_activity/60:.1f} minutes, cleaning up")
+                        stale_session_ids.append(session_id)
+            
+            # Clean up stale sessions
+            for session_id in stale_session_ids:
+                session = sessions.get(session_id)
+                if session and isinstance(session, VoiceSession):
+                    # Close WebSocket if still open
+                    try:
+                        await session.websocket.close()
+                    except:
+                        pass
+                    
+                    # Cleanup Deepgram if active
+                    if session.deepgram_service:
+                        await session.deepgram_service.finish()
+                    
+                    del sessions[session_id]
+                    print(f"✓ Cleaned up session {session_id}")
+                    
+        except Exception as e:
+            print(f"✗ Error in cleanup task: {e}")
 
 
 class VoiceSession:
@@ -28,8 +72,28 @@ class VoiceSession:
         self.is_generating_tts = False
         self.should_stop_tts = False
         
+        # Session metadata
+        self.created_at = datetime.now()
+        self.last_activity = time.time()  # Unix timestamp for easy comparison
+        self.total_turns = 0
+        
+    def update_activity(self):
+        """Update last activity timestamp"""
+        self.last_activity = time.time()
+    
+    def get_conversation_metadata(self) -> dict:
+        """Get session metadata"""
+        return {
+            "session_id": self.session_id,
+            "created_at": self.created_at.isoformat(),
+            "total_turns": self.total_turns,
+            "history_length": len(self.conversation_history),
+            "last_activity": datetime.fromtimestamp(self.last_activity).isoformat()
+        }
+        
     async def handle_start_turn(self, msg: ControlMessage):
         """Handle START_TURN: Initialize Deepgram streaming"""
+        self.update_activity()
         print(f"📞 START_TURN: {msg.turn_id}")
         self.current_turn_id = msg.turn_id
         self.partial_transcript = ""
@@ -54,21 +118,21 @@ class VoiceSession:
             await self.deepgram_service.send_audio(audio_data)
             
     async def handle_end_turn(self, msg: ControlMessage):
-        """Handle END_TURN: Finalize transcript and generate response"""
+        """Handle END_TURN: Finalize transcript and generate streaming response"""
+        self.update_activity()
         print(f"📞 END_TURN: {msg.turn_id}")
         
         # Finalize Deepgram
         if self.deepgram_service:
             await self.deepgram_service.finish()
             self.deepgram_service = None
-            
-        # Wait a bit for final transcript
+        
         await asyncio.sleep(0.2)
         
         if not self.final_transcript:
             print("⚠️ No transcript received")
             return
-            
+        
         # Send final transcript
         await self.send_json({
             "type": "FINAL_TRANSCRIPT",
@@ -76,31 +140,97 @@ class VoiceSession:
             "confidence": 1.0
         })
         
-        # Generate AI response
-        ai_response = get_gemini_response(
-            self.final_transcript,
-            self.conversation_history
-        )
+        # Check if first turn in session
+        is_first_turn = len(self.conversation_history) == 0
         
-        # Update conversation history
+        # Stream AI response with text batching
+        full_response_text = ""
+        text_batches_for_tts = []
+        
+        async for text_chunk in stream_gemini_response(
+            self.final_transcript,
+            self.conversation_history,
+            is_first_turn=is_first_turn
+        ):
+            if self.should_stop_tts:
+                print("⏹️ LLM streaming interrupted")
+                break
+            
+            full_response_text += text_chunk
+            text_batches_for_tts.append(text_chunk)
+            
+            # Send LLM token chunk to frontend for real-time display
+            await self.send_json({
+                "type": "LLM_TEXT_CHUNK",
+                "text": text_chunk,
+                "is_final": False
+            })
+        
+        # Send final AI response
+        await self.send_json({
+            "type": "AI_RESPONSE",
+            "text": full_response_text,
+            "has_audio": True
+        })
+        
+        # Update conversation history with metadata
         self.conversation_history.append({
             "user": self.final_transcript,
-            "ai": ai_response,
-            "turn": len(self.conversation_history) + 1
+            "ai": full_response_text,
+            "turn": self.total_turns + 1,
+            "turn_id": self.current_turn_id,
+            "timestamp": datetime.now().isoformat()
         })
+        
+        # Increment turn count
+        self.total_turns += 1
         
         # Keep last 10 turns
         self.conversation_history = self.conversation_history[-10:]
         
-        # Send AI response text
-        await self.send_json({
-            "type": "AI_RESPONSE",
-            "text": ai_response,
-            "has_audio": True
-        })
+        # Generate and stream TTS with small batches
+        if not self.should_stop_tts:
+            await self.stream_tts_batched(text_batches_for_tts)
+    
+    async def stream_tts_batched(self, text_batches: List[str]):
+        """Generate TTS for small text batches and stream audio chunks"""
+        self.is_generating_tts = True
+        seq = 0
         
-        # Generate and stream TTS
-        await self.stream_tts(ai_response)
+        for batch_idx, text_batch in enumerate(text_batches):
+            if self.should_stop_tts:
+                print("⏹️ TTS interrupted")
+                break
+            
+            # Skip empty batches
+            if not text_batch.strip():
+                continue
+            
+            print(f"🔊 Synthesizing batch {batch_idx + 1}/{len(text_batches)}: '{text_batch[:50]}...'")
+            
+            # Generate TTS for this batch (should be 500-800ms of audio)
+            audio_base64 = tts_service.text_to_speech(text_batch)
+            
+            if not audio_base64:
+                continue
+            
+            # Decode from base64
+            audio_bytes = base64.b64decode(audio_base64)
+            
+            # Send as single chunk (already small ~500-800ms)
+            is_final = (batch_idx == len(text_batches) - 1)
+            
+            await self.send_json({
+                "type": "TTS_CHUNK",
+                "seq": seq,
+                "is_final": is_final
+            })
+            await self.websocket.send_bytes(audio_bytes)
+            
+            seq += 1
+            print(f"✓ Sent TTS chunk {seq} ({len(audio_bytes)} bytes)")
+        
+        self.is_generating_tts = False
         
     async def stream_tts(self, text: str):
         """Generate TTS and stream in chunks"""
@@ -160,15 +290,28 @@ class VoiceSession:
         self.final_transcript = text
 
 
+# Module-level variables for cleanup task
+cleanup_task_started = False
+cleanup_task = None
+
 @router.websocket("/ws/voice")
 async def voice_websocket(websocket: WebSocket):
     """Main WebSocket endpoint for voice conversation"""
+    global cleanup_task_started, cleanup_task
+    
     await websocket.accept()
     
     session = VoiceSession(websocket)
     sessions[session.session_id] = session
     
     print(f"✅ WebSocket connected: {session.session_id}")
+    print(f"📊 Active sessions: {len(sessions)}")
+    
+    # Start cleanup task (only once)
+    if not cleanup_task_started:
+        cleanup_task_started = True
+        cleanup_task = asyncio.create_task(cleanup_stale_sessions())
+        print("🧹 Started session cleanup background task")
     
     # Send keep-alive pings every 20s
     async def keep_alive():
@@ -221,4 +364,20 @@ async def voice_websocket(websocket: WebSocket):
         if session.session_id in sessions:
             del sessions[session.session_id]
         print(f"🧹 Cleaned up session: {session.session_id}")
+
+
+@router.get("/sessions/stats")
+async def get_session_stats():
+    """Get active session statistics"""
+    active_count = len(sessions)
+    session_list = []
+    
+    for session_id, session in sessions.items():
+        if isinstance(session, VoiceSession):
+            session_list.append(session.get_conversation_metadata())
+    
+    return {
+        "active_sessions": active_count,
+        "sessions": session_list
+    }
 
