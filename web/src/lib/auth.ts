@@ -3,8 +3,11 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 
+// Normalize baseURL - remove trailing slash if present
+const baseURL = (process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BETTER_AUTH_URL || '').replace(/\/$/, '');
+
 export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+  baseURL: baseURL || undefined,
   secret: process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET,
   socialProviders: {
     github: {
