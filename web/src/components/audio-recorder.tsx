@@ -3,7 +3,7 @@
 import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mic, MicOff, Play, Square } from "lucide-react";
+import { Mic, Play, Square } from "lucide-react";
 
 interface AudioRecorderProps {
   onTranscript?: (transcript: string) => void;

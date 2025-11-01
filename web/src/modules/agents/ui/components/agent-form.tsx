@@ -30,8 +30,6 @@ export const AgentForm = ({
   onCancel,
   initialValues,
 }: AgentFormProps) => {
-  const router = useRouter();
-
   const createAgent = useCreateAgent();
   const updateAgent = useUpdateAgent();
 

@@ -65,6 +65,7 @@ export async function PUT(
 
     const body = await request.json();
     const validatedData = meetingsUpdateSchema.parse(body);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, ...updateData } = validatedData;
 
     const [updatedMeeting] = await db

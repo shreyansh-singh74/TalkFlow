@@ -36,6 +36,7 @@ export function useAgents(params: {
     queryKey: ["agents", params],
     queryFn: () =>
       apiCall<{
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         items: any[];
         total: number;
         totalPages: number;
@@ -46,6 +47,7 @@ export function useAgents(params: {
 export function useAgent(id: string) {
   return useQuery({
     queryKey: ["agent", id],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     queryFn: () => apiCall<any>(`/api/agents/${id}`),
     enabled: !!id,
   });
@@ -54,7 +56,9 @@ export function useAgent(id: string) {
 export function useCreateAgent() {
   const queryClient = useQueryClient();
   return useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mutationFn: (data: any) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       apiCall<any>("/api/agents", {
         method: "POST",
         body: JSON.stringify(data),
@@ -68,7 +72,9 @@ export function useCreateAgent() {
 export function useUpdateAgent() {
   const queryClient = useQueryClient();
   return useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mutationFn: ({ id, ...data }: { id: string; [key: string]: any }) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       apiCall<any>(`/api/agents/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
@@ -84,6 +90,7 @@ export function useDeleteAgent() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       apiCall<any>(`/api/agents/${id}`, {
         method: "DELETE",
       }),
@@ -112,6 +119,7 @@ export function useMeetings(params: {
     queryKey: ["meetings", params],
     queryFn: () =>
       apiCall<{
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         items: any[];
         total: number;
         totalPages: number;
@@ -122,6 +130,7 @@ export function useMeetings(params: {
 export function useMeeting(id: string) {
   return useQuery({
     queryKey: ["meeting", id],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     queryFn: () => apiCall<any>(`/api/meetings/${id}`),
     enabled: !!id,
   });
@@ -130,7 +139,9 @@ export function useMeeting(id: string) {
 export function useCreateMeeting() {
   const queryClient = useQueryClient();
   return useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mutationFn: (data: any) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       apiCall<any>("/api/meetings", {
         method: "POST",
         body: JSON.stringify(data),
@@ -144,7 +155,9 @@ export function useCreateMeeting() {
 export function useUpdateMeeting() {
   const queryClient = useQueryClient();
   return useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mutationFn: ({ id, ...data }: { id: string; [key: string]: any }) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       apiCall<any>(`/api/meetings/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
@@ -160,6 +173,7 @@ export function useDeleteMeeting() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       apiCall<any>(`/api/meetings/${id}`, {
         method: "DELETE",
       }),

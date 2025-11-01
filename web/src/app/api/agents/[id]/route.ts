@@ -57,6 +57,7 @@ export async function PUT(
 
     const body = await request.json();
     const validatedData = agentsUpdateSchema.parse(body);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, ...updateData } = validatedData;
 
     const [updatedAgent] = await db

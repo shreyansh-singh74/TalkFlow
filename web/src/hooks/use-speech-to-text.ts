@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type SpeechRecognitionType = typeof window extends never
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ? any
   : (typeof window & {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       webkitSpeechRecognition?: any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       SpeechRecognition?: any;
     })["SpeechRecognition"];
 
@@ -47,7 +50,9 @@ export function useSpeechToText(
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SR: any =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
       setSupported(false);
@@ -58,6 +63,7 @@ export function useSpeechToText(
     rec.interimResults = interimResults;
     rec.continuous = continuous;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rec.onresult = (event: any) => {
       let interim = "";
       let final = "";
@@ -75,6 +81,7 @@ export function useSpeechToText(
       });
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rec.onerror = (e: any) => {
       setError(e?.error || "Speech recognition error");
     };
@@ -91,11 +98,11 @@ export function useSpeechToText(
         rec.onresult = null;
         rec.onerror = null;
         rec.onend = null;
-        // @ts-ignore
+        // @ts-expect-error - Browser-specific API
         rec.abort?.();
-        // @ts-ignore
+        // @ts-expect-error - Browser-specific API
         rec.stop?.();
-      } catch (_) {
+      } catch {
         // ignore
       }
       recognitionRef.current = null;
@@ -110,6 +117,7 @@ export function useSpeechToText(
     try {
       recognitionRef.current.start();
       setListening(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       setError(e?.message || "Failed to start recognition");
     }
@@ -119,7 +127,7 @@ export function useSpeechToText(
     if (!recognitionRef.current) return { error: "Recognition not initialized" };
     try {
       recognitionRef.current.stop();
-    } catch (_) {
+    } catch {
       // ignore
     }
     setListening(false);
@@ -143,6 +151,7 @@ export function useSpeechToText(
       const data = (await res.json()) as { response?: string };
       setLastResponse(data.response ?? null);
       return { response: data.response };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       setLastResponse(null);
       return { error: e?.message || "Network error" };

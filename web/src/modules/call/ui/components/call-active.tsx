@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { useWebRTC } from "@/hooks/use-webrtc";
 import {
   Mic,
   MicOff,
@@ -10,9 +9,7 @@ import {
   PhoneOff,
   Radio,
   Trash2,
-  Loader2,
   ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { usePushToTalk } from "@/hooks/use-push-to-talk";
 import { useSpacebarControl } from "@/hooks/use-spacebar-control";
@@ -42,8 +39,10 @@ export const CallActive = ({
   onLeave,
   meetingName,
   attachLocalStream,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   requestMedia,
   localStream,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isFetching,
   error,
   isCameraOn,
@@ -56,6 +55,7 @@ export const CallActive = ({
     isTalking,
     isAISpeaking,
     transcripts,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     partialTranscript,
     streamingAIText,
     conversationStatus,

@@ -29,6 +29,7 @@ export const CommandSelect = ({
   onSearch,
   value,
   placeholder = "Select as an Option",
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   inSearchable,
   className,
 }: Props) => {

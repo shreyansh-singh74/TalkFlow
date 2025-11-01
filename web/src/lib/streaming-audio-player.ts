@@ -17,7 +17,7 @@ export class StreamingAudioPlayer {
   /**
    * Add an audio chunk (MP3 bytes) to the playback queue
    */
-  async addChunk(audioBytes: Uint8Array, isFinal: boolean) {
+  async addChunk(audioBytes: Uint8Array, _isFinal: boolean) {
     try {
       // Decode MP3 to AudioBuffer
       // Create a new ArrayBuffer to avoid type issues

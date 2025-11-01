@@ -11,9 +11,9 @@ const SPEECH_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
   autoGainControl: true,
   sampleRate: 16000,
   channelCount: 1,
-  // @ts-ignore - Browser-specific constraints
+  // @ts-expect-error - Browser-specific constraints
   latency: 0.01,
-  // @ts-ignore - Chrome-specific
+  // @ts-expect-error - Chrome-specific
   googEchoCancellation: true,
   googNoiseSuppression: true,
   googHighpassFilter: true,

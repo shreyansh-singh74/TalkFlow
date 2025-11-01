@@ -1,10 +1,7 @@
-import { db } from "@/db";
-import { agents, meetings } from "@/db/schema";
 // TODO: Implement custom WebRTC webhook handling
-import { and, eq, not } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
-function verifySignatureWithSDK(body: string, signature: string): boolean {
+function verifySignatureWithSDK(): boolean {
   // TODO: Implement custom WebRTC webhook signature verification
   return true; // Placeholder - implement your own verification
 }
@@ -22,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.text();
 
-  if (!verifySignatureWithSDK(body, signature)) {
+  if (!verifySignatureWithSDK()) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 

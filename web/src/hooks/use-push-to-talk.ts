@@ -51,6 +51,7 @@ export function usePushToTalk(
   /**
    * Handle incoming WebSocket messages
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleMessage = useCallback((message: any) => {
     switch (message.type) {
       case "PARTIAL_TRANSCRIPT":

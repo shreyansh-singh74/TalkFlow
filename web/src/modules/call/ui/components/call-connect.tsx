@@ -1,23 +1,20 @@
-import { LoaderIcon } from "lucide-react";
 import { CallUI } from "./call-ui";
-import { useGenerateToken } from "@/hooks/use-api";
 
 interface Props {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   meetingId: string;
   meetingName: string;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   userId: string;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   userName: string;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   userImage: string;
 }
 
 export const CallConnect = ({
-  meetingId,
   meetingName,
-  userId,
-  userName,
-  userImage,
 }: Props) => {
-  const generateToken = useGenerateToken();
   
   // TODO: Implement custom WebRTC connection logic
   // This will be replaced with your own WebRTC implementation

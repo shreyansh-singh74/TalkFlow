@@ -1,11 +1,8 @@
 
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/lib/auth-client";
-import { GeneratedAvatarUri } from "@/lib/avatar";
 import { LogInIcon, Mic, MicOff, Camera, CameraOff, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
-import { useWebRTC } from "@/hooks/use-webrtc";
+import { useEffect, useRef } from "react";
 
 interface Props {
   onJoin: () => void;
@@ -21,7 +18,6 @@ interface Props {
 }
 
 export const CallLobby = ({ onJoin, attachLocalStream, requestMedia, localStream, isFetching, error, isCameraOn, isMicOn, toggleCamera, toggleMic }: Props) => {
-  const { data } = authClient.useSession();
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
