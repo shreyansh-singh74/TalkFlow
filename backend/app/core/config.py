@@ -20,15 +20,18 @@ class Settings:
     # API Keys
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GOOGLE_APPLICATION_CREDENTIALS: str = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
-    
-    # Whisper Model Configuration
-    WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "tiny")
-    WHISPER_DEVICE: str = "cpu"
-    WHISPER_COMPUTE_TYPE: str = "int8"
+    DEEPGRAM_API_KEY: str = os.getenv("DEEPGRAM_API_KEY", "")
     
     # Audio Settings
     AUDIO_SAMPLE_RATE: int = 16000
     AUDIO_CHANNELS: int = 1
+    AUDIO_CHUNK_SIZE: int = 4096  # samples
+    TTS_CHUNK_SIZE: int = 100_000  # 100KB
+    
+    # WebSocket Settings
+    WEBSOCKET_PING_INTERVAL: int = 20  # seconds
+    WEBSOCKET_PING_TIMEOUT: int = 60
+    WEBSOCKET_MAX_SIZE: int = 16_777_216  # 16MB
     
     # TTS Settings
     TTS_LANGUAGE_CODE: str = "en-US"
@@ -48,6 +51,8 @@ class Settings:
             print("WARNING: GOOGLE_APPLICATION_CREDENTIALS not set - TTS will not work!")
         elif not os.path.exists(self.GOOGLE_APPLICATION_CREDENTIALS):
             print(f"WARNING: Google credentials file not found at {self.GOOGLE_APPLICATION_CREDENTIALS}")
+        if not self.DEEPGRAM_API_KEY:
+            print("WARNING: DEEPGRAM_API_KEY not set - Transcription will not work!")
 
 settings = Settings()
 settings.validate()

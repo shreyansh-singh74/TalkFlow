@@ -4,7 +4,7 @@ from typing import Optional
 
 class HealthResponse(BaseModel):
     status: str
-    whisper_model: str
+    transcription_service: str
 
 class TranscriptionResponse(BaseModel):
     transcript: str

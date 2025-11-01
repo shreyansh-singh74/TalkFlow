@@ -1,12 +1,12 @@
-# TalkFlow Backend - Speech-to-Text Only
+# TalkFlow Backend - Speech-to-Text with Deepgram
 
 A simple FastAPI backend that converts audio to text using Whisper.
 
 ## What It Does
 
-**Simple Flow:**
+**Complete Conversation Flow:**
 ```
-Frontend sends audio → Backend transcribes → Returns text
+Frontend sends audio → Deepgram transcribes → Gemini AI responds → Google TTS → Returns transcript + AI reply + audio
 ```
 
 ## Project Structure
@@ -21,11 +21,13 @@ backend/
     │   └── transcription.py        # Audio transcription endpoint
     ├── core/
     │   ├── config.py               # Configuration
-    │   └── models.py               # Whisper model loading
+    │   └── models.py               # AI model configuration
     ├── services/
-    │   └── transcription_service.py # Transcription logic
-    └── utils/
-        └── audio_utils.py          # Audio conversion
+    │   ├── transcription_service.py # Deepgram transcription
+    │   ├── gemini_response.py      # AI conversation
+    │   └── tts_service.py          # Text-to-speech
+    └── schemas/
+        └── responses.py            # API response models
 ```
 
 ## Installation
@@ -41,14 +43,37 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-3. Ensure ffmpeg is installed:
-```bash
-# Ubuntu/Debian
-sudo apt-get install ffmpeg
+## Configuration
 
-# macOS
-brew install ffmpeg
+Create a `.env` file in the backend directory:
+
+```env
+# AI and API Keys
+DEEPGRAM_API_KEY=your_deepgram_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+GOOGLE_APPLICATION_CREDENTIALS=path/to/your/google-credentials.json
+
+# Optional: CORS origins
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3002
 ```
+
+## Getting API Keys
+
+### Deepgram API Key
+1. Sign up at [deepgram.com](https://deepgram.com)
+2. Navigate to API Keys in the dashboard
+3. Copy your API key
+
+### Gemini API Key
+1. Go to [Google AI Studio](https://aistudio.google.com)
+2. Create a new API key
+3. Copy your API key
+
+### Google Cloud TTS
+1. Create a Google Cloud project
+2. Enable Cloud Text-to-Speech API
+3. Create a service account and download JSON credentials
+4. Place the JSON file in your project directory
 
 ## Running the Server
 
@@ -66,7 +91,6 @@ Server will start at: `http://localhost:8000`
 
 ### Health Check
 ```
-GET /
 GET /health
 ```
 
@@ -74,7 +98,7 @@ Response:
 ```json
 {
   "status": "healthy",
-  "whisper_model": "tiny"
+  "transcription_service": "deepgram"
 }
 ```
 
@@ -83,13 +107,18 @@ Response:
 POST /transcribe
 Content-Type: multipart/form-data
 
-Body: { audio: <audio file> }
+Body: 
+  - audio: <audio file>
+  - conversation_id: <optional string>
+  - turn_number: <optional int>
 ```
 
 Response:
 ```json
 {
-  "transcript": "transcribed text here",
+  "transcript": "Hello, how are you?",
+  "reply": "I'm doing great! How can I help you today?",
+  "audio": "base64_encoded_mp3_audio",
   "success": true
 }
 ```
@@ -99,13 +128,17 @@ Response:
 ### Using curl
 ```bash
 curl -X POST http://localhost:8000/transcribe \
-  -F "audio=@recording.webm"
+  -F "audio=@recording.webm" \
+  -F "conversation_id=abc123" \
+  -F "turn_number=1"
 ```
 
 ### Using JavaScript (Frontend)
 ```javascript
 const formData = new FormData();
 formData.append('audio', audioBlob, 'recording.webm');
+formData.append('conversation_id', 'abc123');
+formData.append('turn_number', '1');
 
 const response = await fetch('http://localhost:8000/transcribe', {
   method: 'POST',
@@ -113,63 +146,60 @@ const response = await fetch('http://localhost:8000/transcribe', {
 });
 
 const data = await response.json();
-console.log(data.transcript); // "Hello, this is the transcribed text"
+console.log(data.transcript);  // User speech
+console.log(data.reply);       // AI response
+// data.audio contains base64 MP3
 ```
-
-## Configuration
-
-Edit `app/core/config.py` to modify:
-- **WHISPER_MODEL**: Model size (tiny/base/small/medium/large)
-- **ALLOWED_ORIGINS**: CORS origins for frontend
-- **AUDIO_SAMPLE_RATE**: Audio sample rate (default: 16000)
 
 ## Features
 
-✅ Speech-to-text using faster-whisper  
-✅ Automatic audio format conversion  
-✅ CORS support for frontend integration  
-✅ Clean, simple codebase  
-✅ Fast and efficient  
+✅ **Deepgram Transcription** - High-quality speech-to-text  
+✅ **Gemini AI** - Intelligent, context-aware responses  
+✅ **Google Cloud TTS** - Natural text-to-speech  
+✅ **Conversation Memory** - Maintains context across turns  
+✅ **CORS Support** - Frontend integration ready  
+✅ **Error Handling** - Robust error management  
+✅ **Audio Format Support** - Multiple audio formats accepted  
 
-## What Was Removed
+## Configuration Options
 
-This is a simplified version. Removed features:
-- ❌ AI conversation (Gemini)
-- ❌ Text-to-speech (TTS)
-- ❌ Conversation memory
-- ❌ Audio file serving
+Edit `app/core/config.py` or environment variables to customize:
 
-**This backend ONLY does transcription!**
+- **Deepgram Model**: Currently using `nova-2` (configured in transcription_service.py)
+- **TTS Voice**: `en-US-Neural2-C` (female) or `en-US-Neural2-D` (male)
+- **Speaking Rate**: Default 1.0
+- **Conversation History**: Last 10 turns maintained in memory
 
 ## Dependencies
 
 - **fastapi**: Web framework
 - **uvicorn**: ASGI server
-- **faster-whisper**: Efficient Whisper implementation
+- **deepgram-sdk**: Deepgram transcription
+- **google-generativeai**: Gemini AI
+- **google-cloud-texttospeech**: Google Cloud TTS
 - **python-multipart**: File upload support
 - **python-dotenv**: Environment variables
 
-## Environment Variables (Optional)
-
-Create a `.env` file:
-```env
-WHISPER_MODEL=tiny
-```
-
-Available models: `tiny`, `base`, `small`, `medium`, `large-v3`
-
 ## Troubleshooting
+
+**Deepgram API key not working:**
+- Verify your API key is correct
+- Check your Deepgram account has sufficient credits
+- Ensure the key is set in `.env` file
+
+**Gemini API errors:**
+- Verify API key is active in Google AI Studio
+- Check rate limits
+- Ensure content policy compliance
+
+**Google TTS not working:**
+- Verify `GOOGLE_APPLICATION_CREDENTIALS` path is correct
+- Ensure Cloud Text-to-Speech API is enabled
+- Check service account has proper permissions
 
 **Port already in use:**
 ```bash
 lsof -ti:8000 | xargs kill -9
-```
-
-**FFmpeg not found:**
-```bash
-# Install ffmpeg
-sudo apt-get install ffmpeg  # Ubuntu
-brew install ffmpeg          # macOS
 ```
 
 ## Production Deployment
@@ -178,6 +208,13 @@ brew install ffmpeg          # macOS
 uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
+For production, consider:
+- Using Redis for conversation storage
+- Implementing rate limiting
+- Adding authentication
+- Setting up proper logging
+- Using environment-specific configurations
+
 ---
 
-**Simple. Fast. Just transcription.** 🎤→📝
+**Powered by Deepgram + Gemini + Google Cloud TTS** 🎤→🤖→🔊

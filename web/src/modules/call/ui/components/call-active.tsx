@@ -12,8 +12,10 @@ import {
   Trash2,
   Loader2,
 } from "lucide-react";
-import { useEnhancedAutoTranscription } from "@/hooks/use-enhanced-auto-transcription";
+import { usePushToTalk } from "@/hooks/use-push-to-talk";
+import { useSpacebarControl } from "@/hooks/use-spacebar-control";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useEffect } from "react";
 
 interface Props {
   onLeave: () => void;
@@ -43,28 +45,38 @@ export const CallActive = ({
   toggleMic,
 }: Props) => {
   const {
-    isActive,
-    isUserSpeaking,
-    isProcessing,
+    isConnected,
+    isTalking,
     isAISpeaking,
     transcripts,
+    partialTranscript,
     error: transcriptionError,
-    currentAudioLevel,
-    speechThreshold,
-    startListening,
-    stopListening,
-    clearTranscripts,
-  } = useEnhancedAutoTranscription();
+    connect,
+    disconnect,
+    startTalking,
+    stopTalking,
+    clearTranscripts
+  } = usePushToTalk();
 
-  const handleMicToggle = async () => {
-    toggleMic();
-    if (isMicOn) {
-      // Currently on, so turning off → stop automatic listening
-      stopListening();
-    } else {
-      // Currently off, so turning on → start automatic listening
-      await startListening();
+  // Spacebar control
+  useSpacebarControl({
+    onSpaceDown: startTalking,
+    onSpaceUp: stopTalking,
+    enabled: isConnected && isMicOn
+  });
+
+  // Auto-connect when mic turns on
+  useEffect(() => {
+    if (isMicOn && !isConnected) {
+      connect();
+    } else if (!isMicOn && isConnected) {
+      disconnect();
     }
+  }, [isMicOn, isConnected, connect, disconnect]);
+
+  const handleMicToggle = () => {
+    toggleMic();
+    // Connection is handled by useEffect above
   };
 
   const formatTime = (date: Date) => {
@@ -129,11 +141,10 @@ export const CallActive = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleMicToggle}
-                  disabled={isProcessing}
                   className={`h-14 w-14 rounded-full backdrop-blur-lg bg-white/10 border border-white/20 hover:bg-white/20 hover:scale-110 transition-all duration-200 shadow-lg ${
-                    !isMicOn ? 'bg-red-500/30 border-red-500/50' : isActive ? 'bg-blue-500/30 border-blue-500/50 animate-pulse' : ''
+                    !isMicOn ? 'bg-red-500/30 border-red-500/50' : isConnected ? 'bg-blue-500/30 border-blue-500/50 animate-pulse' : ''
                   }`}
-                  title={isMicOn ? "Stop Auto-Conversation" : "Start Auto-Conversation"}
+                  title={isMicOn ? "Turn off microphone" : "Turn on microphone"}
                 >
                   {isMicOn ? (
                     <Mic className="h-6 w-6 text-white" />
@@ -166,40 +177,15 @@ export const CallActive = ({
             )}
           </div>
 
-          {/* Audio Level Meter - Debug Mode */}
-          {isActive && (
-            <div className="w-full max-w-6xl mt-2">
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-                <span>Audio Level:</span>
-                <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-100 ${
-                      currentAudioLevel > speechThreshold ? 'bg-green-500' : 'bg-blue-500'
-                    }`}
-                    style={{ width: `${(currentAudioLevel / 255) * 100}%` }}
-                  />
-                </div>
-                <span>{currentAudioLevel.toFixed(0)} / {speechThreshold}</span>
-                {isUserSpeaking && <span className="text-green-400">● SPEAKING</span>}
-              </div>
-            </div>
-          )}
-
           {/* Transcript Section Below Video */}
-          {(transcripts.length > 0 || isActive || isProcessing || transcriptionError) && (
+          {(transcripts.length > 0 || isConnected || isTalking || isAISpeaking || transcriptionError) && (
             <div className="w-full max-w-6xl bg-black/80 backdrop-blur-lg border border-white/10 rounded-lg p-4 mt-4">
               <div className="flex flex-col gap-3 max-h-[300px]">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Radio className="h-4 w-4 text-blue-400" />
-                    <span className="text-sm font-semibold">Auto-Conversation</span>
-                    {isProcessing && (
-                      <div className="flex items-center gap-1">
-                        <Loader2 className="h-3 w-3 text-blue-400 animate-spin" />
-                        <span className="text-xs text-blue-300">AI is thinking...</span>
-                      </div>
-                    )}
+                    <span className="text-sm font-semibold">Voice Conversation</span>
                     {isAISpeaking && (
                       <div className="flex items-center gap-1">
                         <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
@@ -229,22 +215,22 @@ export const CallActive = ({
                 )}
 
                 {/* Listening State */}
-                {isActive && !isUserSpeaking && !isProcessing && !isAISpeaking && (
+                {isConnected && !isTalking && !isAISpeaking && (
                   <div className="flex items-center gap-2 p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                     <div className="h-2 w-2 bg-blue-400 rounded-full animate-pulse" />
-                    <p className="text-xs text-blue-200">Listening... Speak naturally, I'll capture your complete thoughts</p>
+                    <p className="text-xs text-blue-200">Hold SPACE to talk</p>
                   </div>
                 )}
 
                 {/* Speaking State */}
-                {isUserSpeaking && (
+                {isTalking && (
                   <div className="flex items-center gap-2 p-2 bg-purple-500/10 border border-purple-500/30 rounded-lg">
                     <div className="flex gap-1">
                       <div className="h-2 w-1 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
                       <div className="h-2 w-1 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
                       <div className="h-2 w-1 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
                     </div>
-                    <p className="text-xs text-purple-200">Speaking...</p>
+                    <p className="text-xs text-purple-200">Recording... Release SPACE to send</p>
                   </div>
                 )}
 
@@ -254,7 +240,7 @@ export const CallActive = ({
                     <div className="flex flex-col items-center justify-center h-full gap-2 text-center py-4">
                       <Mic className="h-6 w-6 text-gray-400" />
                       <p className="text-xs text-gray-400">
-                        {isActive ? "Listening... Start speaking!" : "Turn on the mic to start auto-conversation"}
+                        {isConnected ? "Hold SPACE to talk" : "Turn on the mic to start voice conversation"}
                       </p>
                     </div>
                   ) : (

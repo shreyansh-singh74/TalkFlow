@@ -15,6 +15,6 @@ async def root():
 async def health_check():
     return {
         "status": "healthy", 
-        "whisper_model": settings.WHISPER_MODEL
+        "transcription_service": "deepgram"
     }
 

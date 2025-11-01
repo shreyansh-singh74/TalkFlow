@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.routes import health, transcription
+from app.api.routes import health, transcription, voice_websocket
 
 # Initialize FastAPI app
 app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION)
@@ -20,6 +20,7 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router, tags=["Health"])
 app.include_router(transcription.router, tags=["Transcription"])
+app.include_router(voice_websocket.router, tags=["Voice WebSocket"])
 
 if __name__ == "__main__":
     import uvicorn
