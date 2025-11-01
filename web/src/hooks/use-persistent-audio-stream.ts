@@ -5,15 +5,20 @@ import { useCallback, useRef, useState, useEffect } from "react";
 /**
  * Audio constraints optimized for speech recognition
  */
-const SPEECH_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
+const SPEECH_AUDIO_CONSTRAINTS: MediaTrackConstraints & {
+  // Browser-specific and Chrome-specific audio constraints
+  latency?: number;
+  googEchoCancellation?: boolean;
+  googNoiseSuppression?: boolean;
+  googHighpassFilter?: boolean;
+  googAutoGainControl?: boolean;
+} = {
   echoCancellation: true,
   noiseSuppression: true,
   autoGainControl: true,
   sampleRate: 16000,
   channelCount: 1,
-  // @ts-expect-error - Browser-specific constraints
   latency: 0.01,
-  // @ts-expect-error - Chrome-specific
   googEchoCancellation: true,
   googNoiseSuppression: true,
   googHighpassFilter: true,

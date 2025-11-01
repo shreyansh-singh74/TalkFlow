@@ -98,10 +98,13 @@ export function useSpeechToText(
         rec.onresult = null;
         rec.onerror = null;
         rec.onend = null;
-        // @ts-expect-error - Browser-specific API
-        rec.abort?.();
-        // @ts-expect-error - Browser-specific API
-        rec.stop?.();
+        // Optional chaining handles browser compatibility
+        if ('abort' in rec && typeof rec.abort === 'function') {
+          rec.abort();
+        }
+        if ('stop' in rec && typeof rec.stop === 'function') {
+          rec.stop();
+        }
       } catch {
         // ignore
       }

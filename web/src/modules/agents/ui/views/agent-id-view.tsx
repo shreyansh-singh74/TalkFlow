@@ -41,7 +41,7 @@ export const AgentIdView = ({ agentId }: Props) => {
 
     if (!ok) return;
 
-    await removeAgent.mutateAsync({ id: agentId });
+    await removeAgent.mutateAsync(agentId);
   };
 
   if (isLoading) {

@@ -60,7 +60,7 @@ export const MeetingIdView = ({ meetingId }: Props) => {
     if (!ok) {
       return;
     }
-    await removeMeeting.mutateAsync({ id: meetingId });
+    await removeMeeting.mutateAsync(meetingId);
   };
 
   const isActive = data.status === "active";

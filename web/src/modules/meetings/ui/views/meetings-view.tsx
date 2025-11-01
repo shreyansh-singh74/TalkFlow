@@ -14,7 +14,10 @@ export const MeetingsView = () => {
   const router = useRouter();
   const [filters, setFilters] = useMeetingsFilter();
 
-  const { data, isLoading, error } = useMeetings(filters);
+  const { data, isLoading, error } = useMeetings({
+    ...filters,
+    status: filters.status ?? undefined,
+  });
 
   if (isLoading) {
     return <MeetingsViewLoading />;

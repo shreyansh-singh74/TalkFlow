@@ -7,9 +7,10 @@ import { agentsUpdateSchema } from "@/modules/agents/schemas";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await auth.api.getSession({
       headers: request.headers,
     });
@@ -25,7 +26,7 @@ export async function GET(
       })
       .from(agents)
       .where(
-        and(eq(agents.id, params.id), eq(agents.userId, session.user.id))
+        and(eq(agents.id, id), eq(agents.userId, session.user.id))
       );
 
     if (!existingAgent) {
@@ -44,9 +45,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: paramId } = await params;
     const session = await auth.api.getSession({
       headers: request.headers,
     });
@@ -63,7 +65,7 @@ export async function PUT(
     const [updatedAgent] = await db
       .update(agents)
       .set(updateData)
-      .where(and(eq(agents.id, params.id), eq(agents.userId, session.user.id)))
+      .where(and(eq(agents.id, paramId), eq(agents.userId, session.user.id)))
       .returning();
 
     if (!updatedAgent) {
@@ -82,9 +84,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await auth.api.getSession({
       headers: request.headers,
     });
@@ -96,7 +99,7 @@ export async function DELETE(
     const [removedAgent] = await db
       .delete(agents)
       .where(
-        and(eq(agents.id, params.id), eq(agents.userId, session.user.id))
+        and(eq(agents.id, id), eq(agents.userId, session.user.id))
       )
       .returning();
 

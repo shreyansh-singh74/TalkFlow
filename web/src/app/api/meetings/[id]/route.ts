@@ -7,9 +7,10 @@ import { meetingsUpdateSchema } from "@/modules/meetings/schemas";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await auth.api.getSession({
       headers: request.headers,
     });
@@ -31,7 +32,7 @@ export async function GET(
       .innerJoin(agents, eq(meetings.agentId, agents.id))
       .where(
         and(
-          eq(meetings.id, params.id),
+          eq(meetings.id, id),
           eq(meetings.userId, session.user.id)
         )
       );
@@ -52,9 +53,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: paramId } = await params;
     const session = await auth.api.getSession({
       headers: request.headers,
     });
@@ -71,7 +73,7 @@ export async function PUT(
     const [updatedMeeting] = await db
       .update(meetings)
       .set(updateData)
-      .where(and(eq(meetings.id, params.id), eq(meetings.userId, session.user.id)))
+      .where(and(eq(meetings.id, paramId), eq(meetings.userId, session.user.id)))
       .returning();
 
     if (!updatedMeeting) {
@@ -90,9 +92,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await auth.api.getSession({
       headers: request.headers,
     });
@@ -104,7 +107,7 @@ export async function DELETE(
     const [removedMeeting] = await db
       .delete(meetings)
       .where(
-        and(eq(meetings.id, params.id), eq(meetings.userId, session.user.id))
+        and(eq(meetings.id, id), eq(meetings.userId, session.user.id))
       )
       .returning();
 
