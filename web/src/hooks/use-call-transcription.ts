@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { getBackendUrl } from "@/lib/backend-config";
 
 export interface TranscriptEntry {
   id: string;
@@ -27,11 +28,8 @@ export interface UseCallTranscriptionReturn {
 export function useCallTranscription(
   options: UseCallTranscriptionOptions = {}
 ): UseCallTranscriptionReturn {
-  const {
-    backendUrl = typeof window !== "undefined" 
-      ? process.env.NEXT_PUBLIC_BACKEND_URL || "https://harmonious-heart-production.up.railway.app"
-      : "https://harmonious-heart-production.up.railway.app"
-  } = options;
+  const { backendUrl: providedBackendUrl } = options;
+  const backendUrl = providedBackendUrl || getBackendUrl();
 
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);

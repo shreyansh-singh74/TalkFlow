@@ -4,6 +4,7 @@ import { useMeeting } from "@/hooks/use-api";
 import { CallProvider } from "../components/call-provider";
 import { useSpeechToText } from "@/hooks/use-speech-to-text";
 import { useEffect, useMemo, useState } from "react";
+import { getBackendUrl } from "@/lib/backend-config";
 
 interface Props {
   meetingId: string;
@@ -11,15 +12,14 @@ interface Props {
 
 export const CallView = ({ meetingId }: Props) => {
   const { data, isLoading, error } = useMeeting(meetingId);
+  const backendUrl = getBackendUrl();
 
   const {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     stop,
     lastResponse,
   } = useSpeechToText({
-    endpoint: process.env.NEXT_PUBLIC_BACKEND_URL
-      ? `${process.env.NEXT_PUBLIC_BACKEND_URL.replace(/\/$/, "")}/api/respond`
-      : undefined,
+    endpoint: `${backendUrl}/api/respond`,
   });
 
   const [autoSpeak] = useState(true);

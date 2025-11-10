@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, useEffect } from "react";
 import { AudioChunker } from "@/lib/audio-processing";
 import { StreamingAudioPlayer } from "@/lib/streaming-audio-player";
+import { getWebSocketUrl } from "@/lib/backend-config";
 import { v4 as uuidv4 } from "uuid";
 
 export interface TranscriptEntry {
@@ -29,9 +30,7 @@ export interface UsePushToTalkReturn {
   clearTranscripts: () => void;
 }
 
-export function usePushToTalk(
-  backendUrl: string = process.env.NEXT_PUBLIC_BACKEND_URL || "https://harmonious-heart-production.up.railway.app"
-): UsePushToTalkReturn {
+export function usePushToTalk(): UsePushToTalkReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [isTalking, setIsTalking] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
@@ -121,11 +120,10 @@ export function usePushToTalk(
     }
     
     try {
-      // Convert http:// to ws:// or https:// to wss://
-      const wsUrl = backendUrl.replace(/^http/, "ws");
-      console.log(`🔌 Connecting to ${wsUrl}/ws/voice`);
+      const wsUrl = getWebSocketUrl();
+      console.log(`🔌 Connecting to ${wsUrl}`);
       
-      const ws = new WebSocket(`${wsUrl}/ws/voice`);
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       
       ws.onopen = () => {
@@ -190,7 +188,7 @@ export function usePushToTalk(
       console.error("Failed to connect:", err);
       setError("Failed to connect");
     }
-  }, [backendUrl, handleMessage]);
+  }, [handleMessage]);
   
   /**
    * Start talking (spacebar down)

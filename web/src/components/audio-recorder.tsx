@@ -4,6 +4,7 @@ import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mic, Play, Square } from "lucide-react";
+import { getBackendUrl } from "@/lib/backend-config";
 
 interface AudioRecorderProps {
   onTranscript?: (transcript: string) => void;
@@ -20,8 +21,7 @@ export default function AudioRecorder({ onTranscript, onReply }: AudioRecorderPr
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-
-  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://harmonious-heart-production.up.railway.app";
+  const backendUrl = getBackendUrl();
 
   async function startRecording() {
     try {
@@ -93,7 +93,7 @@ export default function AudioRecorder({ onTranscript, onReply }: AudioRecorderPr
     formData.append("audio", audioBlob, "recording.webm");
 
     try {
-      const response = await fetch(`${BACKEND_URL}/transcribe`, {
+      const response = await fetch(`${backendUrl}/transcribe`, {
         method: "POST",
         body: formData,
       });

@@ -44,7 +44,7 @@ async def stream_gemini_response(
         
         # Initialize model with streaming
         model = genai.GenerativeModel(
-            "gemini-2.0-flash-exp",
+            "gemini-2.0-flash",
             system_instruction=(
                 "You are an English-speaking coach helping users improve conversational English.\n"
                 "Be concise and encouraging. Keep responses to 2-3 sentences.\n"
@@ -119,8 +119,23 @@ async def stream_gemini_response(
             yield token_buffer
             
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         print(f"✗ Gemini Streaming Error: {type(e).__name__}: {e}")
-        yield "Sorry, I couldn't generate a response. Please try again."
+        print(f"Full traceback:\n{error_details}")
+        
+        # Handle specific error types
+        error_str = str(e).lower()
+        error_type = type(e).__name__
+        
+        if "quota" in error_str or "429" in error_str or "ResourceExhausted" in error_type:
+            yield "API quota exceeded. Please get a new Gemini API key from https://aistudio.google.com/app/apikey"
+        elif "401" in error_str or "403" in error_str or "invalid" in error_str:
+            yield "Invalid API key. Please check your Gemini API configuration."
+        elif isinstance(e, ValueError) and "Content blocked" in str(e):
+            yield "I was blocked from answering that. Could you rephrase your message?"
+        else:
+            yield "Sorry, I couldn't generate a response. Please try again."
 
 
 def _call_gemini(prompt: str) -> str:
@@ -193,5 +208,20 @@ def get_gemini_response(
                 return "I'm thinking too long. Can you try again?"
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         print(f"✗ Gemini Error: {type(e).__name__}: {e}")
+        print(f"Full traceback:\n{error_details}")
+        
+        # Handle specific error types
+        error_str = str(e).lower()
+        error_type = type(e).__name__
+        
+        if "quota" in error_str or "429" in error_str or "ResourceExhausted" in error_type:
+            return "API quota exceeded. Please get a new Gemini API key from https://aistudio.google.com/app/apikey"
+        elif "401" in error_str or "403" in error_str or "invalid" in error_str:
+            return "Invalid API key. Please check your Gemini API configuration."
+        elif isinstance(e, ValueError) and "Content blocked" in str(e):
+            return "I was blocked from answering that. Could you rephrase your question?"
+        
         return "Sorry, I couldn't generate a response. Please try again."
