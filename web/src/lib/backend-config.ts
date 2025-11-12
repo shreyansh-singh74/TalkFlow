@@ -3,6 +3,11 @@
  * Manages switching between localhost and production backend
  */
 
+// Extend Window interface to include our custom property
+interface WindowWithBackendLog extends Window {
+  __backendUrlLogged?: boolean;
+}
+
 /**
  * Get the backend URL based on environment configuration
  * Controlled by NEXT_PUBLIC_USE_LOCALHOST env variable
@@ -22,9 +27,9 @@ export function getBackendUrl(): string {
   const selectedUrl = useLocalhost ? normalizedLocalhost : normalizedProduction;
   
   // Log which backend is being used (only in browser, only once)
-  if (typeof window !== 'undefined' && !(window as any).__backendUrlLogged) {
+  if (typeof window !== 'undefined' && !(window as WindowWithBackendLog).__backendUrlLogged) {
     console.log(`🔗 Backend URL: ${selectedUrl} ${useLocalhost ? '(localhost)' : '(production)'}`);
-    (window as any).__backendUrlLogged = true;
+    (window as WindowWithBackendLog).__backendUrlLogged = true;
   }
   
   return selectedUrl;

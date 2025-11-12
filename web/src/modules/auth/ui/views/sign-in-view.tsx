@@ -127,7 +127,15 @@ export const SignInView = () => {
                         name="password"
                         render={({field})=>(
                             <FormItem>
-                                <FormLabel>Password</FormLabel>
+                                <div className="flex items-center justify-between">
+                                    <FormLabel>Password</FormLabel>
+                                    <Link 
+                                        href="/forgot-password" 
+                                        className="text-sm text-muted-foreground hover:text-primary underline underline-offset-4"
+                                    >
+                                        Forgot password?
+                                    </Link>
+                                </div>
                                 <FormControl>
                                     <Input 
                                     type="password"
