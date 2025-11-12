@@ -1,196 +1,94 @@
 # **TalkFlow**
 
-> **AI-Powered Language Learning Platform** — Practice pronunciation with personalized AI tutors and track your progress through interactive sessions.
+> **AI-Powered Language Learning Platform** — Practice pronunciation with personalized AI tutors and real-time feedback.
 
 ---
 
-## 🚀 Overview
+## Overview
+**TalkFlow** helps users improve pronunciation and speaking fluency through AI tutors that provide instant, personalized feedback. Built with **Next.js** and **FastAPI**, it combines modern web technologies with AI models like **Google Gemini** and **OpenAI Whisper**.
 
-**TalkFlow** is an AI-driven language learning platform that helps you improve pronunciation with real-time feedback.  
-You can create your own AI tutors, schedule practice meetings, and track your progress — all in one place.
-
-## Features
-
-- **Custom AI Tutors** - Create personalized language learning agents with custom instructions
-- **Real-time Pronunciation Feedback** - Get instant feedback using OpenAI Whisper and Google Gemini
-- **Meeting Management** - Schedule, track, and manage your learning sessions
-- **Progress Tracking** - Monitor your improvement with detailed session analytics
-- **User Authentication** - Secure login and user management system
-- **Responsive Design** - Works seamlessly on desktop and mobile devices
+---
 
 ## Tech Stack
+**Frontend:** Next.js 15, React 19, TypeScript, Tailwind CSS, Better Auth  
+**Backend:** FastAPI, Python 3.12, OpenAI Whisper, Google Gemini  
+**Database:** Drizzle ORM  
+**Other:** ffmpeg (audio processing)
 
-### Frontend
-- Next.js 15 with React 19
-- TypeScript for type safety
-- Tailwind CSS for styling
-- Radix UI components
-- Better Auth for authentication
-- Drizzle ORM for database management
+---
+
+## Features
+- Create custom AI tutors  
+- Real-time pronunciation feedback  
+- Track session analytics  
+- Manage and schedule meetings  
+- Secure authentication  
+- Fully responsive UI
+
+---
+
+## Setup
+
+**Requirements:**  
+Node.js 18+, Python 3.12+, ffmpeg
+
+```bash
+# Clone repo
+git clone https://github.com/yourusername/TalkFlow.git
+cd TalkFlow
+````
 
 ### Backend
-- FastAPI for API development
-- OpenAI Whisper for speech-to-text transcription
-- Google Gemini for AI-powered feedback
-- Python 3.12 with async support
 
-## Prerequisites
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
 
-- Node.js 18+ and npm
-- Python 3.12+
-- ffmpeg (for audio processing)
+### Frontend
 
-## Installation
+```bash
+cd web
+npm install
+npm run dev
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/TalkFlow.git
-   cd TalkFlow
-   ```
+**Environment variables (.env):**
 
-2. **Install dependencies**
-   
-   **Backend:**
-   ```bash
-   cd backend
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
-   
-   **Frontend:**
-   ```bash
-   cd web
-   npm install
-   ```
+```bash
+GEMINI_API_KEY="your-gemini-api-key"
+WHISPER_MODEL="base"
+```
 
-3. **Configure environment variables**
-   
-   Create a `.env` file in the root directory:
-   ```bash
-   GEMINI_API_KEY="your-gemini-api-key-here"
-   WHISPER_MODEL="tiny"  # Options: tiny, base, small, medium, large
-   ```
-
-4. **Start the application**
-   
-   **Backend:**
-   ```bash
-   cd backend
-   source venv/bin/activate
-   python main.py
-   ```
-   
-   **Frontend:**
-   ```bash
-   cd web
-   npm run dev
-   ```
-
-5. **Access the application**
-   - Main app: http://localhost:3000
-   - Test recorder: http://localhost:3000/test-recorder
+---
 
 ## How It Works
 
-1. **Create an Account** - Sign up and create your profile
-2. **Build AI Tutors** - Create custom language learning agents with specific instructions
-3. **Schedule Meetings** - Plan practice sessions with your AI tutors
-4. **Practice Pronunciation** - Record audio and receive real-time feedback
-5. **Track Progress** - Monitor your improvement over time
+1. Create an account
+2. Build your AI tutor
+3. Schedule a meeting
+4. Speak and get feedback
+5. Track progress over time
 
-## Getting Started
+---
 
-### Creating Your First AI Tutor
-1. Navigate to the Agents section
-2. Click "Create New Agent"
-3. Provide a name and detailed instructions for your tutor
-4. Save and start scheduling meetings
+## Core APIs
 
-### Practicing Pronunciation
-1. Go to your scheduled meeting
-2. Click the microphone button to start recording
-3. Speak clearly into your device
-4. Stop recording to receive AI feedback
-5. Review pronunciation tips and practice suggestions
+* `/api/conversations` — Create conversation
+* `/api/analyse` — Get pronunciation metrics
+* `/api/reports` — Fetch session analytics
 
-## Configuration
-
-### Whisper Models
-Choose the right model for your needs:
-- `tiny` - Fastest, good for testing
-- `base` - Balanced speed and accuracy
-- `small` - Better accuracy, slower
-- `medium` - High accuracy, best for production
-- `large` - Highest accuracy, requires more resources
-
-### API Keys
-- **Gemini API**: Get your free API key from [Google AI Studio](https://ai.google.dev/)
-- **Rate Limits**: Free tier includes 15 requests per minute
-
-## Screenshots
-
-### Dashboard Overview
-![Dashboard](web/images/dashboard.png)
-
-### AI Tutors Management
-![AI Tutors](web/images/agents.png)
-
-### Meetings & Sessions
-![Meetings](web/images/meetings.png)
-
-### Sign In
-![Sign In](web/images/login.png)
-
-### Sign Up
-![Sign Up](web/images/signup.png)
-
-
-## Project Structure
-
-```
-TalkFlow/
-├── backend/                 # FastAPI backend
-│   ├── main.py             # Main server file
-│   ├── requirements.txt    # Python dependencies
-│   └── venv/              # Virtual environment
-├── web/                    # Next.js frontend
-│   ├── src/
-│   │   ├── app/           # App router pages
-│   │   ├── components/    # Reusable UI components
-│   │   ├── modules/       # Feature modules
-│   │   ├── lib/          # Utilities and configurations
-│   │   └── db/           # Database schema
-│   └── package.json
-├── docs/                   # Documentation and screenshots
-│   └── screenshots/       # UI screenshots
-└── README.md
-```
-
-## Performance
-
-- **Transcription Speed**: ~2-5 seconds for 10-second audio
-- **API Response Time**: <500ms for feedback generation
-- **Supported Audio Formats**: WebM, MP3, WAV
-- **Browser Support**: Chrome, Firefox, Safari, Edge
+---
 
 ## Contributing
 
-We welcome contributions! Please follow these steps:
+Fork → Create branch → Commit → PR
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+---
 
+## License
 
-## Acknowledgments
-
-- [OpenAI Whisper](https://github.com/openai/whisper) for speech recognition
-- [Google Gemini](https://ai.google.dev/) for AI-powered feedback
-- [FastAPI](https://fastapi.tiangolo.com/) for the backend framework
-- [Next.js](https://nextjs.org/) for the frontend framework
-
-
-Start your language learning journey today!
+MIT © 2025 TalkFlow
