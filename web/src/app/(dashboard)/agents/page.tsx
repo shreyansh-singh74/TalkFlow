@@ -10,22 +10,19 @@ import { redirect } from "next/navigation";
 import { SearchParams } from "nuqs";
 import { Suspense } from "react";
 
+export const dynamic = "force-dynamic";
+
 interface Props {
   searchParams: Promise<SearchParams>;
 }
 
 const Page = async ({ searchParams }: Props) => {
-  try {
-    await loadSearchParams(searchParams);
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+  await loadSearchParams(searchParams);
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
 
-    if (!session) {
-      redirect("/sign-in");
-    }
-  } catch (error) {
-    console.error("Auth error:", error);
+  if (!session) {
     redirect("/sign-in");
   }
 
