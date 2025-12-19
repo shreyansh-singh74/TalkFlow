@@ -26,11 +26,11 @@ export default function AudioRecorder({ onTranscript, onReply }: AudioRecorderPr
   async function startRecording() {
     try {
       setError("");
+      // Don't specify sampleRate - Firefox requires matching rates between MediaStream and AudioContext
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 16000
+          noiseSuppression: true
         } 
       });
       

@@ -31,6 +31,7 @@ class Settings:
     # API Keys
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     DEEPGRAM_API_KEY: str = os.getenv("DEEPGRAM_API_KEY", "")
+    OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
     
     # Google Cloud Credentials - Support both file path and base64 encoded JSON
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
@@ -104,8 +105,8 @@ class Settings:
     
     def validate(self):
         """Validate required settings"""
-        if not self.GEMINI_API_KEY:
-            print("WARNING: GEMINI_API_KEY not set - AI responses will not work!")
+        if not self.OPENROUTER_API_KEY and not self.GEMINI_API_KEY:
+            print("WARNING: Neither OPENROUTER_API_KEY nor GEMINI_API_KEY are set - AI responses will not work!")
         if not self.GOOGLE_APPLICATION_CREDENTIALS:
             print("WARNING: GOOGLE_APPLICATION_CREDENTIALS not set - TTS will not work!")
         elif self.GOOGLE_APPLICATION_CREDENTIALS and not os.path.exists(self.GOOGLE_APPLICATION_CREDENTIALS):

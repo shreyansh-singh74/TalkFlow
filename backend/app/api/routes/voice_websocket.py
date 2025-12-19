@@ -59,6 +59,22 @@ async def cleanup_stale_sessions():
         except Exception as e:
             print(f"✗ Error in cleanup task: {e}")
 
+"""
+voice_websocket.py handles the WebSocket interface for real-time voice conversations in the application.
+
+Core concepts on this page:
+- Defines FastAPI routes for managing voice chat sessions via WebSocket.
+- Maintains in-memory session storage (`sessions`) mapping session IDs to session data (each typically an instance of `VoiceSession`).
+- Runs a background task (`cleanup_stale_sessions`) that regularly checks for and removes stale (inactive) sessions, closing their WebSockets and cleaning up resources when a timeout is exceeded.
+- The `VoiceSession` class tracks all session-specific context and resources, including:
+    - Connection/websocket info.
+    - Conversation history and metadata.
+    - Integration with Deepgram for live audio transcription.
+    - Manages start/end of transcription turns, partial/final transcript handling, audio streaming, and TTS (text-to-speech) generation flow.
+- The routes defined here enable interactive, bi-directional audio and text communication between client and server for the voice chat feature.
+
+Essentially, this module brings together session lifecycle management, speech-to-text (Deepgram), text-to-speech (Google TTS), and conversational AI into a single, persistent WebSocket workflow for each connected user.
+"""
 
 class VoiceSession:
     def __init__(self, websocket: WebSocket):

@@ -1,5 +1,3 @@
-import google.generativeai as genai
-from app.core.config import settings
 import os
 import asyncio
 import time
@@ -7,9 +5,81 @@ import re
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import List, Dict, Optional, AsyncGenerator
 
+import requests
+
+from app.core.config import settings
+
 # Suppress Google API warnings
 os.environ['GRPC_VERBOSITY'] = 'ERROR'
 os.environ['GLOG_minloglevel'] = '2'
+
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-001")
+
+
+def _call_openrouter(prompt: str) -> str:
+    """
+    Call OpenRouter chat completions API and return the full response text.
+    This replaces the direct Gemini SDK call, but keeps the same prompt shape.
+    """
+    if not settings.OPENROUTER_API_KEY:
+        raise RuntimeError("OPENROUTER_API_KEY is not set")
+
+    headers = {
+        "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        # Optional but recommended by OpenRouter for rate‑limiting/attribution
+        "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:3000"),
+        "X-Title": os.getenv("OPENROUTER_APP_NAME", "TalkFlow"),
+    }
+
+    payload = {
+        "model": OPENROUTER_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are an English-speaking coach helping users improve conversational English.\n"
+                    "Be concise and encouraging. Keep responses to 2-3 sentences.\n"
+                    "If you notice grammar errors, gently correct them and ask the user to repeat.\n"
+                    "Ask follow-up questions to keep the conversation going.\n"
+                    "Remember the context of previous messages in the conversation."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.7,
+        "max_tokens": 150,
+    }
+
+    try:
+        resp = requests.post(
+            OPENROUTER_API_URL,
+            headers=headers,
+            json=payload,
+            timeout=20,
+        )
+    except Exception as e:  # Network error, timeout, etc.
+        raise RuntimeError(f"Failed to call OpenRouter: {e}") from e
+
+    # Raise for HTTP errors so we can handle them consistently below
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as http_err:
+        # Try to include any error payload from OpenRouter
+        try:
+            err_json = resp.json()
+            err_message = err_json.get("error", {}).get("message") or str(err_json)
+        except Exception:
+            err_message = resp.text
+        raise RuntimeError(f"OpenRouter HTTP error {resp.status_code}: {err_message}") from http_err
+
+    data = resp.json()
+    # Expected shape: {"choices": [{"message": {"content": "..."}, ...}], ...}
+    try:
+        return data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError) as e:
+        raise RuntimeError(f"Unexpected OpenRouter response format: {data}") from e
 
 async def stream_gemini_response(
     current_text: str,
@@ -40,28 +110,7 @@ async def stream_gemini_response(
         context_messages.append(f"User: {current_text}")
         full_prompt = "\n".join(context_messages)
         
-        print(f"🤖 Streaming Gemini with context (length: {len(full_prompt)} chars)")
-        
-        # Initialize model with streaming
-        model = genai.GenerativeModel(
-            "gemini-2.0-flash",
-            system_instruction=(
-                "You are an English-speaking coach helping users improve conversational English.\n"
-                "Be concise and encouraging. Keep responses to 2-3 sentences.\n"
-                "If you notice grammar errors, gently correct them and ask the user to repeat.\n"
-                "Ask follow-up questions to keep the conversation going.\n"
-                "Remember the context of previous messages in the conversation."
-            )
-        )
-        
-        response = model.generate_content(
-            full_prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=150,
-            ),
-            stream=True
-        )
+        print(f"🤖 Streaming OpenRouter (Gemini via OpenRouter) with context (length: {len(full_prompt)} chars)")
         
         # Token batching buffer
         token_buffer = ""
@@ -69,6 +118,16 @@ async def stream_gemini_response(
         last_flush_time = time.time() * 1000  # ms
         
         # Policy parameters
+        # We call OpenRouter once to get the full reply, then
+        # apply the same batching policies as before on the text.
+        loop = asyncio.get_event_loop()
+        reply_text = await loop.run_in_executor(
+            None, _call_openrouter, full_prompt
+        )
+
+        # Split reply text into "tokens" (space‑separated words) and stream
+        words = reply_text.split()
+
         if is_first_turn:
             # Policy A: Low latency (10-30 tokens or 100-200ms)
             min_tokens = 10
@@ -81,18 +140,15 @@ async def stream_gemini_response(
             max_tokens = 50
             flush_interval_ms = 300  # 300ms
             print("📊 Using Policy B (punctuation-aware)")
-        
-        for chunk in response:
-            if not chunk.text:
-                continue
-                
-            token_buffer += chunk.text
-            token_count += len(chunk.text.split())
+
+        for word in words:
+            token_buffer += (word + " ")
+            token_count += 1
             current_time = time.time() * 1000  # ms
-            
+
             # Flush conditions
             should_flush = False
-            
+
             if is_first_turn:
                 # Policy A: Time-based or token count
                 if token_count >= min_tokens or (current_time - last_flush_time) >= flush_interval_ms:
@@ -105,13 +161,16 @@ async def stream_gemini_response(
                     should_flush = True
                 elif token_count >= min_tokens and (current_time - last_flush_time) >= flush_interval_ms:
                     should_flush = True
-            
+
             if should_flush and token_buffer.strip():
                 print(f"💬 Flushing: {len(token_buffer)} chars, {token_count} tokens")
                 yield token_buffer
                 token_buffer = ""
                 token_count = 0
                 last_flush_time = current_time
+
+            # Small sleep to avoid hammering the event loop
+            await asyncio.sleep(flush_interval_ms / 1000.0 / 10.0)
         
         # Flush remaining
         if token_buffer.strip():
@@ -139,26 +198,11 @@ async def stream_gemini_response(
 
 
 def _call_gemini(prompt: str) -> str:
-    """Internal function to call Gemini API"""
-    model = genai.GenerativeModel(
-        "gemini-2.0-flash",
-        system_instruction=(
-            "You are an English-speaking coach helping users improve conversational English.\n"
-            "Be concise and encouraging. Keep responses to 2-3 sentences.\n"
-            "If you notice grammar errors, gently correct them and ask the user to repeat.\n"
-            "Ask follow-up questions to keep the conversation going.\n"
-            "Remember the context of previous messages in the conversation."
-        )
-    )
-    
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.types.GenerationConfig(
-            temperature=0.7,
-            max_output_tokens=150,  # Keep responses short
-        )
-    )
-    return response.text
+    """
+    Backwards-compatible wrapper that now calls OpenRouter instead of the
+    deprecated direct Gemini SDK. Kept for existing callers.
+    """
+    return _call_openrouter(prompt)
 
 def get_gemini_response(
     current_text: str,

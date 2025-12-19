@@ -37,7 +37,7 @@ async def transcribe(
         context = []
         if conversation_id:
             context = conversation_contexts.get(conversation_id, [])
-            print(f"📚 Retrieved {len(context)} previous turns for conversation {conversation_id}")
+            print(f"Retrieved {len(context)} previous turns for conversation {conversation_id}")
         
         # Get Gemini AI response WITH context
         reply = get_gemini_response(
@@ -58,16 +58,16 @@ async def transcribe(
             
             # Keep only last 10 turns to prevent memory bloat
             conversation_contexts[conversation_id] = conversation_contexts[conversation_id][-10:]
-            print(f"💾 Updated conversation context (now {len(conversation_contexts[conversation_id])} turns)")
+            print(f"Updated conversation context (now {len(conversation_contexts[conversation_id])} turns)")
         
         # Convert AI reply to speech
         audio_base64 = None
         if reply:
             audio_base64 = tts_service.text_to_speech(reply)
             if audio_base64:
-                print(f"✓ TTS audio generated successfully")
+                print(f"TTS audio generated successfully")
             else:
-                print(f"✗ TTS generation failed, returning text only")
+                print(f"TTS generation failed, returning text only")
         
         result = {
             "transcript": transcript,

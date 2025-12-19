@@ -56,6 +56,7 @@ export class AudioChunker {
   private processor: ScriptProcessorNode;
   private source: MediaStreamAudioSourceNode;
   private onChunk: (chunk: Int16Array) => void;
+  private targetSampleRate: number;
   
   constructor(
     stream: MediaStream,
@@ -63,16 +64,31 @@ export class AudioChunker {
     targetSampleRate: number = 16000
   ) {
     this.onChunk = onChunk;
-    this.context = new AudioContext({ sampleRate: targetSampleRate });
+    this.targetSampleRate = targetSampleRate;
+    
+    // Don't specify sampleRate - let it use the stream's native rate
+    // Firefox doesn't allow connecting MediaStreamAudioSourceNode to AudioContext
+    // with different sample rates
+    this.context = new AudioContext();
+    console.log(`🎧 AudioContext created with sample rate: ${this.context.sampleRate}`);
     this.source = this.context.createMediaStreamSource(stream);
     
-    // 4096 samples at 16kHz = ~256ms
-    // We'll collect chunks to get ~100ms
+    // 4096 samples at native rate
     this.processor = this.context.createScriptProcessor(4096, 1, 1);
     
     this.processor.onaudioprocess = (e) => {
       const inputData = e.inputBuffer.getChannelData(0);
-      const pcm16 = convertToPCM16(inputData);
+      const nativeSampleRate = this.context.sampleRate;
+      
+      // Resample if needed
+      let processedData: Float32Array;
+      if (nativeSampleRate !== targetSampleRate) {
+        processedData = resampleAudio(inputData, nativeSampleRate, targetSampleRate);
+      } else {
+        processedData = inputData;
+      }
+      
+      const pcm16 = convertToPCM16(processedData);
       this.onChunk(pcm16);
     };
     

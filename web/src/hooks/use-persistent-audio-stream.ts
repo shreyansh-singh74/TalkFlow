@@ -4,6 +4,8 @@ import { useCallback, useRef, useState, useEffect } from "react";
 
 /**
  * Audio constraints optimized for speech recognition
+ * Note: Don't specify sampleRate - Firefox requires MediaStream and AudioContext
+ * to have matching sample rates. We'll resample to 16kHz in the AudioChunker instead.
  */
 const SPEECH_AUDIO_CONSTRAINTS: MediaTrackConstraints & {
   // Browser-specific and Chrome-specific audio constraints
@@ -16,7 +18,7 @@ const SPEECH_AUDIO_CONSTRAINTS: MediaTrackConstraints & {
   echoCancellation: true,
   noiseSuppression: true,
   autoGainControl: true,
-  sampleRate: 16000,
+  // sampleRate omitted - use system default for Firefox compatibility
   channelCount: 1,
   latency: 0.01,
   googEchoCancellation: true,

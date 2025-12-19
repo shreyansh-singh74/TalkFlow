@@ -10,9 +10,9 @@ class TTSService:
         """Initialize the Google Cloud TTS client"""
         try:
             self.client = texttospeech.TextToSpeechClient()
-            print("✓ Google Cloud TTS client initialized successfully")
+            print("Google Cloud TTS client initialized successfully")
         except Exception as e:
-            print(f"✗ Failed to initialize TTS client: {str(e)}")
+            print(f"Failed to initialize TTS client: {str(e)}")
             self.client = None
     
     def text_to_speech(self, text: str) -> str | None:
@@ -26,11 +26,11 @@ class TTSService:
             Base64 encoded audio string or None if conversion fails
         """
         if not self.client:
-            print("✗ TTS client not initialized")
+            print("TTS client not initialized")
             return None
             
         if not text or text.strip() == "":
-            print("✗ Empty text provided for TTS")
+            print("Empty text provided for TTS")
             return None
         
         try:
@@ -60,11 +60,11 @@ class TTSService:
             # Encode audio content to base64
             audio_base64 = base64.b64encode(response.audio_content).decode('utf-8')
             
-            print(f"✓ Successfully generated TTS audio ({len(response.audio_content)} bytes)")
+            print(f"Successfully generated TTS audio ({len(response.audio_content)} bytes)")
             return audio_base64
             
         except Exception as e:
-            print(f"✗ TTS conversion error: {str(e)}")
+            print(f"TTS conversion error: {str(e)}")
             return None
 
 # Create a singleton instance

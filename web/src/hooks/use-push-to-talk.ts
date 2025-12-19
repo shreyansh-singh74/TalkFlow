@@ -214,10 +214,12 @@ export function usePushToTalk(): UsePushToTalkReturn {
       wsRef.current.send(JSON.stringify({ type: "INTERRUPT" }));
       
       // Get microphone stream
+      // Don't specify sampleRate - let it use system default
+      // Firefox enforces sample rate matching between MediaStream and AudioContext
+      // We'll resample to 16kHz in the AudioChunker instead
       if (!streamRef.current) {
         streamRef.current = await navigator.mediaDevices.getUserMedia({
           audio: {
-            sampleRate: 16000,
             channelCount: 1,
             echoCancellation: true,
             noiseSuppression: true
