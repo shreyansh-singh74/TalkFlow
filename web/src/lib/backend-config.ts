@@ -39,26 +39,34 @@ export function getBackendUrl(): string {
   // No hardcoded fallback to prevent using wrong backend
   const productionUrl = getEnv('NEXT_PUBLIC_BACKEND_URL_PROD');
   
+  // Remove trailing slashes (normalize early)
+  const normalizedLocalhost = localhostUrl.replace(/\/$/, '');
+  const normalizedProduction = productionUrl?.replace(/\/$/, '') || '';
+  
   // During build time (SSG), return a placeholder to prevent build errors
   // The actual URL will be resolved at runtime in the browser
   const isBuildTime = typeof window === 'undefined';
   
   if (isBuildTime) {
     // Return a placeholder during build - this won't be used, just prevents build errors
-    return productionUrl || localhostUrl || 'http://localhost:8000';
+    return normalizedProduction || normalizedLocalhost;
   }
   
-  // At runtime, throw error if production URL is missing (only in browser)
+  // At runtime, check if production URL is missing
   if (!useLocalhost && !productionUrl) {
-    throw new Error(
-      'NEXT_PUBLIC_BACKEND_URL_PROD environment variable is not set. ' +
-      'Please set it in your Vercel environment variables or .env.local file.'
-    );
+    // In production, log a warning and use localhost as fallback
+    // This prevents the app from crashing, but you should fix the env var
+    if (typeof window !== 'undefined') {
+      console.error(
+        '⚠️ NEXT_PUBLIC_BACKEND_URL_PROD is not set. ' +
+        'Please set it in Vercel environment variables with "All Environments" scope. ' +
+        'Falling back to localhost URL.'
+      );
+    }
+    // Fallback to localhost URL to prevent app crash
+    // This should be fixed by setting the env var properly
+    return normalizedLocalhost;
   }
-  
-  // Remove trailing slashes
-  const normalizedLocalhost = localhostUrl.replace(/\/$/, '');
-  const normalizedProduction = productionUrl?.replace(/\/$/, '') || '';
   
   const selectedUrl = useLocalhost ? normalizedLocalhost : normalizedProduction;
   
