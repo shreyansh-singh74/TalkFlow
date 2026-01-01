@@ -39,6 +39,16 @@ export function getBackendUrl(): string {
   // No hardcoded fallback to prevent using wrong backend
   const productionUrl = getEnv('NEXT_PUBLIC_BACKEND_URL_PROD');
   
+  // During build time (SSG), return a placeholder to prevent build errors
+  // The actual URL will be resolved at runtime in the browser
+  const isBuildTime = typeof window === 'undefined';
+  
+  if (isBuildTime) {
+    // Return a placeholder during build - this won't be used, just prevents build errors
+    return productionUrl || localhostUrl || 'http://localhost:8000';
+  }
+  
+  // At runtime, throw error if production URL is missing (only in browser)
   if (!useLocalhost && !productionUrl) {
     throw new Error(
       'NEXT_PUBLIC_BACKEND_URL_PROD environment variable is not set. ' +
