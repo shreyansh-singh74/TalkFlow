@@ -153,13 +153,13 @@ console.log(data.reply);       // AI response
 
 ## Features
 
-✅ **Deepgram Transcription** - High-quality speech-to-text  
-✅ **Gemini AI** - Intelligent, context-aware responses  
-✅ **Google Cloud TTS** - Natural text-to-speech  
-✅ **Conversation Memory** - Maintains context across turns  
-✅ **CORS Support** - Frontend integration ready  
-✅ **Error Handling** - Robust error management  
-✅ **Audio Format Support** - Multiple audio formats accepted  
+- **Deepgram Transcription** - High-quality speech-to-text  
+- **Gemini AI** - Intelligent, context-aware responses  
+- **Google Cloud TTS** - Natural text-to-speech  
+- **Conversation Memory** - Maintains context across turns  
+- **CORS Support** - Frontend integration ready  
+- **Error Handling** - Robust error management  
+- **Audio Format Support** - Multiple audio formats accepted  
 
 ## Configuration Options
 
@@ -217,4 +217,4 @@ For production, consider:
 
 ---
 
-**Powered by Deepgram + Gemini + Google Cloud TTS** 🎤→🤖→🔊
+**Powered by Deepgram + Gemini + Google Cloud TTS**

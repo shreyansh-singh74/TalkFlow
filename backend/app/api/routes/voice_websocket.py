@@ -36,7 +36,7 @@ async def cleanup_stale_sessions():
                     time_since_activity = current_time - session.last_activity
                     
                     if time_since_activity > SESSION_TIMEOUT_SECONDS:
-                        print(f"🧹 Session {session_id} inactive for {time_since_activity/60:.1f} minutes, cleaning up")
+                        print(f"Session {session_id} inactive for {time_since_activity/60:.1f} minutes, cleaning up")
                         stale_session_ids.append(session_id)
             
             # Clean up stale sessions
@@ -54,10 +54,10 @@ async def cleanup_stale_sessions():
                         await session.deepgram_service.finish()
                     
                     del sessions[session_id]
-                    print(f"✓ Cleaned up session {session_id}")
+                    print(f"Cleaned up session {session_id}")
                     
         except Exception as e:
-            print(f"✗ Error in cleanup task: {e}")
+            print(f"Error in cleanup task: {e}")
 
 """
 voice_websocket.py handles the WebSocket interface for real-time voice conversations in the application.
@@ -110,7 +110,7 @@ class VoiceSession:
     async def handle_start_turn(self, msg: ControlMessage):
         """Handle START_TURN: Initialize Deepgram streaming"""
         self.update_activity()
-        print(f"📞 START_TURN: {msg.turn_id}")
+        print(f"START_TURN: {msg.turn_id}")
         self.current_turn_id = msg.turn_id
         self.partial_transcript = ""
         self.final_transcript = ""
@@ -136,7 +136,7 @@ class VoiceSession:
     async def handle_end_turn(self, msg: ControlMessage):
         """Handle END_TURN: Finalize transcript and generate streaming response"""
         self.update_activity()
-        print(f"📞 END_TURN: {msg.turn_id}")
+        print(f"END_TURN: {msg.turn_id}")
         
         # Finalize Deepgram
         if self.deepgram_service:
@@ -146,7 +146,7 @@ class VoiceSession:
         await asyncio.sleep(0.2)
         
         if not self.final_transcript:
-            print("⚠️ No transcript received")
+            print("No transcript received")
             return
         
         # Send final transcript
@@ -169,7 +169,7 @@ class VoiceSession:
             is_first_turn=is_first_turn
         ):
             if self.should_stop_tts:
-                print("⏹️ LLM streaming interrupted")
+                print("LLM streaming interrupted")
                 break
             
             full_response_text += text_chunk
@@ -215,14 +215,14 @@ class VoiceSession:
         
         for batch_idx, text_batch in enumerate(text_batches):
             if self.should_stop_tts:
-                print("⏹️ TTS interrupted")
+                print("TTS interrupted")
                 break
             
             # Skip empty batches
             if not text_batch.strip():
                 continue
             
-            print(f"🔊 Synthesizing batch {batch_idx + 1}/{len(text_batches)}: '{text_batch[:50]}...'")
+            print(f"Synthesizing batch {batch_idx + 1}/{len(text_batches)}: '{text_batch[:50]}...'")
             
             # Generate TTS for this batch (should be 500-800ms of audio)
             audio_base64 = tts_service.text_to_speech(text_batch)
@@ -244,7 +244,7 @@ class VoiceSession:
             await self.websocket.send_bytes(audio_bytes)
             
             seq += 1
-            print(f"✓ Sent TTS chunk {seq} ({len(audio_bytes)} bytes)")
+            print(f"Sent TTS chunk {seq} ({len(audio_bytes)} bytes)")
         
         self.is_generating_tts = False
         
@@ -269,7 +269,7 @@ class VoiceSession:
         for i in range(0, len(audio_bytes), chunk_size):
             # Check if interrupted
             if self.should_stop_tts:
-                print("⏹️ TTS interrupted")
+                print("TTS interrupted")
                 break
                 
             chunk = audio_bytes[i:i + chunk_size]
@@ -320,14 +320,14 @@ async def voice_websocket(websocket: WebSocket):
     session = VoiceSession(websocket)
     sessions[session.session_id] = session
     
-    print(f"✅ WebSocket connected: {session.session_id}")
-    print(f"📊 Active sessions: {len(sessions)}")
+    print(f"WebSocket connected: {session.session_id}")
+    print(f"Active sessions: {len(sessions)}")
     
     # Start cleanup task (only once)
     if not cleanup_task_started:
         cleanup_task_started = True
         cleanup_task = asyncio.create_task(cleanup_stale_sessions())
-        print("🧹 Started session cleanup background task")
+        print("Started session cleanup background task")
     
     # Send keep-alive pings every 20s
     async def keep_alive():
@@ -364,9 +364,9 @@ async def voice_websocket(websocket: WebSocket):
                 await session.handle_audio_chunk(message["bytes"])
                 
     except WebSocketDisconnect:
-        print(f"❌ WebSocket disconnected: {session.session_id}")
+        print(f"WebSocket disconnected: {session.session_id}")
     except Exception as e:
-        print(f"❌ WebSocket error: {e}")
+        print(f"WebSocket error: {e}")
         await websocket.send_text(json.dumps({
             "type": "ERROR",
             "message": str(e),
@@ -379,7 +379,7 @@ async def voice_websocket(websocket: WebSocket):
             await session.deepgram_service.finish()
         if session.session_id in sessions:
             del sessions[session.session_id]
-        print(f"🧹 Cleaned up session: {session.session_id}")
+        print(f"Cleaned up session: {session.session_id}")
 
 
 @router.get("/sessions/stats")

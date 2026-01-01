@@ -121,13 +121,13 @@ export function usePushToTalk(): UsePushToTalkReturn {
     
     try {
       const wsUrl = getWebSocketUrl();
-      console.log(`🔌 Connecting to ${wsUrl}`);
+      console.log(`Connecting to ${wsUrl}`);
       
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       
       ws.onopen = () => {
-        console.log("✅ WebSocket connected");
+        console.log("WebSocket connected");
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
@@ -147,18 +147,18 @@ export function usePushToTalk(): UsePushToTalkReturn {
       };
       
       ws.onerror = (error) => {
-        console.error("❌ WebSocket error:", error);
+        console.error("WebSocket error:", error);
         setError("Connection error");
       };
       
       ws.onclose = () => {
-        console.log("🔌 WebSocket disconnected");
+        console.log("WebSocket disconnected");
         setIsConnected(false);
         
         // Auto-reconnect with exponential backoff
         if (reconnectAttemptsRef.current < 10) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
-          console.log(`🔄 Reconnecting in ${delay}ms...`);
+          console.log(`Reconnecting in ${delay}ms...`);
           setError(`Reconnecting in ${delay / 1000}s...`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
@@ -204,7 +204,7 @@ export function usePushToTalk(): UsePushToTalkReturn {
     }
     
     try {
-      console.log("🎤 START TALKING");
+      console.log("START TALKING");
       
       // Stop any AI audio
       audioPlayerRef.current?.stop();
@@ -265,7 +265,7 @@ export function usePushToTalk(): UsePushToTalkReturn {
       return;
     }
     
-    console.log("🛑 STOP TALKING");
+    console.log("STOP TALKING");
     
     // Stop audio chunking
     chunkerRef.current?.stop();
@@ -288,7 +288,7 @@ export function usePushToTalk(): UsePushToTalkReturn {
    * Disconnect WebSocket
    */
   const disconnect = useCallback(() => {
-    console.log("🔌 Disconnecting");
+    console.log("Disconnecting");
     
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);

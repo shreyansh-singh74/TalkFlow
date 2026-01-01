@@ -56,22 +56,22 @@ class Settings:
                 temp_file.close()
                 self.GOOGLE_APPLICATION_CREDENTIALS = temp_file.name
                 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = temp_file.name
-                print("✓ Google credentials loaded from GOOGLE_CREDENTIALS_JSON (base64)")
+                print("Google credentials loaded from GOOGLE_CREDENTIALS_JSON (base64)")
             except Exception as e:
-                print(f"✗ WARNING: Failed to decode GOOGLE_CREDENTIALS_JSON: {e}")
+                print(f"WARNING: Failed to decode GOOGLE_CREDENTIALS_JSON: {e}")
                 print("  Make sure GOOGLE_CREDENTIALS_JSON contains a valid base64-encoded JSON string")
         elif google_creds_path:
             # Check if it's actually a base64 string (starts with 'ewog' or similar, not a path)
             if google_creds_path.startswith('ewog') or (len(google_creds_path) > 500 and '/' not in google_creds_path):
-                print("✗ ERROR: GOOGLE_APPLICATION_CREDENTIALS contains a base64 string!")
+                print("ERROR: GOOGLE_APPLICATION_CREDENTIALS contains a base64 string!")
                 print("  This should be set as GOOGLE_CREDENTIALS_JSON instead.")
                 print("  Please set GOOGLE_CREDENTIALS_JSON=<your-base64-string> in Railway")
                 self.GOOGLE_APPLICATION_CREDENTIALS = ""
             elif os.path.exists(google_creds_path):
                 self.GOOGLE_APPLICATION_CREDENTIALS = google_creds_path
-                print(f"✓ Google credentials loaded from file: {google_creds_path}")
+                print(f"Google credentials loaded from file: {google_creds_path}")
             else:
-                print(f"✗ WARNING: Google credentials file not found at: {google_creds_path}")
+                print(f"WARNING: Google credentials file not found at: {google_creds_path}")
                 self.GOOGLE_APPLICATION_CREDENTIALS = ""
         else:
             self.GOOGLE_APPLICATION_CREDENTIALS = ""

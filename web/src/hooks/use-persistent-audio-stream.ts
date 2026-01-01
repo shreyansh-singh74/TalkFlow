@@ -54,12 +54,12 @@ export function usePersistentAudioStream(): UsePersistentAudioStreamReturn {
   const startStream = useCallback(async () => {
     // Prevent concurrent start attempts
     if (isStartingRef.current) {
-      console.log("⏸️ Stream start already in progress");
+      console.log("Stream start already in progress");
       return;
     }
 
     if (streamRef.current) {
-      console.log("⏸️ Stream already active");
+      console.log("Stream already active");
       return;
     }
 
@@ -67,20 +67,20 @@ export function usePersistentAudioStream(): UsePersistentAudioStreamReturn {
     setError(null);
 
     try {
-      console.log("🎤 Requesting persistent microphone stream...");
+      console.log("Requesting persistent microphone stream...");
       
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: SPEECH_AUDIO_CONSTRAINTS,
       });
 
-      console.log("✅ Microphone stream acquired:", {
+      console.log("Microphone stream acquired:", {
         tracks: mediaStream.getTracks().length,
         active: mediaStream.active,
       });
 
       // Check if stream is still needed (user might have cancelled)
       if (!isStartingRef.current) {
-        console.log("⏹️ Stream cancelled before activation");
+        console.log("Stream cancelled before activation");
         mediaStream.getTracks().forEach((track) => track.stop());
         return;
       }
@@ -88,7 +88,7 @@ export function usePersistentAudioStream(): UsePersistentAudioStreamReturn {
       // Set up track ended listener for error recovery
       mediaStream.getTracks().forEach((track) => {
         track.onended = () => {
-          console.warn("⚠️ Audio track ended unexpectedly");
+          console.warn("Audio track ended unexpectedly");
           setError("Microphone connection lost. Please restart.");
           setIsActive(false);
           streamRef.current = null;
@@ -100,9 +100,9 @@ export function usePersistentAudioStream(): UsePersistentAudioStreamReturn {
       setStream(mediaStream);
       setIsActive(true);
       
-      console.log("✅ Persistent audio stream ready");
+      console.log("Persistent audio stream ready");
     } catch (err) {
-      console.error("❌ Failed to start audio stream:", err);
+      console.error("Failed to start audio stream:", err);
       
       let errorMessage = "Could not access microphone.";
       if (err instanceof Error) {
@@ -130,7 +130,7 @@ export function usePersistentAudioStream(): UsePersistentAudioStreamReturn {
    * Stop the persistent audio stream
    */
   const stopStream = useCallback(() => {
-    console.log("🛑 Stopping persistent audio stream");
+    console.log("Stopping persistent audio stream");
     
     isStartingRef.current = false;
     
@@ -146,14 +146,14 @@ export function usePersistentAudioStream(): UsePersistentAudioStreamReturn {
     setIsActive(false);
     setError(null);
     
-    console.log("✅ Persistent audio stream stopped");
+    console.log("Persistent audio stream stopped");
   }, []);
 
   /**
    * Restart the stream (useful for error recovery)
    */
   const restartStream = useCallback(async () => {
-    console.log("🔄 Restarting persistent audio stream");
+    console.log("Restarting persistent audio stream");
     stopStream();
     await new Promise((resolve) => setTimeout(resolve, 100)); // Brief delay
     await startStream();
@@ -165,7 +165,7 @@ export function usePersistentAudioStream(): UsePersistentAudioStreamReturn {
   useEffect(() => {
     return () => {
       if (streamRef.current) {
-        console.log("🧹 Cleaning up persistent audio stream on unmount");
+        console.log("Cleaning up persistent audio stream on unmount");
         streamRef.current.getTracks().forEach((track) => {
           track.onended = null;
           track.stop();

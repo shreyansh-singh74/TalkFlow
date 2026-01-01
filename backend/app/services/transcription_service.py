@@ -24,11 +24,11 @@ async def transcribe_audio(audio: UploadFile) -> str:
         
         # Extract transcript
         transcript = response.results.channels[0].alternatives[0].transcript.strip()
-        print(f"✓ Transcribed: '{transcript}'")
+        print(f"Transcribed: '{transcript}'")
         
         return transcript
         
     except Exception as e:
-        print(f"✗ Deepgram transcription error: {str(e)}")
+        print(f"Deepgram transcription error: {str(e)}")
         raise Exception(f"Transcription failed: {str(e)}")
 

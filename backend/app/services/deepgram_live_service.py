@@ -25,7 +25,7 @@ class DeepgramLiveService:
     async def start(self):
         """Start Deepgram service"""
         self.is_active = True
-        print("✓ Deepgram service started (buffered mode)")
+        print("Deepgram service started (buffered mode)")
             
     async def send_audio(self, audio_chunk: bytes):
         """Buffer audio chunk for transcription"""
@@ -99,7 +99,7 @@ class DeepgramLiveService:
             self.audio_buffer.clear()
             
         except Exception as e:
-            print(f"✗ Deepgram transcription error: {e}")
+            print(f"Deepgram transcription error: {e}")
         finally:
             self.is_active = False
             if hasattr(self, 'audio_buffer'):

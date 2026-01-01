@@ -1,16 +1,9 @@
-/**
- * Backend URL Configuration
- * Manages switching between localhost and production backend
- */
-
-// Type declaration for process.env (Next.js provides this at build time)
 declare const process: {
   env: {
     [key: string]: string | undefined;
   };
 };
 
-// Type-safe environment variable accessor
 function getEnv(key: string): string | undefined {
   if (typeof process !== 'undefined' && process.env) {
     return process.env[key];
@@ -18,80 +11,88 @@ function getEnv(key: string): string | undefined {
   return undefined;
 }
 
-// Extend Window interface to include our custom property
 interface WindowWithBackendLog extends Window {
   __backendUrlLogged?: boolean;
+  __backendUrlCache?: string;
 }
 
-/**
- * Get the backend URL based on environment configuration
- * Controlled by NEXT_PUBLIC_USE_LOCALHOST env variable
- */
+let backendUrlCache: string | null = null;
+
 export function getBackendUrl(): string {
-  // Check if we should use localhost
-  const useLocalhost = getEnv('NEXT_PUBLIC_USE_LOCALHOST') === 'true';
-  
-  // Get URLs from environment variables
-  // Localhost fallback is safe as it's only for development
-  const localhostUrl = getEnv('NEXT_PUBLIC_BACKEND_URL_LOCAL') || 'http://localhost:8000';
-  
-  // Production URL must be set in environment variables
-  // No hardcoded fallback to prevent using wrong backend
-  const productionUrl = getEnv('NEXT_PUBLIC_BACKEND_URL_PROD');
-  
-  // Remove trailing slashes (normalize early)
-  const normalizedLocalhost = localhostUrl.replace(/\/$/, '');
-  const normalizedProduction = productionUrl?.replace(/\/$/, '') || '';
-  
-  // During build time (SSG), return a placeholder to prevent build errors
-  // The actual URL will be resolved at runtime in the browser
-  const isBuildTime = typeof window === 'undefined';
-  
-  if (isBuildTime) {
-    // Return a placeholder during build - this won't be used, just prevents build errors
-    return normalizedProduction || normalizedLocalhost;
+  if (typeof window === 'undefined') {
+    const productionUrl = getEnv('NEXT_PUBLIC_BACKEND_URL_PROD');
+    const localhostUrl = getEnv('NEXT_PUBLIC_BACKEND_URL_LOCAL') || 'http://localhost:8000';
+    return (productionUrl || localhostUrl).replace(/\/$/, '');
   }
-  
-  // At runtime, check if production URL is missing
-  if (!useLocalhost && !productionUrl) {
-    // In production, log a warning and use localhost as fallback
-    // This prevents the app from crashing, but you should fix the env var
-    if (typeof window !== 'undefined') {
-      console.error(
-        '⚠️ NEXT_PUBLIC_BACKEND_URL_PROD is not set. ' +
-        'Please set it in Vercel environment variables with "All Environments" scope. ' +
-        'Falling back to localhost URL.'
-      );
+
+  if (backendUrlCache) {
+    return backendUrlCache;
+  }
+
+  const useLocalhost = 
+    getEnv('NEXT_PUBLIC_USE_LOCALHOST') === 'true' ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
+
+  const envLocalhostUrl = getEnv('NEXT_PUBLIC_BACKEND_URL_LOCAL') || 'http://localhost:8000';
+  if (useLocalhost) {
+    const url = envLocalhostUrl.replace(/\/$/, '');
+    backendUrlCache = url;
+    return url;
+  }
+
+  const envProductionUrl = getEnv('NEXT_PUBLIC_BACKEND_URL_PROD');
+  if (envProductionUrl) {
+    const url = envProductionUrl.replace(/\/$/, '');
+    backendUrlCache = url;
+    if (!(window as WindowWithBackendLog).__backendUrlLogged) {
+      console.log(`Backend URL: ${url} (production, from env)`);
+      (window as WindowWithBackendLog).__backendUrlLogged = true;
     }
-    // Fallback to localhost URL to prevent app crash
-    // This should be fixed by setting the env var properly
-    return normalizedLocalhost;
+    return url;
+  }
+
+  if (!(window as WindowWithBackendLog).__backendUrlCache) {
+    (window as WindowWithBackendLog).__backendUrlCache = 'fetching';
+    
+    fetch('/api/config')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to fetch config from API');
+        }
+        return response.json();
+      })
+      .then(config => {
+        if (config?.backendUrl) {
+          const url = config.backendUrl.replace(/\/$/, '');
+          backendUrlCache = url;
+          if (!(window as WindowWithBackendLog).__backendUrlLogged) {
+            console.log(`Backend URL: ${url} (from runtime config API)`);
+            (window as WindowWithBackendLog).__backendUrlLogged = true;
+          }
+        } else if (config?.error) {
+          console.error(`Error: ${config.error}`);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to fetch backend URL from runtime config API:', error);
+      });
+    
+    throw new Error(
+      'NEXT_PUBLIC_BACKEND_URL_PROD is not set. ' +
+      'Please set it in Vercel environment variables with "All Environments" scope.'
+    );
   }
   
-  const selectedUrl = useLocalhost ? normalizedLocalhost : normalizedProduction;
-  
-  // Log which backend is being used (only in browser, only once)
-  if (typeof window !== 'undefined' && !(window as WindowWithBackendLog).__backendUrlLogged) {
-    console.log(`🔗 Backend URL: ${selectedUrl} ${useLocalhost ? '(localhost)' : '(production)'}`);
-    (window as WindowWithBackendLog).__backendUrlLogged = true;
-  }
-  
-  return selectedUrl;
+  return backendUrlCache || '';
 }
 
-/**
- * Get WebSocket URL from backend URL
- * Converts http:// to ws:// and https:// to wss://
- */
 export function getWebSocketUrl(path: string = '/ws/voice'): string {
   const backendUrl = getBackendUrl();
   const wsUrl = backendUrl.replace(/^http/, 'ws');
   return `${wsUrl}${path}`;
 }
 
-/**
- * Check if using localhost backend
- */
 export function isUsingLocalhost(): boolean {
   return getEnv('NEXT_PUBLIC_USE_LOCALHOST') === 'true';
 }

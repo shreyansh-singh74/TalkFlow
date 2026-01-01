@@ -76,11 +76,11 @@ async def transcribe(
             "success": True
         }
         
-        print(f"✓ Returning response with reply: {len(reply)} chars, audio: {bool(audio_base64)}")
+        print(f"Returning response with reply: {len(reply)} chars, audio: {bool(audio_base64)}")
         return result
         
     except Exception as e:
-        print(f"✗ Error: {str(e)}")
+        print(f"Error: {str(e)}")
         return {
             "transcript": "",
             "reply": "",
@@ -94,7 +94,7 @@ async def clear_conversation(conversation_id: str):
     """Clear conversation history for a specific conversation"""
     if conversation_id in conversation_contexts:
         del conversation_contexts[conversation_id]
-        print(f"🧹 Cleared conversation {conversation_id}")
+        print(f"Cleared conversation {conversation_id}")
         return {"success": True, "message": "Conversation cleared"}
     return {"success": False, "message": "Conversation not found"}
 

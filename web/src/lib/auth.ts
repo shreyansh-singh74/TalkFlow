@@ -159,13 +159,13 @@ export const auth = betterAuth({
             `,
             text: `Hi ${user.name || 'there'},\n\nWe received a request to reset your password for your TalkFlow account.\n\nClick the link below to reset your password:\n${url}\n\nThis link will expire in 1 hour.\n\nIf you didn't request a password reset, please ignore this email.\n\nBest regards,\nThe TalkFlow Team`,
           });
-          console.log(`✅ Password reset email sent successfully to ${user.email}`);
+          console.log(`Password reset email sent successfully to ${user.email}`);
         } catch (error) {
-          console.error(`❌ Failed to send password reset email to ${user.email}:`, error);
+          console.error(`Failed to send password reset email to ${user.email}:`, error);
           throw error; // Re-throw to let Better-Auth handle it
         }
       } else {
-        console.warn('⚠️ SMTP credentials not configured. Email not sent.');
+        console.warn('SMTP credentials not configured. Email not sent.');
       }
     },
   },
