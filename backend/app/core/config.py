@@ -16,6 +16,7 @@ class Settings:
     APP_VERSION: str = "1.0.0"
     
     # CORS Settings - Support production origins from environment
+    # Use FRONTEND_URL or NEXT_PUBLIC_APP_URL (both should be set to the same value)
     _default_origins = [
         "http://localhost:3000",
         "http://localhost:3002"
@@ -24,8 +25,9 @@ class Settings:
         os.getenv("FRONTEND_URL", ""),
         os.getenv("NEXT_PUBLIC_APP_URL", ""),
     ]
+    # Filter out empty strings and normalize URLs (remove trailing slashes)
     ALLOWED_ORIGINS: List[str] = _default_origins + [
-        origin for origin in _production_origins if origin
+        origin.rstrip('/') for origin in _production_origins if origin and origin.strip()
     ]
     
     # API Keys

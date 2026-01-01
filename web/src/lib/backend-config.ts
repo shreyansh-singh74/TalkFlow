@@ -3,6 +3,21 @@
  * Manages switching between localhost and production backend
  */
 
+// Type declaration for process.env (Next.js provides this at build time)
+declare const process: {
+  env: {
+    [key: string]: string | undefined;
+  };
+};
+
+// Type-safe environment variable accessor
+function getEnv(key: string): string | undefined {
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key];
+  }
+  return undefined;
+}
+
 // Extend Window interface to include our custom property
 interface WindowWithBackendLog extends Window {
   __backendUrlLogged?: boolean;
@@ -14,15 +29,26 @@ interface WindowWithBackendLog extends Window {
  */
 export function getBackendUrl(): string {
   // Check if we should use localhost
-  const useLocalhost = process.env.NEXT_PUBLIC_USE_LOCALHOST === 'true';
+  const useLocalhost = getEnv('NEXT_PUBLIC_USE_LOCALHOST') === 'true';
   
   // Get URLs from environment variables
-  const localhostUrl = process.env.NEXT_PUBLIC_BACKEND_URL_LOCAL || 'http://localhost:8000';
-  const productionUrl = process.env.NEXT_PUBLIC_BACKEND_URL_PROD || 'https://harmonious-heart-production.up.railway.app';
+  // Localhost fallback is safe as it's only for development
+  const localhostUrl = getEnv('NEXT_PUBLIC_BACKEND_URL_LOCAL') || 'http://localhost:8000';
+  
+  // Production URL must be set in environment variables
+  // No hardcoded fallback to prevent using wrong backend
+  const productionUrl = getEnv('NEXT_PUBLIC_BACKEND_URL_PROD');
+  
+  if (!useLocalhost && !productionUrl) {
+    throw new Error(
+      'NEXT_PUBLIC_BACKEND_URL_PROD environment variable is not set. ' +
+      'Please set it in your Vercel environment variables or .env.local file.'
+    );
+  }
   
   // Remove trailing slashes
   const normalizedLocalhost = localhostUrl.replace(/\/$/, '');
-  const normalizedProduction = productionUrl.replace(/\/$/, '');
+  const normalizedProduction = productionUrl?.replace(/\/$/, '') || '';
   
   const selectedUrl = useLocalhost ? normalizedLocalhost : normalizedProduction;
   
@@ -49,6 +75,6 @@ export function getWebSocketUrl(path: string = '/ws/voice'): string {
  * Check if using localhost backend
  */
 export function isUsingLocalhost(): boolean {
-  return process.env.NEXT_PUBLIC_USE_LOCALHOST === 'true';
+  return getEnv('NEXT_PUBLIC_USE_LOCALHOST') === 'true';
 }
 
