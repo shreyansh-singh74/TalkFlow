@@ -5,14 +5,14 @@ import * as schema from "@/db/schema";
 import nodemailer from "nodemailer";
 
 // Normalize baseURL - remove trailing slash and /api/auth if present
-const rawBaseURL = process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BETTER_AUTH_URL || '';
+const rawBaseURL = process.env.BETTER_AUTH_URL || '';
 const baseURL = rawBaseURL.replace(/\/$/, '').replace(/\/api\/auth$/, '');
 
 // Create SMTP transporter
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  host: "smtp.gmail.com",
   port: Number(process.env.SMTP_PORT) || 587,
-  secure: false, // true for 465, false for other ports
+  secure: false, 
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -21,6 +21,9 @@ const transporter = nodemailer.createTransport({
 
 export const auth = betterAuth({
   baseURL: baseURL || undefined,
+  trustedOrigins: ["http://localhost:3000",
+    "https://talk-flow-black.vercel.app"
+  ],
   secret: process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET,
   socialProviders: {
     github: {

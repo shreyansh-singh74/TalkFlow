@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { NuqsAdapter } from "nuqs/adapters/next";
 import { QueryProvider } from "./query-provider";
+import { getBackendUrl } from "@/lib/backend-config";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,6 +26,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  console.log("Backend URL: ", getBackendUrl());
   return (
     <NuqsAdapter>
       <QueryProvider>

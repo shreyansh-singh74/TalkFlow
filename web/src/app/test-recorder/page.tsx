@@ -9,9 +9,9 @@ export default function TestRecorderPage() {
           Test the audio recording and AI feedback system
         </p>
       </div>
-      
       <AudioRecorder />
     </div>
   );
 }
+
 
