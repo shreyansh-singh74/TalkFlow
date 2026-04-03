@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { pgTable, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, pgEnum, jsonb, real } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -99,6 +99,33 @@ export const meetings = pgTable("meetings", {
   transcriptUrl: text("transcript_url"),
   recordingUrl: text("recording_url"),
   summary: text("summary"),
+  phonemeData: jsonb("phoneme_data").$type<{
+    overall_accuracy: number;
+    words: Array<{
+      word: string;
+      accuracy: number;
+      phonemes: string[];
+    }>;
+    problematic_phonemes: string[];
+    mastered_phonemes: string[];
+  }>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow()
+});
+
+export const phonemeAnalysis = pgTable("phoneme_analysis", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  meetingId: text("meeting_id")
+    .notNull()
+    .references(() => meetings.id, { onDelete: "cascade" }),
+  word: text("word").notNull(),
+  expectedIpa: text("expected_ipa").notNull(),
+  actualPhonemes: jsonb("actual_phonemes").$type<string[]>().notNull(),
+  accuracyScore: real("accuracy_score").notNull(),
+  feedback: text("feedback"),
+  suggestions: jsonb("suggestions").$type<string[]>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow()
 });

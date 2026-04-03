@@ -6,3 +6,9 @@ google-generativeai
 google-cloud-texttospeech
 deepgram-sdk
 requests
+g2p-en
+librosa
+soundfile
+numpy
+scipy
+dtaidistance
