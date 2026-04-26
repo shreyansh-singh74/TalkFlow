@@ -17,6 +17,14 @@
 
 ---
 
+<!-- <img src="./web/images/architechture_v1.png" alt="Phoneme Architechture" width="700" /> -->
+<!-- ![Phoneme Architecture](./web/images/architecture_v1.png) -->
+
+<p align="center">
+  <img src="./web/images/architecture_v1.png" alt="Phoneme Architecture" width="700" />
+</p>
+
+
 ## Features
 - Create custom AI tutors  
 - Real-time pronunciation feedback  
