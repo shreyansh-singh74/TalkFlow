@@ -6,8 +6,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertCircle,
   CheckCircle2,
-  Info,
-  TrendingUp,
 } from "lucide-react";
 import { PhonemeSegment, WordPhonemeAnalysis } from "@/hooks/use-phoneme-analysis";
 
@@ -28,7 +26,7 @@ export function PhonemeFeedback({
         <CheckCircle2 className="h-4 w-4 text-green-600" />
         <AlertTitle>Excellent!</AlertTitle>
         <AlertDescription className="text-green-700">
-          Great pronunciation of "{word.word}". Keep up the good work!
+          Great pronunciation of &quot;{word.word}&quot;. Keep up the good work!
         </AlertDescription>
       </Alert>
     );
@@ -55,7 +53,7 @@ function PhonemeErrorCard({ segment, word }: PhonemeErrorCardProps) {
     <Alert className="border-red-200 bg-red-50">
       <AlertCircle className="h-4 w-4 text-red-600" />
       <AlertTitle className="text-red-900">
-        Pronunciation Issue in "{word}"
+        Pronunciation Issue in &quot;{word}&quot;
       </AlertTitle>
       <AlertDescription className="text-red-800 space-y-2">
         <p>

@@ -1,15 +1,17 @@
-# app/schemas/responses.py
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
+
 
 class HealthResponse(BaseModel):
     status: str
     transcription_service: str
 
+
 class TranscriptionResponse(BaseModel):
     transcript: str
     success: bool
     error: Optional[str] = None
+
 
 class ConversationResponse(BaseModel):
     transcript: str
@@ -19,15 +21,17 @@ class ConversationResponse(BaseModel):
     success: bool
     error: Optional[str] = None
 
+
 class ConversationCreateResponse(BaseModel):
     conversation_id: str
     success: bool
+
 
 class ConversationDeleteResponse(BaseModel):
     message: str
     success: bool
 
-# Phoneme Analysis Schemas
+
 class PhonemeSegmentResponse(BaseModel):
     phoneme: str
     expected: str
@@ -36,6 +40,7 @@ class PhonemeSegmentResponse(BaseModel):
     is_correct: bool
     feedback: Optional[str] = None
     suggestions: Optional[List[str]] = None
+
 
 class WordPhonemeAnalysisResponse(BaseModel):
     word: str
@@ -46,19 +51,63 @@ class WordPhonemeAnalysisResponse(BaseModel):
     word_accuracy: float
     phoneme_matches: int
     total_phonemes: int
-    suggestions: List[str]
+    suggestions: List[str] = Field(default_factory=list)
+
+
+class PhonemeErrorCount(BaseModel):
+    phoneme: str
+    count: int
+
 
 class SentencePhonemeAnalysisResponse(BaseModel):
     sentence: str
     words: List[WordPhonemeAnalysisResponse]
     overall_accuracy: float
-    problematic_phonemes: List[str]
-    mastered_phonemes: List[str]
-    most_common_errors: List[tuple]
+    problematic_phonemes: List[str] = Field(default_factory=list)
+    mastered_phonemes: List[str] = Field(default_factory=list)
+    most_common_errors: List[PhonemeErrorCount] = Field(default_factory=list)
+
 
 class PhonemeAnalysisRequest(BaseModel):
     sentence: str
     user_transcript: Optional[str] = None
+
+
+class WordPhonemeAnalysisRequest(BaseModel):
+    word: str
+    user_transcript: Optional[str] = None
+
+
+class PhonemeCompareRequest(BaseModel):
+    expected: str
+    actual: str
+
+
+class PhonemeCompareResponse(BaseModel):
+    expected: str
+    actual: str
+    expected_ipa: str
+    actual_ipa: str
+    accuracy_score: float
+    segments: List[PhonemeSegmentResponse]
+
+
+class IpaResponse(BaseModel):
+    word: str
+    ipa: str
+    phonemes: List[str]
+
+
+class ArpabetSyllableItem(BaseModel):
+    phones: str
+    display: str
+    stressed: bool
+
+
+class PronunciationReferenceResponse(BaseModel):
+    word: str
+    arpabet_syllables: List[ArpabetSyllableItem] = Field(default_factory=list)
+
 
 class ConversationWithPhonemeResponse(BaseModel):
     transcript: str
@@ -68,4 +117,3 @@ class ConversationWithPhonemeResponse(BaseModel):
     phoneme_analysis: Optional[SentencePhonemeAnalysisResponse] = None
     success: bool
     error: Optional[str] = None
-

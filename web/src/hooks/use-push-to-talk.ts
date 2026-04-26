@@ -4,7 +4,11 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { AudioChunker } from "@/lib/audio-processing";
 import { StreamingAudioPlayer } from "@/lib/streaming-audio-player";
 import { getWebSocketUrl } from "@/lib/backend-config";
+import { SentencePhonemeAnalysis } from "@/hooks/use-phoneme-analysis";
+import type { PronunciationResultPayload } from "@/types/pronunciation";
 import { v4 as uuidv4 } from "uuid";
+
+const DEFAULT_TARGET_TEXT = "circumstances of the accident";
 
 export interface TranscriptEntry {
   id: string;
@@ -23,6 +27,9 @@ export interface UsePushToTalkReturn {
   streamingAIText: string;
   conversationStatus: string;
   error: string | null;
+  phonemeAnalysis: SentencePhonemeAnalysis | null;
+  lastPronunciation: PronunciationResultPayload | null;
+  targetText: string;
   connect: () => Promise<void>;
   disconnect: () => void;
   startTalking: () => void;
@@ -38,6 +45,10 @@ export function usePushToTalk(): UsePushToTalkReturn {
   const [partialTranscript, setPartialTranscript] = useState("");
   const [streamingAIText, setStreamingAIText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [phonemeAnalysis, setPhonemeAnalysis] = useState<SentencePhonemeAnalysis | null>(null);
+  const [lastPronunciation, setLastPronunciation] =
+    useState<PronunciationResultPayload | null>(null);
+  const [targetText, setTargetText] = useState(DEFAULT_TARGET_TEXT);
   
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -86,6 +97,22 @@ export function usePushToTalk(): UsePushToTalkReturn {
         });
         // Don't set isAISpeaking here - wait for first TTS chunk
         break;
+
+      case "PHONEME_ANALYSIS":
+        if (message.analysis) {
+          const analysis = message.analysis as SentencePhonemeAnalysis;
+          setPhonemeAnalysis(analysis);
+          setTargetText(message.target_text || analysis.sentence || DEFAULT_TARGET_TEXT);
+        }
+        break;
+
+      case "PRONUNCIATION_RESULT": {
+        const p = message as PronunciationResultPayload;
+        setLastPronunciation(p);
+        setPhonemeAnalysis(null);
+        setTargetText(p.target_text || DEFAULT_TARGET_TEXT);
+        break;
+      }
         
       case "TTS_CHUNK":
         // Binary chunk will arrive separately
@@ -320,6 +347,8 @@ export function usePushToTalk(): UsePushToTalkReturn {
     setPartialTranscript("");
     setStreamingAIText("");
     setError(null);
+    setPhonemeAnalysis(null);
+    setLastPronunciation(null);
   }, []);
   
   /**
@@ -349,6 +378,9 @@ export function usePushToTalk(): UsePushToTalkReturn {
     streamingAIText,
     conversationStatus: getConversationStatus(),
     error,
+    phonemeAnalysis,
+    lastPronunciation,
+    targetText,
     connect,
     disconnect,
     startTalking,

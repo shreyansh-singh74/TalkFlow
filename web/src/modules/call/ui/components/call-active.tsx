@@ -1,93 +1,181 @@
-import Link from "next/link";
-import Image from "next/image";
+"use client";
+
 import { Button } from "@/components/ui/button";
 import {
+  Bot,
   Mic,
   MicOff,
-  Camera,
-  CameraOff,
+  PersonStanding,
   PhoneOff,
-  Radio,
   Trash2,
-  ChevronLeft,
+  User,
 } from "lucide-react";
 import { usePushToTalk } from "@/hooks/use-push-to-talk";
 import { useSpacebarControl } from "@/hooks/use-spacebar-control";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useEffect, useState } from "react";
-import { 
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PronunciationReferenceCard } from "@/components/pronunciation-reference-card";
+import { WrongWordsBar } from "@/components/wrong-words-bar";
+import { normalizeWord } from "@/lib/normalize-word";
+import { speakWord } from "@/lib/speak-word";
+import { splitTargetToWords } from "@/lib/split-target-words";
+import { cn } from "@/lib/utils";
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { PhonemeRealTimeFeedback } from "./phoneme-real-time-feedback";
+import { useUpdateMeeting } from "@/hooks/use-api";
+import type {
+  MeetingPhonemeDataPersisted,
+  PronunciationResultPayload,
+} from "@/types/pronunciation";
+import { HeardTextHighlight } from "@/components/heard-text-highlight";
+import { ChevronDown } from "lucide-react";
+
+const WAVE_BARS = [
+  "h-3", "h-6", "h-10", "h-5", "h-8", "h-12", "h-7", "h-4", "h-9", "h-4",
+] as const;
 
 interface Props {
   onLeave: () => void;
   meetingName: string;
-  attachLocalStream: (el: HTMLVideoElement | null) => void;
-  requestMedia: () => Promise<void>;
-  localStream: MediaStream | null;
-  isFetching: boolean;
-  error: string | null;
-  isCameraOn: boolean;
-  isMicOn: boolean;
-  toggleCamera: () => void;
-  toggleMic: () => void;
+  meetingId: string;
+  agentId: string;
 }
 
 export const CallActive = ({
   onLeave,
   meetingName,
-  attachLocalStream,
+  meetingId,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  requestMedia,
-  localStream,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  isFetching,
-  error,
-  isCameraOn,
-  isMicOn,
-  toggleCamera,
-  toggleMic,
+  agentId: _agentId,
 }: Props) => {
+  const updateMeeting = useUpdateMeeting();
+  const phonemeEntriesRef = useRef<MeetingPhonemeDataPersisted["entries"]>([]);
+  const persistDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const {
     isConnected,
     isTalking,
     isAISpeaking,
     transcripts,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     partialTranscript,
     streamingAIText,
     conversationStatus,
     error: transcriptionError,
+    phonemeAnalysis,
+    lastPronunciation,
+    targetText,
     connect,
     disconnect,
     startTalking,
     stopTalking,
-    clearTranscripts
+    clearTranscripts,
   } = usePushToTalk();
 
-  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isPhonemeOpen, setIsPhonemeOpen] = useState(true);
+  const [isMicEnabled, setIsMicEnabled] = useState(false);
+  const [activeWordKey, setActiveWordKey] = useState("");
+  const [speechLang, setSpeechLang] = useState("en-IN");
+  const lastUserTranscript = transcripts.length > 0 ? transcripts[transcripts.length - 1].text : "";
 
-  // Spacebar control
+  const targetWords = useMemo(() => splitTargetToWords(targetText), [targetText]);
+  const misExpectedNormSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of lastPronunciation?.misaligned_words || []) {
+      if (p?.expected) {
+        s.add(normalizeWord(p.expected));
+      }
+    }
+    return s;
+  }, [lastPronunciation?.misaligned_words]);
+
+  const displayWord = useMemo(() => {
+    const t = targetWords.find((w) => w.norm === activeWordKey);
+    if (t) {
+      return t.raw.replace(/[^a-zA-Z0-9']+$/g, "");
+    }
+    return activeWordKey;
+  }, [targetWords, activeWordKey]);
+
+  useEffect(() => {
+    if (activeWordKey) {
+      return;
+    }
+    const w = targetWords[0];
+    if (w) {
+      setActiveWordKey(normalizeWord(w.raw));
+    }
+  }, [targetText, targetWords, activeWordKey]);
+
+  const lastPrRef = useRef(lastPronunciation);
+  lastPrRef.current = lastPronunciation;
+
+  useEffect(() => {
+    const p = lastPrRef.current;
+    if (!p) {
+      return;
+    }
+    const m = p.misaligned_words;
+    const w0 = targetWords[0];
+    if (m?.length) {
+      setActiveWordKey(normalizeWord(m[0].expected));
+    } else if (w0) {
+      setActiveWordKey(normalizeWord(w0.raw));
+    }
+  }, [lastPronunciation?.turn_id, targetWords]);
+
+  const appendPronunciationEntry = useCallback(
+    (p: PronunciationResultPayload) => {
+      if (phonemeEntriesRef.current.some((e) => e.turn_id === p.turn_id)) {
+        return;
+      }
+      const entry: MeetingPhonemeDataPersisted["entries"][number] = {
+        at: new Date().toISOString(),
+        turn_id: p.turn_id,
+        target_text: p.target_text,
+        heard_text: p.heard_text,
+        score: p.score,
+        feedback: p.feedback.slice(0, 5),
+      };
+      phonemeEntriesRef.current = [...phonemeEntriesRef.current, entry].slice(-50);
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!lastPronunciation) return;
+    if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current);
+    persistDebounceRef.current = setTimeout(() => {
+      appendPronunciationEntry(lastPronunciation);
+      updateMeeting.mutate({
+        id: meetingId,
+        phonemeData: { entries: phonemeEntriesRef.current },
+      });
+    }, 2000);
+    return () => {
+      if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current);
+    };
+  }, [lastPronunciation, meetingId, updateMeeting, appendPronunciationEntry]);
+
   useSpacebarControl({
     onSpaceDown: startTalking,
     onSpaceUp: stopTalking,
-    enabled: isConnected && isMicOn
+    enabled: isConnected && isMicEnabled,
   });
 
-  // Auto-connect when mic turns on
   useEffect(() => {
-    if (isMicOn && !isConnected) {
+    if (isMicEnabled && !isConnected) {
       connect();
-    } else if (!isMicOn && isConnected) {
+    } else if (!isMicEnabled && isConnected) {
       disconnect();
     }
-  }, [isMicOn, isConnected, connect, disconnect]);
+  }, [isMicEnabled, isConnected, connect, disconnect]);
 
   const handleMicToggle = () => {
-    toggleMic();
-    // Connection is handled by useEffect above
+    setIsMicEnabled((c) => !c);
   };
 
   const formatTime = (date: Date) => {
@@ -98,264 +186,382 @@ export const CallActive = ({
     });
   };
 
-  return (
-    <div className="flex h-full text-white overflow-hidden relative">
-      <div className="flex flex-col p-4 h-full w-full overflow-hidden">
-        {/* Top Bar */}
-        <div className="flex items-center w-full justify-between mb-4 flex-shrink-0">
-          <div className="bg-[#101213] rounded-full flex items-center gap-4 w-full mr-2">
-            <Link
-              href="/"
-              className="flex items-center justify-center p-1 bg-white/10 rounded-full w-fit"
-            >
-              <Image src="/logo.svg" width={22} height={22} alt="Logo" />
-            </Link>
-            <h4 className="text-base">{meetingName}</h4>
-          </div>
-          
-          {/* Leave Button - Top Right */}
-          <Button
-            variant="destructive"
-            onClick={onLeave}
-            className="flex items-center gap-2 rounded-full text-xs h-7.5"
-            size="default"
-          >
-            <PhoneOff className="h-2 w-2" />
-            Leave Call
-          </Button>
-        </div>
+  const handleLeaveWithPersist = () => {
+    if (persistDebounceRef.current) {
+      clearTimeout(persistDebounceRef.current);
+      persistDebounceRef.current = null;
+    }
+    if (lastPronunciation) {
+      appendPronunciationEntry(lastPronunciation);
+    }
+    if (phonemeEntriesRef.current.length > 0) {
+      updateMeeting.mutate({
+        id: meetingId,
+        phonemeData: { entries: phonemeEntriesRef.current },
+      });
+    }
+    onLeave();
+  };
 
-        {/* Main Content: Video Left, Chat Right */}
-        <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
-          {/* Video Section - Left */}
-          <div className="flex-1 flex items-center justify-center overflow-hidden">
-            <div className="w-[70%] h-[70%] max-w-3xl bg-black/50 rounded-lg relative overflow-hidden group">
-              {localStream && isCameraOn ? (
-                <video
-                  ref={attachLocalStream}
-                  className="w-full h-full object-cover"
-                  muted
-                  playsInline
-                  autoPlay
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-white/80 bg-gradient-to-br from-gray-900 to-gray-800">
-                  <CameraOff className="w-16 h-16 mb-3" />
-                  <p className="text-sm">Camera is off</p>
-                </div>
-              )}
-              
-              {/* Status Overlay at Bottom - Always Visible */}
-              {conversationStatus && (
-                <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-black/80 backdrop-blur-lg border border-white/20 px-4 py-2 rounded-full shadow-lg z-10">
-                  <div className="flex items-center gap-2">
-                    {isTalking && (
-                      <div className="flex items-center gap-1">
-                        <div className="h-2 w-1 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-                        <div className="h-2 w-1 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                        <div className="h-2 w-1 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-                      </div>
-                    )}
-                    {streamingAIText && (
-                      <div className="h-2 w-2 bg-yellow-400 rounded-full animate-pulse" />
-                    )}
-                    {isAISpeaking && (
-                      <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
-                    )}
-                    {!isTalking && !streamingAIText && !isAISpeaking && isConnected && (
-                      <div className="h-2 w-2 bg-blue-400 rounded-full animate-pulse" />
-                    )}
-                    <span className="text-sm font-medium text-white">{conversationStatus}</span>
-                  </div>
-                </div>
-              )}
-              
-              {/* Overlay Controls at Bottom - Show on Hover */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-6 pb-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-                <div className="flex items-center justify-center gap-4 pointer-events-auto">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleMicToggle}
-                    className={`h-14 w-14 rounded-full backdrop-blur-lg bg-white/10 border border-white/20 hover:bg-white/20 hover:scale-110 transition-all duration-200 shadow-lg ${
-                      !isMicOn ? 'bg-red-500/30 border-red-500/50' : isConnected ? 'bg-blue-500/30 border-blue-500/50 animate-pulse' : ''
-                    }`}
-                    title={isMicOn ? "Turn off microphone" : "Turn on microphone"}
-                  >
-                    {isMicOn ? (
-                      <Mic className="h-6 w-6 text-white" />
-                    ) : (
-                      <MicOff className="h-6 w-6 text-red-200" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={toggleCamera}
-                    className={`h-14 w-14 rounded-full backdrop-blur-lg bg-white/10 border border-white/20 hover:bg-white/20 hover:scale-110 transition-all duration-200 shadow-lg ${
-                      !isCameraOn ? 'bg-red-500/30 border-red-500/50' : ''
-                    }`}
-                    title={isCameraOn ? "Turn off camera" : "Turn on camera"}
-                  >
-                    {isCameraOn ? (
-                      <Camera className="h-6 w-6 text-white" />
-                    ) : (
-                      <CameraOff className="h-6 w-6 text-red-200" />
-                    )}
-                  </Button>
-                </div>
+  const mainMicPress = (e: React.PointerEvent) => {
+    if (!isMicEnabled) {
+      handleMicToggle();
+      return;
+    }
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    startTalking();
+  };
+
+  const mainMicRelease = (e: React.PointerEvent) => {
+    if (!isMicEnabled) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    } catch {
+      // ignore
+    }
+    stopTalking();
+  };
+
+  const scoreDisplay = lastPronunciation
+    ? Math.min(100, Math.max(0, Math.round(Number(lastPronunciation.score))))
+    : null;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground font-sans">
+      <header className="flex h-12 shrink-0 items-center border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <h1 className="truncate text-sm font-semibold tracking-tight" title={meetingName}>
+          {meetingName}
+        </h1>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        <section className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto p-6">
+          <div className="mx-auto flex w-full max-w-3xl flex-col items-center space-y-10">
+            <div className="space-y-2 text-center">
+              <span className="text-[13px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                Repeat after me
+              </span>
+              <p className="text-[15px] text-muted-foreground">
+                Listen carefully and repeat the sentence.
+              </p>
+            </div>
+
+            <div className="flex min-h-[240px] w-full max-w-3xl flex-col items-stretch justify-center gap-3 rounded-xl border border-border/60 bg-card p-6 text-card-foreground shadow-sm sm:min-h-[300px] sm:p-10">
+              <h2 className="max-w-3xl text-center text-2xl font-semibold leading-relaxed tracking-tight sm:text-3xl sm:leading-normal md:text-4xl">
+                {targetText.split(/(\s+)/g).map((part, i) => {
+                  if (!/\S/.test(part)) {
+                    return <span key={i}>{part}</span>;
+                  }
+                  const norm = normalizeWord(part);
+                  if (!norm) {
+                    return <span key={i}>{part}</span>;
+                  }
+                  const wrong = misExpectedNormSet.has(norm);
+                  const active = norm === activeWordKey;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      className={cn(
+                        "inline p-0 align-baseline transition-colors",
+                        "border-b-2 border-transparent bg-transparent",
+                        "hover:text-primary",
+                        active && "font-semibold text-primary",
+                        !active && "text-foreground"
+                      )}
+                      onClick={() => {
+                        setActiveWordKey(norm);
+                      }}
+                    >
+                      {part}
+                      {wrong && (
+                        <span className="ml-0.5 inline text-destructive" aria-label="Mismatched">
+                          ×
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </h2>
+            </div>
+
+            <PronunciationReferenceCard
+              displayWord={displayWord}
+              activeWordKey={activeWordKey}
+              lang={speechLang}
+              onLangChange={setSpeechLang}
+            />
+
+            {transcriptionError && (
+              <div
+                className="w-full max-w-md rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive"
+                role="alert"
+              >
+                {transcriptionError}
+              </div>
+            )}
+
+            <div className="mt-2 flex flex-col items-center space-y-6">
+              <div
+                className={`flex h-12 w-64 items-center justify-center space-x-1.5 ${
+                  isTalking ? "opacity-100" : "opacity-50"
+                }`}
+              >
+                {WAVE_BARS.map((h, i) => (
+                  <div
+                    key={i}
+                    className={`w-1.5 rounded-full transition-all ${h} ${
+                      isTalking ? "animate-pulse" : ""
+                    } bg-primary`}
+                    style={{ animationDelay: `${i * 80}ms` }}
+                  />
+                ))}
               </div>
 
-              {error && (
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-lg text-sm">
-                  {error}
+              <button
+                type="button"
+                onPointerDown={mainMicPress}
+                onPointerUp={mainMicRelease}
+                onPointerCancel={mainMicRelease}
+                onPointerLeave={mainMicRelease}
+                className="group relative flex h-24 w-24 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-200 active:scale-95"
+                title={!isMicEnabled ? "Enable microphone" : "Hold to speak"}
+              >
+                <span className="absolute inset-0 rounded-full bg-primary-foreground/0 opacity-0 transition-opacity group-hover:opacity-10" />
+                {isMicEnabled ? <Mic className="h-9 w-9" /> : <MicOff className="h-9 w-9" />}
+              </button>
+
+              <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
+                <div className="rounded-full border border-border bg-muted/60 px-4 py-2">
+                  Hold{" "}
+                  <kbd className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
+                    SPACE
+                  </kbd>{" "}
+                  to talk
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleMicToggle}
+                  className="rounded-full"
+                >
+                  {isMicEnabled ? "Turn off mic" : "Turn on mic"}
+                </Button>
+              </div>
+
+              {conversationStatus && (
+                <p className="text-center text-xs text-muted-foreground">{conversationStatus}</p>
               )}
+
+            <WrongWordsBar
+              pairs={lastPronunciation?.misaligned_words}
+              activeKey={activeWordKey}
+              onSelectExpected={(expected, fromWrongBar) => {
+                setActiveWordKey(normalizeWord(expected));
+                if (fromWrongBar) {
+                  speakWord(expected, { rate: 0.7, lang: speechLang });
+                }
+              }}
+            />
+            </div>
+          </div>
+        </section>
+
+        <aside className="flex h-full min-h-0 w-full flex-col border-t border-border bg-muted/50 lg:w-[32%] lg:max-w-md lg:border-t-0 lg:border-l">
+          <div className="z-10 flex shrink-0 items-start justify-between gap-3 border-b border-border/80 bg-muted/50 px-6 py-4 backdrop-blur-sm">
+            <h2 className="text-xl font-medium tracking-tight">Voice Conversation</h2>
+            <div className="flex shrink-0 items-center gap-2">
+              {transcripts.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={clearTranscripts}
+                  className="h-8 w-8 text-muted-foreground"
+                  title="Clear conversation"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleLeaveWithPersist}
+                className="gap-1.5 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10"
+              >
+                <PhoneOff className="h-3.5 w-3.5" />
+                Leave
+              </Button>
             </div>
           </div>
 
-          {/* Chat Section - Right */}
-          <Collapsible open={isChatOpen} onOpenChange={setIsChatOpen}>
-            {!isChatOpen && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsChatOpen(true)}
-                className="h-full w-12 bg-black/80 backdrop-blur-lg border border-white/10 rounded-lg hover:bg-black/90 flex flex-col items-center justify-center gap-2"
-              >
-                <Radio className="h-5 w-5 text-blue-400" />
-                <ChevronLeft className="h-4 w-4 transform rotate-180" />
-              </Button>
-            )}
-            <CollapsibleContent className="w-[400px] h-full overflow-hidden flex-shrink-0">
-              <div className="h-full bg-black/80 backdrop-blur-lg border border-white/10 rounded-lg p-4 flex flex-col">
-                {/* Header with Toggle - Fixed */}
-                <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-3 flex-shrink-0">
-                  <CollapsibleTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-white hover:text-white hover:bg-white/10 h-8"
-                    >
-                      <Radio className="h-4 w-4 text-blue-400 mr-2" />
-                      <span className="font-semibold">Voice Conversation</span>
-                      <ChevronLeft className="h-4 w-4 ml-2" />
-                    </Button>
-                  </CollapsibleTrigger>
-                  <div className="flex items-center gap-2">
-                    {isAISpeaking && (
-                      <div className="flex items-center gap-1">
-                        <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
-                        <span className="text-xs text-green-400">AI Speaking...</span>
-                      </div>
-                    )}
-                    {transcripts.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={clearTranscripts}
-                        className="h-7 w-7 hover:bg-white/10"
-                        title="Clear transcripts"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
+          <div className="min-h-0 flex-1 space-y-8 overflow-y-auto p-6">
+            <section className="space-y-3">
+              <div className="flex items-baseline justify-between">
+                <h3 className="text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Pronunciation
+                </h3>
+                {scoreDisplay != null && (
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-3xl font-bold tabular-nums text-primary">
+                      {scoreDisplay}
+                    </span>
+                    <span className="text-sm text-muted-foreground">/ 100</span>
                   </div>
-                </div>
-
-                {/* Scrollable Content */}
-                <ScrollArea className="flex-1 min-h-0">
-                  <div className="flex flex-col gap-3 pr-4">
-                    {/* Status Messages */}
-                    {transcriptionError && (
-                      <div className="flex items-center gap-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg flex-shrink-0">
-                        <div className="h-2 w-2 bg-red-500 rounded-full" />
-                        <p className="text-xs text-red-200">{transcriptionError}</p>
-                      </div>
-                    )}
-
-                    {/* Listening State */}
-                    {isConnected && !isTalking && !isAISpeaking && !streamingAIText && (
-                      <div className="flex items-center gap-2 p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg flex-shrink-0">
-                        <div className="h-2 w-2 bg-blue-400 rounded-full animate-pulse" />
-                        <p className="text-xs text-blue-200">Hold SPACE to talk</p>
-                      </div>
-                    )}
-
-                    {/* Speaking State */}
-                    {isTalking && (
-                      <div className="flex items-center gap-2 p-2 bg-purple-500/10 border border-purple-500/30 rounded-lg flex-shrink-0">
-                        <div className="flex gap-1">
-                          <div className="h-2 w-1 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-                          <div className="h-2 w-1 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                          <div className="h-2 w-1 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-                        </div>
-                        <p className="text-xs text-purple-200">Recording... Release SPACE to send</p>
-                      </div>
-                    )}
-
-                    {/* AI Streaming State */}
-                    {streamingAIText && (
-                      <div className="flex items-start gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded-lg flex-shrink-0">
-                        <Radio className="h-3 w-3 text-green-400 mt-0.5 animate-pulse" />
-                        <div className="flex-1">
-                          <span className="text-xs font-medium text-green-300">AI is thinking...</span>
-                          <p className="text-xs text-green-100 leading-relaxed mt-1">{streamingAIText}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* AI Speaking State in Chat */}
-                    {isAISpeaking && (
-                      <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded-lg flex-shrink-0">
-                        <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
-                        <p className="text-xs text-green-200">AI Speaking...</p>
-                      </div>
-                    )}
-
-                    {/* Transcripts */}
-                    {transcripts.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full gap-2 text-center py-4">
-                        <Mic className="h-6 w-6 text-gray-400" />
-                        <p className="text-xs text-gray-400">
-                          {isConnected ? "Hold SPACE to talk" : "Turn on the mic to start voice conversation"}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {transcripts.map((transcript) => (
-                          <div key={transcript.id} className="space-y-2">
-                            {/* User transcript */}
-                            <div className="p-2 bg-white/5 rounded-lg border border-white/10">
-                              <div className="flex items-start justify-between gap-2 mb-1">
-                                <span className="text-xs font-medium text-gray-400">You</span>
-                                <span className="text-xs text-gray-500">
-                                  {formatTime(transcript.timestamp)}
-                                </span>
-                              </div>
-                              <p className="text-xs text-white leading-relaxed">{transcript.text}</p>
-                            </div>
-                            
-                            {/* AI reply if exists */}
-                            {transcript.reply && (
-                              <div className="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20 ml-4">
-                                <div className="flex items-start gap-2 mb-1">
-                                  <Radio className="h-3 w-3 text-blue-400 mt-0.5" />
-                                  <span className="text-xs font-medium text-blue-300">AI Response</span>
-                                </div>
-                                <p className="text-xs text-blue-50 leading-relaxed">{transcript.reply}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
+                )}
               </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
+
+              {lastPronunciation ? (
+                <div className="space-y-4 rounded-lg border border-border/60 bg-card p-4 text-card-foreground shadow-sm">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Target
+                    </div>
+                    <p className="mt-1 text-base leading-relaxed">{lastPronunciation.target_text}</p>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Heard
+                    </div>
+                    <HeardTextHighlight
+                      className="mt-1 text-base leading-relaxed"
+                      text={lastPronunciation.heard_text || "—"}
+                      misalignedWords={lastPronunciation.misaligned_words}
+                    />
+                  </div>
+                  {lastPronunciation.feedback.slice(0, 3).map((line, i) => (
+                    <p key={i} className="text-sm leading-relaxed text-muted-foreground">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              ) : phonemeAnalysis ? (
+                <Collapsible open={isPhonemeOpen} onOpenChange={setIsPhonemeOpen}>
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-card-foreground"
+                    >
+                      <span>Live · {Math.round(phonemeAnalysis.overall_accuracy)}%</span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${
+                          isPhonemeOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-border bg-card p-2">
+                    <PhonemeRealTimeFeedback
+                      transcript={lastUserTranscript}
+                      analysis={phonemeAnalysis}
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Finish speaking to see your pronunciation score and feedback.
+                </p>
+              )}
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Conversation
+              </h3>
+              <ScrollArea className="h-[min(360px,40vh)] pr-2 lg:h-[min(400px,45vh)]">
+                <div className="space-y-3 pb-2">
+                  {isConnected &&
+                    !isTalking &&
+                    !isAISpeaking &&
+                    !streamingAIText &&
+                    isMicEnabled && (
+                      <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-card p-3 text-sm text-muted-foreground shadow-sm">
+                        <span className="text-xs text-primary">Ready</span>
+                        <p className="mt-1">Hold SPACE to talk.</p>
+                      </div>
+                    )}
+                  {isTalking && (
+                    <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-card p-3 text-sm shadow-sm">
+                      <span className="text-xs font-medium text-primary">Recording</span>
+                      <p className="mt-1 text-foreground">Release SPACE when you are done.</p>
+                    </div>
+                  )}
+                  {isAISpeaking && !streamingAIText && (
+                    <div className="flex max-w-[90%] items-start gap-3">
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <Bot className="h-4 w-4" />
+                      </div>
+                      <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-card p-3 text-sm text-muted-foreground shadow-sm">
+                        Assistant is speaking…
+                      </div>
+                    </div>
+                  )}
+                  {streamingAIText && (
+                    <div className="flex max-w-[90%] items-start gap-3 self-start">
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <Bot className="h-4 w-4" />
+                      </div>
+                      <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-card p-3 text-sm leading-relaxed text-foreground shadow-sm">
+                        <p className="text-xs text-muted-foreground">Assistant is replying…</p>
+                        <p className="mt-1">{streamingAIText}</p>
+                      </div>
+                    </div>
+                  )}
+                  {partialTranscript && (
+                    <div className="flex w-full justify-end">
+                      <div className="flex max-w-[90%] items-start gap-3 flex-row-reverse">
+                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                          <User className="h-4 w-4" />
+                        </div>
+                        <div className="rounded-2xl rounded-tr-sm border border-border/40 bg-muted p-3 text-sm italic text-foreground shadow-sm">
+                          {partialTranscript}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {transcripts.length === 0 && !partialTranscript && !streamingAIText ? (
+                    <div className="flex flex-col items-center justify-center py-6 text-center text-sm text-muted-foreground">
+                      <PersonStanding className="mb-2 h-6 w-6 opacity-50" />
+                      <p>
+                        {isMicEnabled
+                          ? "Your turns and AI replies will appear here."
+                          : "Turn on the microphone to start."}
+                      </p>
+                    </div>
+                  ) : (
+                    transcripts.map((t) => (
+                      <div key={t.id} className="space-y-3">
+                        <div className="ml-auto flex max-w-[90%] items-start gap-3 flex-row-reverse">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                            <User className="h-4 w-4" />
+                          </div>
+                          <div className="rounded-2xl rounded-tr-sm border border-border/40 bg-muted p-3 text-sm leading-relaxed text-foreground shadow-sm">
+                            <p>{t.text}</p>
+                            <p className="mt-1 text-[10px] text-muted-foreground">
+                              {formatTime(t.timestamp)}
+                            </p>
+                          </div>
+                        </div>
+                        {t.reply && (
+                          <div className="flex max-w-[90%] items-start gap-3 self-start">
+                            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                              <Bot className="h-4 w-4" />
+                            </div>
+                            <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-card p-3 text-sm leading-relaxed text-foreground shadow-sm">
+                              {t.reply}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </section>
+          </div>
+        </aside>
       </div>
     </div>
   );

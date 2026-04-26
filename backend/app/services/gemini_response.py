@@ -1,13 +1,16 @@
 import os
 import asyncio
+import json
 import time
 import re
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from typing import List, Dict, Optional, AsyncGenerator
+from functools import partial
+from typing import List, Dict, Optional, AsyncGenerator, Any
 
 import requests
 
 from app.core.config import settings
+from app.services.pronunciation_coach import PRONUNCIATION_COACH_SYSTEM_SUFFIX
 
 # Suppress Google API warnings
 os.environ['GRPC_VERBOSITY'] = 'ERROR'
@@ -16,11 +19,24 @@ os.environ['GLOG_minloglevel'] = '2'
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-001")
 
+MAX_TOKENS_DEFAULT = 150
+MAX_TOKENS_WITH_PRONUNCIATION_COACH = 256
+BASE_SYSTEM_PROMPT = (
+    "You are an English-speaking coach helping users improve conversational English.\n"
+    "Be concise and encouraging. Keep responses to 2-3 sentences.\n"
+    "If you notice grammar errors, gently correct them and ask the user to repeat.\n"
+    "Ask follow-up questions to keep the conversation going.\n"
+    "Remember the context of previous messages in the conversation."
+)
 
-def _call_openrouter(prompt: str) -> str:
+
+def _call_openrouter(
+    prompt: str, pronunciation_coach: Optional[Dict[str, Any]] = None
+) -> str:
     """
     Call OpenRouter chat completions API and return the full response text.
     This replaces the direct Gemini SDK call, but keeps the same prompt shape.
+    When pronunciation_coach is set, appends human-level JSON only (no phoneme arrays).
     """
     if not settings.OPENROUTER_API_KEY:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
@@ -33,23 +49,30 @@ def _call_openrouter(prompt: str) -> str:
         "X-Title": os.getenv("OPENROUTER_APP_NAME", "TalkFlow"),
     }
 
+    if pronunciation_coach:
+        system_content = BASE_SYSTEM_PROMPT + "\n\n" + PRONUNCIATION_COACH_SYSTEM_SUFFIX
+        user_content = (
+            prompt
+            + "\n\nPRONUNCIATION_ASSESSMENT:\n"
+            + json.dumps(pronunciation_coach, ensure_ascii=False)
+        )
+        max_tokens = MAX_TOKENS_WITH_PRONUNCIATION_COACH
+    else:
+        system_content = BASE_SYSTEM_PROMPT
+        user_content = prompt
+        max_tokens = MAX_TOKENS_DEFAULT
+
     payload = {
         "model": OPENROUTER_MODEL,
         "messages": [
             {
                 "role": "system",
-                "content": (
-                    "You are an English-speaking coach helping users improve conversational English.\n"
-                    "Be concise and encouraging. Keep responses to 2-3 sentences.\n"
-                    "If you notice grammar errors, gently correct them and ask the user to repeat.\n"
-                    "Ask follow-up questions to keep the conversation going.\n"
-                    "Remember the context of previous messages in the conversation."
-                ),
+                "content": system_content,
             },
-            {"role": "user", "content": prompt},
+            {"role": "user", "content": user_content},
         ],
         "temperature": 0.7,
-        "max_tokens": 150,
+        "max_tokens": max_tokens,
     }
 
     try:
@@ -84,16 +107,18 @@ def _call_openrouter(prompt: str) -> str:
 async def stream_gemini_response(
     current_text: str,
     conversation_history: Optional[List[Dict]] = None,
-    is_first_turn: bool = False
+    is_first_turn: bool = False,
+    pronunciation_coach: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[str, None]:
     """
     Stream AI response tokens from Gemini with conversation context
-    
+
     Args:
         current_text: The current user's message
         conversation_history: List of previous turns
         is_first_turn: If True, uses Policy A (fast), else Policy B (punctuation-aware)
-    
+        pronunciation_coach: Optional slim dict (target, heard, score, top feedback,
+            misaligned_words) for OpenRouter; no phoneme arrays.
     Yields:
         Text chunks (tokens batched by policy)
     """
@@ -122,7 +147,7 @@ async def stream_gemini_response(
         # apply the same batching policies as before on the text.
         loop = asyncio.get_event_loop()
         reply_text = await loop.run_in_executor(
-            None, _call_openrouter, full_prompt
+            None, partial(_call_openrouter, full_prompt, pronunciation_coach)
         )
 
         # Split reply text into "tokens" (space‑separated words) and stream

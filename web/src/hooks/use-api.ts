@@ -155,13 +155,18 @@ export function useCreateMeeting() {
 export function useUpdateMeeting() {
   const queryClient = useQueryClient();
   return useMutation({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mutationFn: ({ id, ...data }: { id: string; [key: string]: any }) =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      apiCall<any>(`/api/meetings/${id}`, {
+    mutationFn: (variables: {
+      id: string;
+      name?: string;
+      agentId?: string;
+      phonemeData?: unknown;
+    }) => {
+      const { id, ...data } = variables;
+      return apiCall<unknown>(`/api/meetings/${id}`, {
         method: "PUT",
-        body: JSON.stringify(data),
-      }),
+        body: JSON.stringify({ id, ...data }),
+      });
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
       queryClient.invalidateQueries({ queryKey: ["meeting", variables.id] });

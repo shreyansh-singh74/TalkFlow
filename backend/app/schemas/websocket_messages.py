@@ -1,6 +1,8 @@
-# app/schemas/websocket_messages.py
-from pydantic import BaseModel
-from typing import Literal
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, Field
+
+from app.schemas.responses import SentencePhonemeAnalysisResponse
 
 
 class ControlMessage(BaseModel):
@@ -40,8 +42,29 @@ class TTSChunkMessage(BaseModel):
     is_final: bool
 
 
+class PhonemeAnalysisMessage(BaseModel):
+    type: Literal["PHONEME_ANALYSIS"]
+    turn_id: str
+    target_text: str
+    analysis: SentencePhonemeAnalysisResponse
+
+
 class ErrorMessage(BaseModel):
     type: Literal["ERROR"]
     message: str
     recoverable: bool
+
+
+class PronunciationResultMessage(BaseModel):
+    type: Literal["PRONUNCIATION_RESULT"]
+    turn_id: str
+    target_text: str
+    deepgram_text: Optional[str] = None
+    heard_text: str
+    score: float
+    expected_phonemes: List[str] = Field(default_factory=list)
+    actual_phonemes: List[str] = Field(default_factory=list)
+    errors: List[dict] = Field(default_factory=list)
+    feedback: List[str] = Field(default_factory=list)
+    misaligned_words: List[dict] = Field(default_factory=list)
 

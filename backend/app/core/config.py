@@ -105,6 +105,10 @@ class Settings:
     # Paths
     TEMP_DIR: str = "/tmp"
     
+    ENABLE_WAV2VEC2: bool = os.getenv("ENABLE_WAV2VEC2", "0").lower() in ("1", "true", "yes")
+    WAV2VEC2_MODEL_ID: str = os.getenv("WAV2VEC2_MODEL_ID", "facebook/wav2vec2-base-960h")
+    TURN_AUDIO_MAX_BYTES: int = int(os.getenv("TURN_AUDIO_MAX_BYTES", str(16_000 * 2 * 5)))
+    
     def validate(self):
         """Validate required settings"""
         if not self.OPENROUTER_API_KEY and not self.GEMINI_API_KEY:

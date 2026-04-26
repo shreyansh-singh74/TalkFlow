@@ -2,7 +2,13 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.deepgram_live_service import DeepgramLiveService
 from app.services.gemini_response import get_gemini_response, stream_gemini_response
+from app.services.phoneme_analysis_service import (
+    build_pronunciation_result_dict,
+    phoneme_analyzer,
+)
+from app.services.pronunciation_coach import build_pronunciation_coach_for_llm
 from app.services.tts_service import tts_service
+from app.services.wav2vec2_asr import pcm16le_to_text
 from app.schemas.websocket_messages import ControlMessage
 from app.core.config import settings
 import json
@@ -20,6 +26,20 @@ sessions: Dict[str, dict] = {}
 
 # Session timeout from config
 SESSION_TIMEOUT_SECONDS = settings.SESSION_TIMEOUT_MINUTES * 60
+DEFAULT_TARGET_TEXT = "circumstances of the accident"
+
+
+def extract_practice_target(ai_text: str) -> Optional[str]:
+    marker = "repeat after me:"
+    lower = (ai_text or "").lower()
+    if marker in lower:
+        t = ai_text[lower.rfind(marker) + len(marker) :].strip()
+        if t:
+            return t
+    if "repeat" in lower and ":" in ai_text:
+        t2 = ai_text.rsplit(":", 1)[-1].strip()
+        return t2 or None
+    return None
 
 
 async def cleanup_stale_sessions():
@@ -85,6 +105,9 @@ class VoiceSession:
         self.current_turn_id: Optional[str] = None
         self.partial_transcript = ""
         self.final_transcript = ""
+        self.target_text = DEFAULT_TARGET_TEXT
+        self.active_expected_target: Optional[str] = None
+        self.turn_audio = bytearray()
         self.is_generating_tts = False
         self.should_stop_tts = False
         
@@ -106,7 +129,47 @@ class VoiceSession:
             "history_length": len(self.conversation_history),
             "last_activity": datetime.fromtimestamp(self.last_activity).isoformat()
         }
-        
+
+    async def _emit_pronunciation_result(
+        self,
+        full_pcm: bytes,
+        expected_for_turn: str,
+        deepgram_text: str,
+    ) -> Optional[Dict]:
+        cap = settings.TURN_AUDIO_MAX_BYTES
+        pcm = full_pcm[:cap] if cap > 0 else full_pcm
+        heard_text = ""
+        if settings.ENABLE_WAV2VEC2 and pcm:
+            heard_text = await asyncio.to_thread(pcm16le_to_text, pcm)
+        if not (heard_text or "").strip():
+            heard_text = deepgram_text or ""
+        body = await asyncio.to_thread(
+            build_pronunciation_result_dict,
+            phoneme_analyzer,
+            expected_for_turn,
+            heard_text,
+        )
+        coach = build_pronunciation_coach_for_llm(
+            expected_for_turn,
+            heard_text,
+            body["score"],
+            body.get("feedback") or [],
+        )
+        await self.send_json({
+            "type": "PRONUNCIATION_RESULT",
+            "turn_id": self.current_turn_id or "",
+            "target_text": expected_for_turn,
+            "deepgram_text": deepgram_text,
+            "heard_text": heard_text,
+            "score": body["score"],
+            "expected_phonemes": body["expected_phonemes"],
+            "actual_phonemes": body["actual_phonemes"],
+            "errors": body["errors"],
+            "feedback": body["feedback"],
+            "misaligned_words": coach.get("misaligned_words") or [],
+        })
+        return coach
+
     async def handle_start_turn(self, msg: ControlMessage):
         """Handle START_TURN: Initialize Deepgram streaming"""
         self.update_activity()
@@ -114,6 +177,8 @@ class VoiceSession:
         self.current_turn_id = msg.turn_id
         self.partial_transcript = ""
         self.final_transcript = ""
+        self.turn_audio.clear()
+        self.active_expected_target = self.target_text
         self.should_stop_tts = False
         
         # Stop any ongoing TTS playback
@@ -130,6 +195,11 @@ class VoiceSession:
         
     async def handle_audio_chunk(self, audio_data: bytes):
         """Handle incoming audio chunk"""
+        cap = settings.TURN_AUDIO_MAX_BYTES
+        if cap > 0:
+            room = cap - len(self.turn_audio)
+            if room > 0:
+                self.turn_audio.extend(audio_data[:room])
         if self.deepgram_service:
             await self.deepgram_service.send_audio(audio_data)
             
@@ -142,20 +212,35 @@ class VoiceSession:
         if self.deepgram_service:
             await self.deepgram_service.finish()
             self.deepgram_service = None
-        
+
+        full_pcm = bytes(self.turn_audio)
+        self.turn_audio.clear()
+
         await asyncio.sleep(0.2)
-        
+
         if not self.final_transcript:
             print("No transcript received")
             return
-        
-        # Send final transcript
+
+        expected_for_turn = (self.active_expected_target or self.target_text or DEFAULT_TARGET_TEXT).strip()
+        self.active_expected_target = None
+
         await self.send_json({
             "type": "FINAL_TRANSCRIPT",
             "text": self.final_transcript,
-            "confidence": 1.0
+            "confidence": 1.0,
         })
-        
+
+        pronunciation_coach: Optional[Dict] = None
+        try:
+            pronunciation_coach = await self._emit_pronunciation_result(
+                full_pcm=full_pcm,
+                expected_for_turn=expected_for_turn,
+                deepgram_text=self.final_transcript,
+            )
+        except Exception as exc:
+            print(f"Pronunciation pipeline failed: {exc}")
+
         # Check if first turn in session
         is_first_turn = len(self.conversation_history) == 0
         
@@ -166,7 +251,8 @@ class VoiceSession:
         async for text_chunk in stream_gemini_response(
             self.final_transcript,
             self.conversation_history,
-            is_first_turn=is_first_turn
+            is_first_turn=is_first_turn,
+            pronunciation_coach=pronunciation_coach,
         ):
             if self.should_stop_tts:
                 print("LLM streaming interrupted")
@@ -188,6 +274,10 @@ class VoiceSession:
             "text": full_response_text,
             "has_audio": True
         })
+
+        practice_target = extract_practice_target(full_response_text)
+        if practice_target:
+            self.target_text = practice_target
         
         # Update conversation history with metadata
         self.conversation_history.append({

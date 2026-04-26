@@ -1,72 +1,29 @@
-
 import { Button } from "@/components/ui/button";
-import { LogInIcon, Mic, MicOff, Camera, CameraOff, RefreshCw } from "lucide-react";
+import { LogInIcon, Mic } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
 
 interface Props {
   onJoin: () => void;
-  attachLocalStream: (el: HTMLVideoElement | null) => void;
-  requestMedia: () => Promise<void>;
-  localStream: MediaStream | null;
-  isFetching: boolean;
-  error: string | null;
-  isCameraOn: boolean;
-  isMicOn: boolean;
-  toggleCamera: () => void;
-  toggleMic: () => void;
 }
 
-export const CallLobby = ({ onJoin, attachLocalStream, requestMedia, localStream, isFetching, error, isCameraOn, isMicOn, toggleCamera, toggleMic }: Props) => {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  useEffect(() => {
-    attachLocalStream(videoRef.current);
-  }, [attachLocalStream]);
-
+export const CallLobby = ({ onJoin }: Props) => {
   return (
     <div className="flex flex-col items-center justify-center h-full bg-radial from-sidebar-accent to-sidebar">
       <div className="py-4 px-8 flex flex-1 items-center justify-center">
         <div className="flex flex-col items-center justify-center gap-y-6 bg-background rounded-lg p-10 shadow-sm">
           <div className="flex flex-col gap-y-2 text-center">
-            <h6 className="text-lg font-medium">Ready to join?</h6>
-            <p className="text-sm">Set up your call before joining</p>
+            <h6 className="text-lg font-medium">Ready for voice practice?</h6>
+            <p className="text-sm text-muted-foreground">
+              Microphone access will be requested when you start speaking.
+            </p>
           </div>
           
-          <div className="w-64 h-48 bg-black rounded-lg flex items-center justify-center overflow-hidden relative">
-            {localStream && isCameraOn ? (
-              <video
-                ref={videoRef}
-                className="w-full h-full object-cover"
-                muted
-                playsInline
-                autoPlay
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center text-white/80">
-                <CameraOff className="w-10 h-10 mb-2" />
-                <p className="text-xs">Camera is off</p>
-              </div>
-            )}
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/10 backdrop-blur rounded-full px-3 py-1">
-              <Button variant="ghost" size="icon" onClick={toggleMic} className="h-8 w-8 text-white">
-                {isMicOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-              </Button>
-              <Button variant="ghost" size="icon" onClick={toggleCamera} className="h-8 w-8 text-white">
-                {isCameraOn ? <Camera className="h-4 w-4" /> : <CameraOff className="h-4 w-4" />}
-              </Button>
-            </div>
-          </div>
-          {error && (
-            <p className="text-sm text-red-500">{error}</p>
-          )}
-          
-          <div className="flex gap-x-2">
-            <Button variant="outline" size="sm" onClick={() => requestMedia()} disabled={isFetching}>
-              {!localStream ? "Allow Camera & Mic" : (
-                <span className="inline-flex items-center gap-2"><RefreshCw className="h-4 w-4" /> Refresh Preview</span>
-              )}
-            </Button>
+          <div className="w-64 h-48 rounded-lg border bg-muted/40 flex flex-col items-center justify-center text-center px-6">
+            <Mic className="w-10 h-10 mb-3 text-primary" />
+            <p className="text-sm font-medium">Voice-only mode</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Video is disabled for this phase.
+            </p>
           </div>
           
           <div className="flex gap-x-2 justify-between w-full">
@@ -75,9 +32,9 @@ export const CallLobby = ({ onJoin, attachLocalStream, requestMedia, localStream
                 Cancel
               </Link>
             </Button>
-            <Button onClick={onJoin} disabled={!localStream || isFetching}>
+            <Button onClick={onJoin}>
               <LogInIcon />
-              Join Call
+              Join Voice Practice
             </Button>
           </div>
         </div>

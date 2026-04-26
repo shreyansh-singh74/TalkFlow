@@ -1,8 +1,7 @@
-// web/src/hooks/use-phoneme-analysis.ts
 "use client";
 
-import { useState, useCallback } from "react";
-import { useApi } from "./use-api";
+import { useCallback, useState } from "react";
+import { getBackendUrl } from "@/lib/backend-config";
 
 export interface PhonemeSegment {
   phoneme: string;
@@ -10,8 +9,8 @@ export interface PhonemeSegment {
   actual: string;
   accuracy: number;
   is_correct: boolean;
-  feedback?: string;
-  suggestions?: string[];
+  feedback?: string | null;
+  suggestions?: string[] | null;
 }
 
 export interface WordPhonemeAnalysis {
@@ -26,74 +25,97 @@ export interface WordPhonemeAnalysis {
   suggestions: string[];
 }
 
+export interface PhonemeErrorCount {
+  phoneme: string;
+  count: number;
+}
+
 export interface SentencePhonemeAnalysis {
   sentence: string;
   words: WordPhonemeAnalysis[];
   overall_accuracy: number;
   problematic_phonemes: string[];
   mastered_phonemes: string[];
-  most_common_errors: Array<[string, number]>;
+  most_common_errors: PhonemeErrorCount[];
 }
 
-export interface PhonemeAnalysisState {
+export interface PhonemeCompareResult {
+  expected: string;
+  actual: string;
+  expected_ipa: string;
+  actual_ipa: string;
+  accuracy_score: number;
+  segments: PhonemeSegment[];
+}
+
+export interface IpaResult {
+  word: string;
+  ipa: string;
+  phonemes: string[];
+}
+
+interface PhonemeAnalysisState {
   data: SentencePhonemeAnalysis | null;
   loading: boolean;
   error: string | null;
 }
 
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || `Request failed (${response.status})`);
+  }
+  return response.json() as Promise<T>;
+}
+
+async function getJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || `Request failed (${response.status})`);
+  }
+  return response.json() as Promise<T>;
+}
+
 export function usePhonemeAnalysis() {
-  const api = useApi();
   const [state, setState] = useState<PhonemeAnalysisState>({
     data: null,
     loading: false,
     error: null,
   });
 
-  /**
-   * Analyze phonemes in a sentence
-   */
   const analyzeSentence = useCallback(
     async (sentence: string, userTranscript?: string) => {
       setState({ data: null, loading: true, error: null });
-      
       try {
-        const response = await api.post<SentencePhonemeAnalysis>(
-          "/api/phonemes/analyze",
-          {
-            sentence,
-            user_transcript: userTranscript,
-          }
+        const response = await postJson<SentencePhonemeAnalysis>(
+          `${getBackendUrl()}/api/phonemes/analyze`,
+          { sentence, user_transcript: userTranscript ?? null },
         );
-
         setState({ data: response, loading: false, error: null });
         return response;
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Failed to analyze phonemes";
-        setState({ data: null, loading: false, error: errorMessage });
+        const message = error instanceof Error ? error.message : "Failed to analyze phonemes";
+        setState({ data: null, loading: false, error: message });
         throw error;
       }
     },
-    [api]
+    [],
   );
 
-  /**
-   * Analyze a single word
-   */
   const analyzeWord = useCallback(
     async (word: string, userTranscript?: string) => {
       setState({ data: null, loading: true, error: null });
-      
       try {
-        const params = new URLSearchParams();
-        params.append("word", word);
-        if (userTranscript) params.append("user_transcript", userTranscript);
-
-        const response = await api.get<WordPhonemeAnalysis>(
-          `/api/phonemes/analyze-word?${params}`
+        const response = await postJson<WordPhonemeAnalysis>(
+          `${getBackendUrl()}/api/phonemes/analyze-word`,
+          { word, user_transcript: userTranscript ?? null },
         );
-
-        // Convert single word analysis to sentence format for consistency
         const sentenceAnalysis: SentencePhonemeAnalysis = {
           sentence: word,
           words: [response],
@@ -102,110 +124,59 @@ export function usePhonemeAnalysis() {
           mastered_phonemes: [],
           most_common_errors: [],
         };
-
         setState({ data: sentenceAnalysis, loading: false, error: null });
         return sentenceAnalysis;
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Failed to analyze word";
-        setState({ data: null, loading: false, error: errorMessage });
+        const message = error instanceof Error ? error.message : "Failed to analyze word";
+        setState({ data: null, loading: false, error: message });
         throw error;
       }
     },
-    [api]
+    [],
   );
 
-  /**
-   * Get IPA representation of a word
-   */
-  const getIPA = useCallback(
-    async (word: string) => {
-      try {
-        const response = await api.get<{
-          word: string;
-          ipa: string;
-          phonemes: string[];
-        }>(`/api/phonemes/ipa/${encodeURIComponent(word)}`);
+  const getIPA = useCallback(async (word: string) => {
+    return getJson<IpaResult>(
+      `${getBackendUrl()}/api/phonemes/ipa/${encodeURIComponent(word)}`,
+    );
+  }, []);
 
-        return response;
-      } catch (error) {
-        console.error("Failed to get IPA:", error);
-        throw error;
-      }
-    },
-    [api]
-  );
+  const comparePhonemes = useCallback(async (expected: string, actual: string) => {
+    return postJson<PhonemeCompareResult>(
+      `${getBackendUrl()}/api/phonemes/compare`,
+      { expected, actual },
+    );
+  }, []);
 
-  /**
-   * Compare expected vs actual pronunciation
-   */
-  const comparePhonemes = useCallback(
-    async (expected: string, actual: string) => {
-      try {
-        const params = new URLSearchParams();
-        params.append("expected", expected);
-        params.append("actual", actual);
+  const setAnalysis = useCallback((analysis: SentencePhonemeAnalysis | null) => {
+    setState({ data: analysis, loading: false, error: null });
+  }, []);
 
-        const response = await api.post(`/api/phonemes/compare?${params}`, {});
-
-        return response;
-      } catch (error) {
-        console.error("Failed to compare phonemes:", error);
-        throw error;
-      }
-    },
-    [api]
-  );
-
-  /**
-   * Clear analysis state
-   */
   const clear = useCallback(() => {
     setState({ data: null, loading: false, error: null });
   }, []);
 
-  /**
-   * Get accuracy percentage
-   */
-  const getAccuracyPercentage = useCallback(() => {
-    if (!state.data) return 0;
-    return Math.round(state.data.overall_accuracy * 100) / 100;
-  }, [state.data]);
-
-  /**
-   * Get accuracy color based on score
-   */
-  const getAccuracyColor = useCallback((accuracy: number) => {
-    if (accuracy >= 80) return "text-green-600";
-    if (accuracy >= 60) return "text-yellow-600";
-    return "text-red-600";
-  }, []);
-
-  /**
-   * Get word accuracy color
-   */
-  const getWordAccuracyColor = useCallback((accuracy: number) => {
-    if (accuracy >= 80) return "bg-green-100 text-green-800";
-    if (accuracy >= 60) return "bg-yellow-100 text-yellow-800";
-    return "bg-red-100 text-red-800";
-  }, []);
-
   return {
-    // State
     data: state.data,
     loading: state.loading,
     error: state.error,
-    
-    // Methods
     analyzeSentence,
     analyzeWord,
     getIPA,
     comparePhonemes,
+    setAnalysis,
     clear,
-    
-    // Utility methods
-    getAccuracyPercentage,
-    getAccuracyColor,
-    getWordAccuracyColor,
   };
+}
+
+export function getAccuracyColorClass(accuracy: number): string {
+  if (accuracy >= 80) return "text-green-600";
+  if (accuracy >= 60) return "text-yellow-600";
+  return "text-red-600";
+}
+
+export function getAccuracyBadgeClass(accuracy: number): string {
+  if (accuracy >= 80) return "bg-green-100 text-green-800";
+  if (accuracy >= 60) return "bg-yellow-100 text-yellow-800";
+  return "bg-red-100 text-red-800";
 }

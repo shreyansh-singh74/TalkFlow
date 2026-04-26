@@ -1,60 +1,44 @@
 import { useState } from "react";
-import { useWebRTC } from "@/hooks/use-webrtc";
 import { CallLobby } from "./call-loby";
 import { CallActive } from "./call-active";
 import { CallEnded } from "./call-ended";
 
 interface Props {
+  meetingId: string;
   meetingName: string;
+  agentId: string;
+  userId: string;
+  userName: string;
+  userImage: string;
 }
 
-export const CallUI = ({ meetingName }: Props) => {
+export const CallUI = ({ meetingId, meetingName, agentId }: Props) => {
   const [show, setShow] = useState<"lobby" | "call" | "ended">("lobby");
-  // Single shared WebRTC instance across lobby and active screens
-  const webrtc = useWebRTC({ video: true, audio: true });
 
   const handleJoin = async () => {
-    // TODO: Implement custom WebRTC join logic
-    console.log("Joining WebRTC call");
     setShow("call");
   };
   
   const handleLeave = async () => {
-    // TODO: Implement custom WebRTC leave logic
-    console.log("Leaving WebRTC call");
     setShow("ended");
   };
   
   return (
-    <div className="h-full">
+    <div className="flex h-full min-h-0 flex-col">
       {show == "lobby" && (
         <CallLobby
           onJoin={handleJoin}
-          attachLocalStream={webrtc.attachLocalStream}
-          requestMedia={webrtc.requestMedia}
-          localStream={webrtc.localStream}
-          isFetching={webrtc.isFetching}
-          error={webrtc.error}
-          isCameraOn={webrtc.isCameraOn}
-          isMicOn={webrtc.isMicOn}
-          toggleCamera={webrtc.toggleCamera}
-          toggleMic={webrtc.toggleMic}
         />
       )}
       {show == "call" && (
-        <CallActive
-          onLeave={handleLeave}
-          meetingName={meetingName}
-          attachLocalStream={webrtc.attachLocalStream}
-          requestMedia={webrtc.requestMedia}
-          localStream={webrtc.localStream}
-          isFetching={webrtc.isFetching}
-          error={webrtc.error}
-          isCameraOn={webrtc.isCameraOn}
-          isMicOn={webrtc.isMicOn}
-          toggleCamera={webrtc.toggleCamera}
-          toggleMic={webrtc.toggleMic}
-        />
+        <div className="min-h-0 flex-1">
+          <CallActive
+            onLeave={handleLeave}
+            meetingName={meetingName}
+            meetingId={meetingId}
+            agentId={agentId}
+          />
+        </div>
       )}
       {show == "ended" && <CallEnded />} 
     </div>

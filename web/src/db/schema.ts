@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { pgTable, text, timestamp, boolean, pgEnum, jsonb, real } from "drizzle-orm/pg-core";
+import type { MeetingPhonemeDataPersisted } from "@/types/pronunciation";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -99,16 +100,7 @@ export const meetings = pgTable("meetings", {
   transcriptUrl: text("transcript_url"),
   recordingUrl: text("recording_url"),
   summary: text("summary"),
-  phonemeData: jsonb("phoneme_data").$type<{
-    overall_accuracy: number;
-    words: Array<{
-      word: string;
-      accuracy: number;
-      phonemes: string[];
-    }>;
-    problematic_phonemes: string[];
-    mastered_phonemes: string[];
-  }>(),
+  phonemeData: jsonb("phoneme_data").$type<MeetingPhonemeDataPersisted>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow()
 });

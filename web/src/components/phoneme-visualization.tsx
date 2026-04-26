@@ -31,13 +31,10 @@ export function PhonemeVisualization({
               Pronunciation Accuracy
             </span>
             <span className="text-2xl font-bold text-blue-600">
-              {Math.round(analysis.overall_accuracy * 100)}%
+              {Math.round(analysis.overall_accuracy)}%
             </span>
           </div>
-          <Progress
-            value={analysis.overall_accuracy * 100}
-            className="h-2"
-          />
+          <Progress value={analysis.overall_accuracy} className="h-2" />
         </div>
       </Card>
 
@@ -102,10 +99,12 @@ export function PhonemeVisualization({
             <h4 className="font-semibold text-yellow-900">Most Common Errors</h4>
           </div>
           <ul className="space-y-2">
-            {analysis.most_common_errors.map(([phoneme, count], idx) => (
+            {analysis.most_common_errors.map((err, idx) => (
               <li key={idx} className="flex justify-between items-center text-sm">
-                <span className="font-mono font-semibold">{phoneme}</span>
-                <span className="text-gray-600">{count} error{count > 1 ? 's' : ''}</span>
+                <span className="font-mono font-semibold">{err.phoneme}</span>
+                <span className="text-gray-600">
+                  {err.count} error{err.count > 1 ? "s" : ""}
+                </span>
               </li>
             ))}
           </ul>

@@ -74,9 +74,10 @@ export const CallView = ({ meetingId }: Props) => {
   return (
     <div className="flex h-screen flex-col">
 
-      <CallProvider 
-          meetingId={meetingId}
-          meetingName={data.name}
+      <CallProvider
+        meetingId={meetingId}
+        meetingName={data.name}
+        agentId={data.agentId}
       />
     </div>
   )

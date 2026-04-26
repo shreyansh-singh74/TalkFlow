@@ -68,7 +68,10 @@ export async function PUT(
     const body = await request.json();
     const validatedData = meetingsUpdateSchema.parse(body);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id, ...updateData } = validatedData;
+    const { id, ...rest } = validatedData;
+    const updateData = Object.fromEntries(
+      Object.entries(rest).filter(([, v]) => v !== undefined)
+    ) as Record<string, unknown>;
 
     const [updatedMeeting] = await db
       .update(meetings)
