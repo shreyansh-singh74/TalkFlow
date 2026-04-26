@@ -62,7 +62,7 @@ export const ForgotPasswordView = () => {
       }
 
       // If user exists, proceed with password reset
-      await authClient.forgetPassword({
+      await authClient.requestPasswordReset({
         email: data.email,
         redirectTo: "/reset-password",
       });
