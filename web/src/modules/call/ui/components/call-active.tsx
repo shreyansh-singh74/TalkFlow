@@ -324,20 +324,61 @@ export const CallActive = ({
                 onPointerUp={mainMicRelease}
                 onPointerCancel={mainMicRelease}
                 onPointerLeave={mainMicRelease}
-                className="group relative flex h-24 w-24 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-200 active:scale-95"
+                className="group relative hidden lg:flex h-24 w-24 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-200 active:scale-95"
                 title={!isMicEnabled ? "Enable microphone" : "Hold to speak"}
               >
                 <span className="absolute inset-0 rounded-full bg-primary-foreground/0 opacity-0 transition-opacity group-hover:opacity-10" />
                 {isMicEnabled ? <Mic className="h-9 w-9" /> : <MicOff className="h-9 w-9" />}
               </button>
 
+              {/* Mobile / iPad controls: show on screens smaller than lg */}
+              <div className="lg:hidden flex flex-col items-center gap-3">
+                {!isTalking ? (
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="w-48"
+                    onClick={() => {
+                      if (!isMicEnabled) {
+                        setIsMicEnabled(true);
+                        // ensure connection before starting
+                        setTimeout(() => startTalking(), 250);
+                      } else {
+                        startTalking();
+                      }
+                    }}
+                  >
+                    Start Talking
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="lg"
+                    variant="destructive"
+                    className="w-48"
+                    onClick={() => stopTalking()}
+                  >
+                    Stop
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleMicToggle}
+                  className="rounded-full"
+                >
+                  {isMicEnabled ? "Turn off mic" : "Turn on mic"}
+                </Button>
+              </div>
+
               <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
                 <div className="rounded-full border border-border bg-muted/60 px-4 py-2">
-                  Hold{" "}
+                  <span className="hidden lg:inline">Hold{" "}</span>
                   <kbd className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
                     SPACE
-                  </kbd>{" "}
-                  to talk
+                  </kbd>
+                  <span className="hidden lg:inline"> to talk</span>
                 </div>
                 <Button
                   type="button"
