@@ -28,7 +28,7 @@ export const HomeView = () => {
             </h1>
           )}
           <p className="text-lg md:text-xl text-muted-foreground">
-            Ready to have a conversation?
+            Ready to have pronunciation practice?
           </p>
         </div>
 
@@ -40,7 +40,7 @@ export const HomeView = () => {
             className="h-20 px-12 text-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all"
           >
             <MicIcon className="mr-3 h-6 w-6" />
-            Start Conversation
+            Begin Practice
           </Button>
           
           <p className="text-sm text-muted-foreground">

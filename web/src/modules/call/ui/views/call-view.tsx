@@ -40,7 +40,7 @@ export const CallView = ({ meetingId }: Props) => {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex flex-1 items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
           <p className="mt-2 text-white">Loading meeting...</p>
@@ -51,7 +51,7 @@ export const CallView = ({ meetingId }: Props) => {
 
   if (error || !data) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex flex-1 items-center justify-center">
         <ErrorState 
           title="Failed to Load Meeting"
           description="Could not load the meeting details. Please try again."
@@ -62,7 +62,7 @@ export const CallView = ({ meetingId }: Props) => {
 
   if(data.status === "completed"){
     return (
-        <div className="flex h-screen items-center justify-center">
+      <div className="flex flex-1 items-center justify-center">
             <ErrorState 
                 title="Meeting has Ended"
                 description="You can no longer join this meeting."
@@ -72,7 +72,7 @@ export const CallView = ({ meetingId }: Props) => {
   }
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex flex-1 min-h-0 flex-col">
 
       <CallProvider
         meetingId={meetingId}

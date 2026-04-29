@@ -5,8 +5,6 @@ interface Props {
   children: ReactNode;
 }
 
-const Layout = ({ children }: Props) => {
-    return <DashboardShell>{children}</DashboardShell>;
-};
-
-export default Layout;
+export default function Layout({ children }: Props) {
+  return <DashboardShell>{children}</DashboardShell>;
+}
