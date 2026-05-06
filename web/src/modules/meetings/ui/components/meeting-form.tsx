@@ -43,22 +43,6 @@ export const MeetingForm = ({
   const createMeeting = useCreateMeeting();
   const updateMeeting = useUpdateMeeting();
 
-  // Handle success and error for create
-  if (createMeeting.isSuccess) {
-    onSuccess?.(createMeeting.data?.id);
-  }
-  if (createMeeting.isError) {
-    toast.error(createMeeting.error?.message || "Failed to create meeting");
-  }
-
-  // Handle success and error for update
-  if (updateMeeting.isSuccess) {
-    onSuccess?.();
-  }
-  if (updateMeeting.isError) {
-    toast.error(updateMeeting.error?.message || "Failed to update meeting");
-  }
-
   const form = useForm<z.infer<typeof meetingsInsertSchema>>({
     resolver: zodResolver(meetingsInsertSchema),
     defaultValues: {
@@ -72,9 +56,22 @@ export const MeetingForm = ({
 
   const onSubmit = (values: z.infer<typeof meetingsInsertSchema>) => {
     if (isEdit) {
-      updateMeeting.mutate({ ...values, id: initialValues.id });
+      updateMeeting.mutate(
+        { ...values, id: initialValues.id },
+        {
+          onSuccess: () => onSuccess?.(),
+          onError: (error) => {
+            toast.error(error.message || "Failed to update meeting");
+          },
+        }
+      );
     } else {
-      createMeeting.mutate(values);
+      createMeeting.mutate(values, {
+        onSuccess: (createdMeeting) => onSuccess?.(createdMeeting?.id),
+        onError: (error) => {
+          toast.error(error.message || "Failed to create meeting");
+        },
+      });
     }
   };
 

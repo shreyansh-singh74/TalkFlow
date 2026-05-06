@@ -11,7 +11,6 @@ export default async function Page() {
     if (!!session) {
       redirect("/");
     }
-  console.log("Sign up Page");
   return (
         <SignUpView />
   );

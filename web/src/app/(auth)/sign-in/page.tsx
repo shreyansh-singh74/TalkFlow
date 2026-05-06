@@ -12,6 +12,5 @@ export default async function Page() {
     redirect("/");
   }
 
-  console.log("Sign in Page");
   return <SignInView />;
 }

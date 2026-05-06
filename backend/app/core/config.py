@@ -2,11 +2,14 @@
 import os
 import json
 import base64
+import logging
 import tempfile
 from typing import List
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 class Settings:
     """Application settings and configuration"""
@@ -31,7 +34,6 @@ class Settings:
     ]
     
     # API Keys
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     DEEPGRAM_API_KEY: str = os.getenv("DEEPGRAM_API_KEY", "")
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
     
@@ -56,22 +58,24 @@ class Settings:
                 temp_file.close()
                 self.GOOGLE_APPLICATION_CREDENTIALS = temp_file.name
                 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = temp_file.name
-                print("Google credentials loaded from GOOGLE_CREDENTIALS_JSON (base64)")
+                logger.info("Google credentials loaded from GOOGLE_CREDENTIALS_JSON")
             except Exception as e:
-                print(f"WARNING: Failed to decode GOOGLE_CREDENTIALS_JSON: {e}")
-                print("  Make sure GOOGLE_CREDENTIALS_JSON contains a valid base64-encoded JSON string")
+                logger.warning(
+                    "Failed to decode GOOGLE_CREDENTIALS_JSON; make sure it contains base64-encoded JSON: %s",
+                    e,
+                )
         elif google_creds_path:
             # Check if it's actually a base64 string (starts with 'ewog' or similar, not a path)
             if google_creds_path.startswith('ewog') or (len(google_creds_path) > 500 and '/' not in google_creds_path):
-                print("ERROR: GOOGLE_APPLICATION_CREDENTIALS contains a base64 string!")
-                print("  This should be set as GOOGLE_CREDENTIALS_JSON instead.")
-                print("  Please set GOOGLE_CREDENTIALS_JSON=<your-base64-string> in Railway")
+                logger.error(
+                    "GOOGLE_APPLICATION_CREDENTIALS looks like base64; use GOOGLE_CREDENTIALS_JSON instead"
+                )
                 self.GOOGLE_APPLICATION_CREDENTIALS = ""
             elif os.path.exists(google_creds_path):
                 self.GOOGLE_APPLICATION_CREDENTIALS = google_creds_path
-                print(f"Google credentials loaded from file: {google_creds_path}")
+                logger.info("Google credentials loaded from file: %s", google_creds_path)
             else:
-                print(f"WARNING: Google credentials file not found at: {google_creds_path}")
+                logger.warning("Google credentials file not found at: %s", google_creds_path)
                 self.GOOGLE_APPLICATION_CREDENTIALS = ""
         else:
             self.GOOGLE_APPLICATION_CREDENTIALS = ""
@@ -106,20 +110,27 @@ class Settings:
     TEMP_DIR: str = "/tmp"
     
     ENABLE_WAV2VEC2: bool = os.getenv("ENABLE_WAV2VEC2", "0").lower() in ("1", "true", "yes")
+    WARM_WAV2VEC2_ON_STARTUP: bool = os.getenv("WARM_WAV2VEC2_ON_STARTUP", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
     WAV2VEC2_MODEL_ID: str = os.getenv("WAV2VEC2_MODEL_ID", "facebook/wav2vec2-base-960h")
     TURN_AUDIO_MAX_BYTES: int = int(os.getenv("TURN_AUDIO_MAX_BYTES", str(16_000 * 2 * 5)))
     
     def validate(self):
         """Validate required settings"""
-        if not self.OPENROUTER_API_KEY and not self.GEMINI_API_KEY:
-            print("WARNING: Neither OPENROUTER_API_KEY nor GEMINI_API_KEY are set - AI responses will not work!")
+        if not self.OPENROUTER_API_KEY:
+            logger.warning("OPENROUTER_API_KEY is not set - AI responses will not work")
         if not self.GOOGLE_APPLICATION_CREDENTIALS:
-            print("WARNING: GOOGLE_APPLICATION_CREDENTIALS not set - TTS will not work!")
+            logger.warning("GOOGLE_APPLICATION_CREDENTIALS is not set - TTS will not work")
         elif self.GOOGLE_APPLICATION_CREDENTIALS and not os.path.exists(self.GOOGLE_APPLICATION_CREDENTIALS):
-            print(f"WARNING: Google credentials file not found at {self.GOOGLE_APPLICATION_CREDENTIALS}")
+            logger.warning(
+                "Google credentials file not found at %s",
+                self.GOOGLE_APPLICATION_CREDENTIALS,
+            )
         if not self.DEEPGRAM_API_KEY:
-            print("WARNING: DEEPGRAM_API_KEY not set - Transcription will not work!")
+            logger.warning("DEEPGRAM_API_KEY is not set - speech transcription will not work")
 
 settings = Settings()
 settings.validate()
-

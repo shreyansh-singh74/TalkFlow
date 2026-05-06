@@ -5,17 +5,17 @@ export type MeetingGetMany = Array<{
   status: MeetingStatus;
   agentId: string;
   userId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  startedAt: Date | null;
-  endedAt: Date | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
   agent: {
     id: string;
     name: string;
     instructions: string;
     userId: string;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt: string;
+    updatedAt: string;
   };
   duration: number | null;
 }>;
@@ -26,17 +26,17 @@ export type MeetingGetOne = {
   status: MeetingStatus;
   agentId: string;
   userId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  startedAt: Date | null;
-  endedAt: Date | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
   agent: {
     id: string;
     name: string;
     instructions: string;
     userId: string;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt: string;
+    updatedAt: string;
   };
   duration: number | null;
 };

@@ -6,7 +6,7 @@ import { SentencePhonemeAnalysis } from "@/hooks/use-phoneme-analysis";
 import { useMeeting, useDeleteMeeting } from "@/hooks/use-api";
 import { MeetingIdViewHeader } from "../components/meeting-id-view-header";
 import { useRouter } from "next/navigation";
-import { useConfirm } from "../../hooks/use-confirm";
+import { useConfirm } from "@/hooks/use-confirm";
 import { UpdateMeetingDialog } from "../components/update-meeting-dialog";
 import { useState } from "react";
 import { UpcomingState } from "../components/upcoming-state";
@@ -54,15 +54,6 @@ export const MeetingIdView = ({ meetingId }: Props) => {
     "The following action will remove this meeting"
   );
 
-  // Handle success and error for delete
-  if (removeMeeting.isSuccess) {
-    router.push("/meetings");
-    toast.success("Meeting deleted successfully");
-  }
-  if (removeMeeting.isError) {
-    toast.error(removeMeeting.error?.message || "Failed to delete meeting");
-  }
-
   if (isLoading) {
     return <LoadingState title="Loading Meeting" description="This may take a few seconds" />;
   }
@@ -85,7 +76,15 @@ export const MeetingIdView = ({ meetingId }: Props) => {
     if (!ok) {
       return;
     }
-    await removeMeeting.mutateAsync(meetingId);
+    removeMeeting.mutate(meetingId, {
+      onSuccess: () => {
+        toast.success("Meeting deleted successfully");
+        router.push("/meetings");
+      },
+      onError: (error) => {
+        toast.error(error.message || "Failed to delete meeting");
+      },
+    });
   };
 
   const isActive = data.status === "active";

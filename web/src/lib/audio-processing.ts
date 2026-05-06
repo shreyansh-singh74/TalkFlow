@@ -70,7 +70,7 @@ export class AudioChunker {
     // Firefox doesn't allow connecting MediaStreamAudioSourceNode to AudioContext
     // with different sample rates
     this.context = new AudioContext();
-    console.log(`🎧 AudioContext created with sample rate: ${this.context.sampleRate}`);
+    console.info("AudioContext created", { sampleRate: this.context.sampleRate });
     this.source = this.context.createMediaStreamSource(stream);
     
     // 4096 samples at native rate
@@ -102,4 +102,3 @@ export class AudioChunker {
     this.context.close();
   }
 }
-

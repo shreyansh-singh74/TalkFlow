@@ -42,15 +42,12 @@ interface Props {
   onLeave: () => void;
   meetingName: string;
   meetingId: string;
-  agentId: string;
 }
 
 export const CallActive = ({
   onLeave,
   meetingName,
   meetingId,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  agentId: _agentId,
 }: Props) => {
   const updateMeeting = useUpdateMeeting();
   const phonemeEntriesRef = useRef<MeetingPhonemeDataPersisted["entries"]>([]);

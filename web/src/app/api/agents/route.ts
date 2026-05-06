@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { agents } from "@/db/schema";
+import { agents, meetings } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { and, count, desc, eq, getTableColumns, ilike, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -33,7 +33,11 @@ export async function GET(request: NextRequest) {
 
     const data = await db
       .select({
-        meetingCount: sql<number>`5`, // TODO: Change to actual count
+        meetingCount: sql<number>`(
+          select count(*)::int
+          from ${meetings}
+          where ${meetings.agentId} = ${agents.id}
+        )`.as("meetingCount"),
         ...getTableColumns(agents),
       })
       .from(agents)

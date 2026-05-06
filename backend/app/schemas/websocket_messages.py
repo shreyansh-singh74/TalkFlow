@@ -2,8 +2,6 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from app.schemas.responses import SentencePhonemeAnalysisResponse
-
 
 class ControlMessage(BaseModel):
     type: Literal["START_TURN", "END_TURN", "INTERRUPT"]
@@ -42,13 +40,6 @@ class TTSChunkMessage(BaseModel):
     is_final: bool
 
 
-class PhonemeAnalysisMessage(BaseModel):
-    type: Literal["PHONEME_ANALYSIS"]
-    turn_id: str
-    target_text: str
-    analysis: SentencePhonemeAnalysisResponse
-
-
 class ErrorMessage(BaseModel):
     type: Literal["ERROR"]
     message: str
@@ -67,4 +58,3 @@ class PronunciationResultMessage(BaseModel):
     errors: List[dict] = Field(default_factory=list)
     feedback: List[str] = Field(default_factory=list)
     misaligned_words: List[dict] = Field(default_factory=list)
-

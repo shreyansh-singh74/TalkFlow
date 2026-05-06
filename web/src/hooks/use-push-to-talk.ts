@@ -127,7 +127,6 @@ export function usePushToTalk(): UsePushToTalkReturn {
         break;
         
       case "ERROR":
-        console.error("Server error:", message.message);
         setError(message.message);
         break;
         
@@ -142,19 +141,16 @@ export function usePushToTalk(): UsePushToTalkReturn {
    */
   const connect = useCallback(async () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log("Already connected");
       return;
     }
     
     try {
       const wsUrl = getWebSocketUrl();
-      console.log(`Connecting to ${wsUrl}`);
       
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       
       ws.onopen = () => {
-        console.log("WebSocket connected");
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
@@ -174,18 +170,16 @@ export function usePushToTalk(): UsePushToTalkReturn {
       };
       
       ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
+        void error;
         setError("Connection error");
       };
       
       ws.onclose = () => {
-        console.log("WebSocket disconnected");
         setIsConnected(false);
         
         // Auto-reconnect with exponential backoff
         if (reconnectAttemptsRef.current < 10) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
-          console.log(`Reconnecting in ${delay}ms...`);
           setError(`Reconnecting in ${delay / 1000}s...`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
@@ -212,7 +206,7 @@ export function usePushToTalk(): UsePushToTalkReturn {
       ws.addEventListener("close", () => clearInterval(pingInterval));
       
     } catch (err) {
-      console.error("Failed to connect:", err);
+      void err;
       setError("Failed to connect");
     }
   }, [handleMessage]);
@@ -231,8 +225,6 @@ export function usePushToTalk(): UsePushToTalkReturn {
     }
     
     try {
-      console.log("START TALKING");
-      
       // Stop any AI audio
       audioPlayerRef.current?.stop();
       setIsAISpeaking(false);
@@ -279,7 +271,7 @@ export function usePushToTalk(): UsePushToTalkReturn {
       setError(null);
       
     } catch (err) {
-      console.error("Failed to start talking:", err);
+      void err;
       setError("Microphone access denied");
     }
   }, [isTalking]);
@@ -291,8 +283,6 @@ export function usePushToTalk(): UsePushToTalkReturn {
     if (!isTalking) {
       return;
     }
-    
-    console.log("STOP TALKING");
     
     // Stop audio chunking
     chunkerRef.current?.stop();
@@ -315,8 +305,6 @@ export function usePushToTalk(): UsePushToTalkReturn {
    * Disconnect WebSocket
    */
   const disconnect = useCallback(() => {
-    console.log("Disconnecting");
-    
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
@@ -388,4 +376,3 @@ export function usePushToTalk(): UsePushToTalkReturn {
     clearTranscripts
   };
 }
-

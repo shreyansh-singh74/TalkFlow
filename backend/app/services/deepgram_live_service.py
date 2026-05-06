@@ -6,10 +6,12 @@ with buffered audio chunks for now.
 """
 from deepgram import DeepgramClient
 from app.core.config import settings
-import asyncio
-from typing import Callable, Optional
+import logging
+from typing import Callable
 import tempfile
 import os
+
+logger = logging.getLogger(__name__)
 
 
 class DeepgramLiveService:
@@ -25,7 +27,7 @@ class DeepgramLiveService:
     async def start(self):
         """Start Deepgram service"""
         self.is_active = True
-        print("Deepgram service started (buffered mode)")
+        logger.debug("Deepgram service started in buffered mode")
             
     async def send_audio(self, audio_chunk: bytes):
         """Buffer audio chunk for transcription"""
@@ -46,7 +48,6 @@ class DeepgramLiveService:
             with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
                 # Write WAV header + PCM16 data
                 # Simple WAV header for 16kHz mono PCM16
-                num_samples = len(self.audio_buffer) // 2
                 sample_rate = 16000
                 num_channels = 1
                 bits_per_sample = 16
@@ -98,10 +99,9 @@ class DeepgramLiveService:
             os.unlink(temp_file_path)
             self.audio_buffer.clear()
             
-        except Exception as e:
-            print(f"Deepgram transcription error: {e}")
+        except Exception:
+            logger.exception("Deepgram transcription failed")
         finally:
             self.is_active = False
             if hasattr(self, 'audio_buffer'):
                 self.audio_buffer.clear()
-

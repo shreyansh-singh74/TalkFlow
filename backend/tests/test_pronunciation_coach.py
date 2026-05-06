@@ -2,22 +2,22 @@ import json
 import unittest
 from unittest.mock import patch, MagicMock
 
-import app.services.gemini_response as gemini_response
+import app.services.llm_response as llm_response
 
 from app.services.pronunciation_coach import (
     build_pronunciation_coach_for_llm,
     misaligned_word_pairs,
 )
-from app.services.gemini_response import _call_openrouter
+from app.services.llm_response import _call_openrouter
 
 
 class PronunciationCoachTests(unittest.TestCase):
     def setUp(self):
-        self._prev_key = gemini_response.settings.OPENROUTER_API_KEY
-        gemini_response.settings.OPENROUTER_API_KEY = "test-key"
+        self._prev_key = llm_response.settings.OPENROUTER_API_KEY
+        llm_response.settings.OPENROUTER_API_KEY = "test-key"
 
     def tearDown(self):
-        gemini_response.settings.OPENROUTER_API_KEY = self._prev_key
+        llm_response.settings.OPENROUTER_API_KEY = self._prev_key
 
     def test_misaligned_word_pairs_replace(self):
         pairs = misaligned_word_pairs("circumstances", "circumstance", max_pairs=5)
@@ -42,7 +42,7 @@ class PronunciationCoachTests(unittest.TestCase):
         self.assertEqual(len(coach["feedback"]), 3)
         self.assertEqual(coach["score"], 80.0)
 
-    @patch("app.services.gemini_response.requests.post")
+    @patch("app.services.llm_response.requests.post")
     def test_openrouter_user_message_no_phoneme_arrays(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 200

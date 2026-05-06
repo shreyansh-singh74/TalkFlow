@@ -2,7 +2,6 @@ fastapi
 uvicorn[standard]
 python-multipart
 python-dotenv
-google-generativeai
 google-cloud-texttospeech
 deepgram-sdk
 requests
@@ -16,3 +15,4 @@ dtaidistance
 # CPU: pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch
 transformers
+httpx

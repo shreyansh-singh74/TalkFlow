@@ -32,22 +32,6 @@ export const AgentForm = ({
   const createAgent = useCreateAgent();
   const updateAgent = useUpdateAgent();
 
-  // Handle success and error for create
-  if (createAgent.isSuccess) {
-    onSuccess?.();
-  }
-  if (createAgent.isError) {
-    toast.error(createAgent.error?.message || "Failed to create agent");
-  }
-
-  // Handle success and error for update
-  if (updateAgent.isSuccess) {
-    onSuccess?.();
-  }
-  if (updateAgent.isError) {
-    toast.error(updateAgent.error?.message || "Failed to update agent");
-  }
-
   const form = useForm<z.infer<typeof agentsInsertSchema>>({
     resolver: zodResolver(agentsInsertSchema),
     defaultValues: {
@@ -61,9 +45,22 @@ export const AgentForm = ({
 
   const onSubmit = (values: z.infer<typeof agentsInsertSchema>) => {
     if (isEdit) {
-      updateAgent.mutate({...values,id:initialValues.id})
+      updateAgent.mutate(
+        { ...values, id: initialValues.id },
+        {
+          onSuccess,
+          onError: (error) => {
+            toast.error(error.message || "Failed to update agent");
+          },
+        }
+      );
     } else {
-      createAgent.mutate(values);
+      createAgent.mutate(values, {
+        onSuccess,
+        onError: (error) => {
+          toast.error(error.message || "Failed to create agent");
+        },
+      });
     }
   };
 

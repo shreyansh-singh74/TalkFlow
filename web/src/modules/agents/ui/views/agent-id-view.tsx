@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { VideoIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useConfirm } from "../../hooks/use-confirm";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useState } from "react";
 import { UpdateAgentDialog } from "../components/update-agent-dialog";
 
@@ -22,15 +22,6 @@ export const AgentIdView = ({ agentId }: Props) => {
   const { data, isLoading, error } = useAgent(agentId);
   const removeAgent = useDeleteAgent();
 
-  // Handle success and error for delete
-  if (removeAgent.isSuccess) {
-    router.push("/agents");
-    toast.success("Agent deleted successfully");
-  }
-  if (removeAgent.isError) {
-    toast.error(removeAgent.error?.message || "Failed to delete agent");
-  }
-
   const [RemoveConfirmation, confirmRemove] = useConfirm(
     "Are you sure",
     `The following action will remove ${data?.meetingCount} associated meetings`
@@ -41,7 +32,15 @@ export const AgentIdView = ({ agentId }: Props) => {
 
     if (!ok) return;
 
-    await removeAgent.mutateAsync(agentId);
+    removeAgent.mutate(agentId, {
+      onSuccess: () => {
+        toast.success("Agent deleted successfully");
+        router.push("/agents");
+      },
+      onError: (error) => {
+        toast.error(error.message || "Failed to delete agent");
+      },
+    });
   };
 
   if (isLoading) {

@@ -2,36 +2,6 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 
 
-class HealthResponse(BaseModel):
-    status: str
-    transcription_service: str
-
-
-class TranscriptionResponse(BaseModel):
-    transcript: str
-    success: bool
-    error: Optional[str] = None
-
-
-class ConversationResponse(BaseModel):
-    transcript: str
-    reply: str
-    audio_url: Optional[str] = None
-    conversation_id: str
-    success: bool
-    error: Optional[str] = None
-
-
-class ConversationCreateResponse(BaseModel):
-    conversation_id: str
-    success: bool
-
-
-class ConversationDeleteResponse(BaseModel):
-    message: str
-    success: bool
-
-
 class PhonemeSegmentResponse(BaseModel):
     phoneme: str
     expected: str
@@ -107,13 +77,3 @@ class ArpabetSyllableItem(BaseModel):
 class PronunciationReferenceResponse(BaseModel):
     word: str
     arpabet_syllables: List[ArpabetSyllableItem] = Field(default_factory=list)
-
-
-class ConversationWithPhonemeResponse(BaseModel):
-    transcript: str
-    reply: str
-    audio_url: Optional[str] = None
-    conversation_id: str
-    phoneme_analysis: Optional[SentencePhonemeAnalysisResponse] = None
-    success: bool
-    error: Optional[str] = None

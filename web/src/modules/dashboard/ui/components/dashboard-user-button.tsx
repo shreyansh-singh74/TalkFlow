@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   ChevronDownIcon,
-  CreditCardIcon,
   LogOutIcon,
   User,
 } from "lucide-react";
@@ -60,12 +59,8 @@ export default function DashboardUserButton() {
               alt={user.name || "User Avatar"}
               className="object-cover"
               onError={(e) => {
-                console.log("Image failed to load:", user.image);
                 // Hide broken images and show fallback
                 e.currentTarget.style.display = "none";
-              }}
-              onLoad={() => {
-                console.log("Image loaded successfully:", user.image);
               }}
             />
           ) : null}
@@ -93,10 +88,6 @@ export default function DashboardUserButton() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="cursor-pointer flex items-center justify-between">
-          Billing
-          <CreditCardIcon className="size-4" />
-        </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer flex items-center justify-between"
           onClick={onLogout}

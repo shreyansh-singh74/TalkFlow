@@ -109,10 +109,6 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // TODO: Implement custom WebRTC call creation
-    // This will be replaced with your own WebRTC implementation
-    console.log("Creating WebRTC call for meeting:", createdMeeting.id);
-
     return NextResponse.json(createdMeeting);
   } catch (error) {
     console.error("Database error:", error);

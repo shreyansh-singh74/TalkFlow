@@ -4,8 +4,8 @@ export type AgentGetMany = Array<{
   name: string;
   instructions: string;
   userId: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
   meetingCount: number;
 }>;
 
@@ -14,7 +14,7 @@ export type AgentGetOne = {
   name: string;
   instructions: string;
   userId: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
   meetingCount: number;
 };

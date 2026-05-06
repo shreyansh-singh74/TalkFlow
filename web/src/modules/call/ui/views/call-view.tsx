@@ -1,10 +1,7 @@
 "use client";
 import { ErrorState } from "@/components/error-state";
 import { useMeeting } from "@/hooks/use-api";
-import { CallProvider } from "../components/call-provider";
-import { useSpeechToText } from "@/hooks/use-speech-to-text";
-import { useEffect, useMemo, useState } from "react";
-import { getBackendUrl } from "@/lib/backend-config";
+import { CallUI } from "../components/call-ui";
 
 interface Props {
   meetingId: string;
@@ -12,31 +9,6 @@ interface Props {
 
 export const CallView = ({ meetingId }: Props) => {
   const { data, isLoading, error } = useMeeting(meetingId);
-  const backendUrl = getBackendUrl();
-
-  const {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    stop,
-    lastResponse,
-  } = useSpeechToText({
-    endpoint: `${backendUrl}/api/respond`,
-  });
-
-  const [autoSpeak] = useState(true);
-  const ttsSupported = useMemo(() => typeof window !== "undefined" && !!window.speechSynthesis, []);
-
-  useEffect(() => {
-    if (!autoSpeak || !ttsSupported) return;
-    if (!lastResponse) return;
-    try {
-      const utter = new SpeechSynthesisUtterance(lastResponse);
-      utter.lang = "en-US";
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utter);
-    } catch {
-      // no-op
-    }
-  }, [lastResponse, autoSpeak, ttsSupported]);
 
   if (isLoading) {
     return (
@@ -74,10 +46,9 @@ export const CallView = ({ meetingId }: Props) => {
   return (
     <div className="flex flex-1 min-h-0 flex-col">
 
-      <CallProvider
+      <CallUI
         meetingId={meetingId}
         meetingName={data.name}
-        agentId={data.agentId}
       />
     </div>
   )

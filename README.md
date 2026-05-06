@@ -1,62 +1,66 @@
-# **TalkFlow**
+# TalkFlow
 
-> **AI-Powered Language Learning Platform** — Practice pronunciation with personalized AI tutors and real-time feedback.
+TalkFlow is a spoken-English practice app. Next.js owns auth, database CRUD, and UI; FastAPI owns realtime voice, LLM responses, text-to-speech, and pronunciation feedback.
 
----
+## Stack
 
-## Overview
-**TalkFlow** helps users improve pronunciation and speaking fluency through AI tutors that provide instant, personalized feedback. Built with **Next.js** and **FastAPI**, it combines modern web technologies with AI models like **Google Gemini** and **OpenAI Whisper**.
+- Web: Next.js 15, React 19, TypeScript, Tailwind CSS, Better Auth, Drizzle ORM
+- Backend: FastAPI, Deepgram, OpenRouter, Google Cloud Text-to-Speech, optional wav2vec2 pronunciation comparison
+- Database: Postgres via `DATABASE_URL`
 
----
+## Supported APIs
 
-## Tech Stack
-**Frontend:** Next.js 15, React 19, TypeScript, Tailwind CSS, Better Auth  
-**Backend:** FastAPI, Python 3.12, OpenAI Whisper, Google Gemini  
-**Database:** Drizzle ORM  
-**Other:** ffmpeg (audio processing)
+- Web: `/api/auth/*`, `/api/agents*`, `/api/meetings*`
+- Backend: `/health`, `/ws/voice`, `/api/phonemes/*`
 
----
+Removed prototype surfaces include `/test-recorder`, `/upgrade`, `/api/config`, `/api/meetings/generate-token`, `/api/webhook`, `/transcribe`, and `/clear-conversation`.
 
-<!-- <img src="./web/images/architechture_v1.png" alt="Phoneme Architechture" width="700" /> -->
-<!-- ![Phoneme Architecture](./web/images/architecture_v1.png) -->
+## Environment
 
-<p align="center">
-  <img src="./web/images/architecture_v1.png" alt="Phoneme Architecture" width="700" />
-</p>
+Web:
 
+```env
+DATABASE_URL=
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+BETTER_AUTH_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+```
 
-## Features
-- Create custom AI tutors  
-- Real-time pronunciation feedback  
-- Track session analytics  
-- Manage and schedule meetings  
-- Secure authentication  
-- Fully responsive UI
+Backend:
 
----
+```env
+FRONTEND_URL=http://localhost:3000
+OPENROUTER_API_KEY=
+DEEPGRAM_API_KEY=
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/google-credentials.json
+# or GOOGLE_CREDENTIALS_JSON=<base64-json>
+ENABLE_WAV2VEC2=0
+WARM_WAV2VEC2_ON_STARTUP=0
+WAV2VEC2_MODEL_ID=facebook/wav2vec2-base-960h
+TURN_AUDIO_MAX_BYTES=160000
+```
 
-## Setup
+## Run Locally
 
-**Requirements:**  
-Node.js 18+, Python 3.12+, ffmpeg
-
-```bash
-# Clone repo
-git clone https://github.com/yourusername/TalkFlow.git
-cd TalkFlow
-````
-
-### Backend
+Backend:
 
 ```bash
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python main.py
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Frontend
+Web:
 
 ```bash
 cd web
@@ -64,39 +68,15 @@ npm install
 npm run dev
 ```
 
-**Environment variables (.env):**
+## Checks
 
 ```bash
-GEMINI_API_KEY="your-gemini-api-key"
-WHISPER_MODEL="base"
+cd web
+npm run lint
+npm run build
 ```
 
----
-
-## How It Works
-
-1. Create an account
-2. Build your AI tutor
-3. Schedule a meeting
-4. Speak and get feedback
-5. Track progress over time
-
----
-
-## Core APIs
-
-* `/api/conversations` — Create conversation
-* `/api/analyse` — Get pronunciation metrics
-* `/api/reports` — Fetch session analytics
-
----
-
-## Contributing
-
-Fork → Create branch → Commit → PR
-
----
-
-## License
-
-MIT © 2025 TalkFlow
+```bash
+cd backend
+python -m unittest discover -s tests
+```

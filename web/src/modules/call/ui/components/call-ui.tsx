@@ -1,18 +1,14 @@
 import { useState } from "react";
-import { CallLobby } from "./call-loby";
+import { CallLobby } from "./call-lobby";
 import { CallActive } from "./call-active";
 import { CallEnded } from "./call-ended";
 
 interface Props {
   meetingId: string;
   meetingName: string;
-  agentId: string;
-  userId: string;
-  userName: string;
-  userImage: string;
 }
 
-export const CallUI = ({ meetingId, meetingName, agentId }: Props) => {
+export const CallUI = ({ meetingId, meetingName }: Props) => {
   const [show, setShow] = useState<"lobby" | "call" | "ended">("lobby");
 
   const handleJoin = async () => {
@@ -36,7 +32,6 @@ export const CallUI = ({ meetingId, meetingName, agentId }: Props) => {
             onLeave={handleLeave}
             meetingName={meetingName}
             meetingId={meetingId}
-            agentId={agentId}
           />
         </div>
       )}

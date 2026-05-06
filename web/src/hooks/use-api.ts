@@ -187,12 +187,3 @@ export function useDeleteMeeting() {
     },
   });
 }
-
-export function useGenerateToken() {
-  return useMutation({
-    mutationFn: () =>
-      apiCall<{ token: string }>("/api/meetings/generate-token", {
-        method: "POST",
-      }),
-  });
-}
