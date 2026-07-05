@@ -1,19 +1,17 @@
 """Slim, human-level pronunciation context for the LLM only (no raw phoneme arrays)."""
 from __future__ import annotations
 
-import json
 import re
 from difflib import SequenceMatcher
 from typing import Any, Dict, List
 
-_WORD_RE = re.compile(r"[a-z']+")
+
 
 MAX_FEEDBACK_FOR_LLM = 3
 MAX_MISALIGNED_WORDS = 5
 
 
-def _words(text: str) -> List[str]:
-    return _WORD_RE.findall((text or "").lower())
+from app.utils.text import tokenize_words as _words
 
 
 def misaligned_word_pairs(
@@ -63,9 +61,6 @@ def build_pronunciation_coach_for_llm(
         "misaligned_words": mis,
     }
 
-
-def coach_json_for_prompt(coach: Dict[str, Any]) -> str:
-    return json.dumps(coach, ensure_ascii=False)
 
 
 PRONUNCIATION_COACH_SYSTEM_SUFFIX = (

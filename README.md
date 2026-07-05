@@ -46,6 +46,12 @@ ENABLE_WAV2VEC2=0
 WARM_WAV2VEC2_ON_STARTUP=0
 WAV2VEC2_MODEL_ID=facebook/wav2vec2-base-960h
 TURN_AUDIO_MAX_BYTES=160000
+# Acoustic pronunciation scoring: score the audio waveform (wav2vec2 phoneme
+# recognition + GOP alignment) instead of comparing transcript text. When 0,
+# the legacy text-proxy scorer is used.
+ENABLE_ACOUSTIC_SCORING=0
+WARM_ACOUSTIC_ON_STARTUP=0
+ACOUSTIC_PHONEME_MODEL_ID=facebook/wav2vec2-lv-60-espeak-cv-ft
 ```
 
 ## Run Locally

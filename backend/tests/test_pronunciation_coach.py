@@ -1,6 +1,6 @@
 import json
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 import app.services.llm_response as llm_response
 
@@ -42,7 +42,7 @@ class PronunciationCoachTests(unittest.TestCase):
         self.assertEqual(len(coach["feedback"]), 3)
         self.assertEqual(coach["score"], 80.0)
 
-    @patch("app.services.llm_response.requests.post")
+    @patch("app.services.llm_response.httpx.AsyncClient.post", new_callable=AsyncMock)
     def test_openrouter_user_message_no_phoneme_arrays(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -53,7 +53,8 @@ class PronunciationCoachTests(unittest.TestCase):
         mock_post.return_value = mock_resp
 
         coach = build_pronunciation_coach_for_llm("a", "b", 50.0, ["f1"])
-        _call_openrouter("User: hi", pronunciation_coach=coach)
+        import asyncio
+        asyncio.run(_call_openrouter("User: hi", pronunciation_coach=coach))
         self.assertTrue(mock_post.called)
         kwargs = mock_post.call_args[1]
         payload = kwargs["json"]

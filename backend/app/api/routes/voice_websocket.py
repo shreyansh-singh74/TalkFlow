@@ -1,11 +1,8 @@
 # app/api/routes/voice_websocket.py
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from app.services.deepgram_live_service import DeepgramLiveService
+from app.services.deepgram_service import DeepgramLiveService
 from app.services.llm_response import stream_llm_response
-from app.services.phoneme_analysis_service import (
-    build_pronunciation_result_dict,
-    phoneme_analyzer,
-)
+from app.services.pronunciation import get_scorer
 from app.services.pronunciation_coach import build_pronunciation_coach_for_llm
 from app.services.tts_service import tts_service
 from app.services.wav2vec2_asr import pcm16le_to_text
@@ -142,6 +139,9 @@ class VoiceSession:
     ) -> Optional[Dict]:
         cap = settings.TURN_AUDIO_MAX_BYTES
         pcm = full_pcm[:cap] if cap > 0 else full_pcm
+
+        # The transcript still drives word-level coaching and the text-proxy
+        # fallback. Optional local ASR can override the displayed "heard" text.
         heard_text = ""
         if settings.ENABLE_WAV2VEC2 and pcm:
             try:
@@ -150,17 +150,19 @@ class VoiceSession:
                 logger.exception("Wav2Vec2 ASR failed; using Deepgram transcript")
         if not (heard_text or "").strip():
             heard_text = deepgram_text or ""
-        body = await asyncio.to_thread(
-            build_pronunciation_result_dict,
-            phoneme_analyzer,
-            expected_for_turn,
-            heard_text,
+
+        # The scorer is chosen by config: acoustic (scores `pcm` directly) or
+        # the legacy text proxy. Both return the same result shape.
+        scorer = get_scorer()
+        result = await asyncio.to_thread(
+            scorer.score, expected_for_turn, heard_text, pcm
         )
+
         coach = build_pronunciation_coach_for_llm(
             expected_for_turn,
             heard_text,
-            body["score"],
-            body.get("feedback") or [],
+            result.score,
+            result.feedback or [],
         )
         await self.send_json(
             PronunciationResultMessage(
@@ -169,12 +171,14 @@ class VoiceSession:
                 target_text=expected_for_turn,
                 deepgram_text=deepgram_text,
                 heard_text=heard_text,
-                score=body["score"],
-                expected_phonemes=body["expected_phonemes"],
-                actual_phonemes=body["actual_phonemes"],
-                errors=body["errors"],
-                feedback=body["feedback"],
+                score=result.score,
+                expected_phonemes=result.expected_phonemes,
+                actual_phonemes=result.actual_phonemes,
+                errors=result.errors,
+                feedback=result.feedback,
                 misaligned_words=coach.get("misaligned_words") or [],
+                method=result.method,
+                per_phoneme=result.per_phoneme,
             ).model_dump()
         )
         return coach
@@ -334,13 +338,10 @@ class VoiceSession:
             )
             
             # Generate TTS for this batch (should be 500-800ms of audio)
-            audio_base64 = tts_service.text_to_speech(text_batch)
+            audio_bytes = await asyncio.to_thread(tts_service.text_to_speech, text_batch)
             
-            if not audio_base64:
+            if not audio_bytes:
                 continue
-            
-            # Decode from base64
-            audio_bytes = base64.b64decode(audio_base64)
             
             # Send as single chunk (already small ~500-800ms)
             is_final = (batch_idx == len(text_batches) - 1)
@@ -355,43 +356,7 @@ class VoiceSession:
         
         self.is_generating_tts = False
         
-    async def stream_tts(self, text: str):
-        """Generate TTS and stream in chunks"""
-        self.is_generating_tts = True
-        
-        # Generate full audio
-        audio_base64 = tts_service.text_to_speech(text)
-        
-        if not audio_base64:
-            self.is_generating_tts = False
-            return
-            
-        # Decode from base64
-        audio_bytes = base64.b64decode(audio_base64)
-        
-        # Stream in 100KB chunks
-        chunk_size = 100_000
-        seq = 0
-        
-        for i in range(0, len(audio_bytes), chunk_size):
-            # Check if interrupted
-            if self.should_stop_tts:
-                logger.info("TTS interrupted")
-                break
-                
-            chunk = audio_bytes[i:i + chunk_size]
-            is_final = (i + chunk_size) >= len(audio_bytes)
-            
-            # Send as binary with JSON header
-            await self.send_json(
-                TTSChunkMessage(type="TTS_CHUNK", seq=seq, is_final=is_final).model_dump()
-            )
-            await self.websocket.send_bytes(chunk)
-            
-            seq += 1
-            
-        self.is_generating_tts = False
-        
+
     async def send_json(self, data: dict):
         """Send JSON message"""
         await self.websocket.send_text(json.dumps(data))
@@ -415,15 +380,9 @@ class VoiceSession:
         self.final_transcript = text
 
 
-# Module-level variables for cleanup task
-cleanup_task_started = False
-cleanup_task = None
-
 @router.websocket("/ws/voice")
 async def voice_websocket(websocket: WebSocket):
     """Main WebSocket endpoint for voice conversation"""
-    global cleanup_task_started, cleanup_task
-    
     await websocket.accept()
     
     session = VoiceSession(websocket)
@@ -431,12 +390,6 @@ async def voice_websocket(websocket: WebSocket):
     
     logger.info("WebSocket connected: %s", session.session_id)
     logger.info("Active sessions: %s", len(sessions))
-    
-    # Start cleanup task (only once)
-    if not cleanup_task_started:
-        cleanup_task_started = True
-        cleanup_task = asyncio.create_task(cleanup_stale_sessions())
-        logger.info("Started session cleanup background task")
     
     # Send keep-alive pings every 20s
     async def keep_alive():
@@ -476,9 +429,12 @@ async def voice_websocket(websocket: WebSocket):
         logger.info("WebSocket disconnected: %s", session.session_id)
     except Exception as e:
         logger.exception("WebSocket error")
-        await websocket.send_text(
-            ErrorMessage(type="ERROR", message=str(e), recoverable=False).model_dump_json()
-        )
+        try:
+            await websocket.send_text(
+                ErrorMessage(type="ERROR", message=str(e), recoverable=False).model_dump_json()
+            )
+        except Exception as send_err:
+            logger.warning("Failed to send error message to client: %s", send_err)
     finally:
         # Cleanup
         ping_task.cancel()

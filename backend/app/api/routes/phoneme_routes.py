@@ -62,7 +62,7 @@ async def analyze_word(request: WordPhonemeAnalysisRequest) -> WordPhonemeAnalys
     return word_to_response(analysis)
 
 
-_WORD_RE = re.compile(r"[A-Za-z']+")
+from app.utils.text import WORD_RE as _WORD_RE
 
 
 @router.get("/reference/{word}", response_model=PronunciationReferenceResponse)

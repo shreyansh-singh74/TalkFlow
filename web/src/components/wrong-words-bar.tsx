@@ -2,7 +2,6 @@
 
 import { normalizeWord } from "@/lib/normalize-word";
 import type { MisalignedWordPair } from "@/types/pronunciation";
-import { Button } from "@/components/ui/button";
 
 type Props = {
   pairs: MisalignedWordPair[] | undefined;
@@ -10,30 +9,31 @@ type Props = {
   onSelectExpected: (expected: string, fromWrongBar: boolean) => void;
 };
 
+/**
+ * Strip of mispronounced words the user should practise.
+ * Active word → cobalt accent; inactive → amber tint (the "heard/actual" side).
+ */
 export function WrongWordsBar({ pairs, activeKey, onSelectExpected }: Props) {
-  if (!pairs?.length) {
-    return null;
-  }
+  if (!pairs?.length) return null;
+
   const unique: MisalignedWordPair[] = [];
   const seen = new Set<string>();
   for (const p of pairs) {
     const e = (p.expected || "").trim();
-    if (!e) {
-      continue;
-    }
+    if (!e) continue;
     const n = normalizeWord(e);
-    if (seen.has(n)) {
-      continue;
-    }
+    if (seen.has(n)) continue;
     seen.add(n);
     unique.push({ ...p, expected: e });
   }
-  if (!unique.length) {
-    return null;
-  }
+  if (!unique.length) return null;
+
   return (
     <div className="w-full max-w-2xl space-y-2">
-      <p className="text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <p
+        className="text-center text-[11px] font-semibold uppercase tracking-[0.18em]"
+        style={{ color: "var(--amber-warm)", opacity: 0.8 }}
+      >
         Practice these words
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
@@ -41,16 +41,27 @@ export function WrongWordsBar({ pairs, activeKey, onSelectExpected }: Props) {
           const n = normalizeWord(p.expected);
           const isActive = n === activeKey;
           return (
-            <Button
+            <button
               key={n}
               type="button"
-              size="sm"
-              variant={isActive ? "default" : "outline"}
-              className="rounded-full"
               onClick={() => onSelectExpected(p.expected, true)}
+              className="rounded-full px-3 py-1 text-sm font-medium transition-all duration-150 border"
+              style={
+                isActive
+                  ? {
+                      background: "var(--cobalt)",
+                      color: "#fff",
+                      borderColor: "var(--cobalt)",
+                    }
+                  : {
+                      background: "var(--amber-muted)",
+                      color: "var(--amber-warm)",
+                      borderColor: "var(--amber-warm)",
+                    }
+              }
             >
               {p.expected}
-            </Button>
+            </button>
           );
         })}
       </div>

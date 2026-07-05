@@ -1,4 +1,4 @@
-# app/services/deepgram_live_service.py
+# app/services/deepgram_service.py
 """
 Simplified Deepgram service using prerecorded transcription
 Since Deepgram SDK 5.x doesn't have a simple live API, we'll use prerecorded
@@ -10,6 +10,7 @@ import logging
 from typing import Callable
 import tempfile
 import os
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +44,13 @@ class DeepgramLiveService:
             self.is_active = False
             return
             
+        temp_file_path = None
         try:
             # Create temporary file for buffered audio
             with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
                 # Write WAV header + PCM16 data
                 # Simple WAV header for 16kHz mono PCM16
-                sample_rate = 16000
+                sample_rate = settings.AUDIO_SAMPLE_RATE
                 num_channels = 1
                 bits_per_sample = 16
                 byte_rate = sample_rate * num_channels * bits_per_sample // 8
@@ -79,10 +81,11 @@ class DeepgramLiveService:
                 audio_content = f.read()
             
             # Transcribe using Deepgram
-            response = self.deepgram.listen.v1.media.transcribe_file(
+            response = await asyncio.to_thread(
+                self.deepgram.listen.v1.media.transcribe_file,
                 request=audio_content,
-                model="nova-2",
-                language="en-US",
+                model=settings.DEEPGRAM_MODEL,
+                language=settings.DEEPGRAM_LANGUAGE,
                 smart_format=True,
                 punctuate=True,
             )
@@ -95,13 +98,13 @@ class DeepgramLiveService:
                     # Send as final transcript (no partial for buffered mode)
                     self.on_final(transcript, 1.0)
             
-            # Cleanup
-            os.unlink(temp_file_path)
-            self.audio_buffer.clear()
-            
         except Exception:
             logger.exception("Deepgram transcription failed")
         finally:
             self.is_active = False
-            if hasattr(self, 'audio_buffer'):
-                self.audio_buffer.clear()
+            self.audio_buffer.clear()
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                except Exception as e:
+                    logger.warning("Failed to delete temporary file %s: %s", temp_file_path, e)

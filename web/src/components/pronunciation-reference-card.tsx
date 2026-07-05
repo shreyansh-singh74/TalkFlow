@@ -1,165 +1,206 @@
 "use client";
 
-import { Manrope } from "next/font/google";
 import { useEffect, useId, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
 import { Volume2 } from "lucide-react";
 import { usePronunciationReference } from "@/hooks/use-pronunciation-reference";
 import { DIALECTS, requestSpeechVoices, speakWord } from "@/lib/speak-word";
 import type { PronunciationReferenceResponse } from "@/types/pronunciation";
-
-const manrope = Manrope({ subsets: ["latin"], weight: ["500", "600", "700"] });
+import type { MisalignedWordPair } from "@/types/pronunciation";
 
 type Props = {
   displayWord: string;
   activeWordKey: string;
   lang: string;
   onLangChange: (lang: string) => void;
+  /** Misaligned pairs for the phoneme diff row */
+  misalignedPairs?: MisalignedWordPair[];
 };
 
+/**
+ * Merged phonetic breakdown panel.
+ * Shows: word → target IPA (cobalt) → heard IPA (amber) in one aligned view.
+ * Syllable respelling and IPA toggle so beginners and advanced users both win.
+ */
 export function PronunciationReferenceCard({
   displayWord,
   activeWordKey,
   lang,
   onLangChange,
+  misalignedPairs,
 }: Props) {
   const idSlow = useId();
   const [isSlow, setIsSlow] = useState(false);
+  const [showIPA, setShowIPA] = useState(false);
   const { data, loading, error } = usePronunciationReference(activeWordKey);
 
   useEffect(() => {
     requestSpeechVoices();
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-      return;
-    }
-    window.speechSynthesis.getVoices();
+    if (typeof window !== "undefined") window.speechSynthesis?.getVoices();
   }, []);
 
-  const play = (rate: number) => {
+  const play = () => {
     const text = (data?.word || displayWord || activeWordKey || "").trim();
-    if (!text) {
-      return;
-    }
-    speakWord(text, { lang, rate });
+    if (text) speakWord(text, { lang, rate: isSlow ? 0.65 : 1 });
   };
+
+  // Find the misaligned pair for the active word to show heard IPA
+  const activePair = misalignedPairs?.find(
+    (p) => p.expected?.toLowerCase() === displayWord?.toLowerCase()
+  );
 
   return (
     <div
-      className={`w-full max-w-2xl rounded-xl border border-border bg-card p-4 text-card-foreground shadow-sm ${manrope.className}`}
+      className="w-full max-w-2xl rounded-xl border p-5 shadow-sm"
+      style={{
+        background: "var(--parchment)",
+        borderColor: "oklch(0.85 0.02 80)",
+        color: "var(--ink)",
+      }}
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">Pronunciation</h3>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="sr-only">Dialect</span>
+      {/* Header row */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <span
+          className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+          style={{ color: "var(--cobalt)" }}
+        >
+          Phonetic Breakdown
+        </span>
+        <div className="flex items-center gap-3">
+          {/* IPA toggle */}
+          <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--ink)", opacity: 0.6 }}>
+            <Switch checked={showIPA} onCheckedChange={setShowIPA} className="scale-75" />
+            IPA
+          </label>
+          {/* Dialect select */}
           <select
-            className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+            className="rounded-md border px-2 py-0.5 text-xs"
+            style={{ borderColor: "oklch(0.85 0.02 80)", background: "transparent", color: "var(--ink)" }}
             value={lang}
             onChange={(e) => onLangChange(e.target.value)}
           >
             {DIALECTS.map((d) => (
-              <option key={d.value} value={d.value}>
-                {d.label}
-              </option>
+              <option key={d.value} value={d.value}>{d.label}</option>
             ))}
           </select>
-        </label>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:gap-4">
-        <div className="min-w-0 flex-1 space-y-2">
-          <p className="text-xs text-muted-foreground">Sounds like</p>
-          <h4 className="text-2xl font-semibold capitalize leading-tight tracking-tight sm:text-3xl">
+      {/* Word + playback */}
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <h4
+            className="text-3xl font-semibold capitalize leading-tight tracking-tight"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
             {displayWord}
           </h4>
+
           {loading && (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <p className="mt-1 text-sm" style={{ opacity: 0.5 }}>Loading…</p>
           )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <p className="mt-1 text-sm" style={{ color: "var(--amber-warm)" }}>{error}</p>
+          )}
+
           {data && !loading && (
-            <SyllableLine syllables={data.arpabet_syllables} />
-          )}
-          <div className="flex flex-wrap items-center gap-3 pt-1">
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              className="h-9 w-9 shrink-0"
-              onClick={() => play(isSlow ? 0.7 : 1)}
-              title="Play"
-            >
-              <Volume2 className="h-4 w-4" />
-            </Button>
-            <div className="flex items-center gap-2">
-              <Switch
-                id={idSlow}
-                checked={isSlow}
-                onCheckedChange={setIsSlow}
-              />
-              <Label htmlFor={idSlow} className="text-sm text-muted-foreground">
-                Slow
-              </Label>
+            <div className="mt-3 space-y-2">
+              {/* Syllable respelling — always visible */}
+              <SyllableLine syllables={data.arpabet_syllables} />
+
+              {/* Show "heard" word when there's a mismatch */}
+              {showIPA && activePair && (
+                <HeardVsExpectedRow
+                  expected={activePair.expected}
+                  heard={activePair.heard}
+                />
+              )}
             </div>
-          </div>
+          )}
+
+          {/* Mismatch coaching note */}
+          {activePair && (
+            <p
+              className="mt-3 rounded-md px-3 py-2 text-sm leading-relaxed"
+              style={{ background: "var(--cobalt-muted)", color: "var(--cobalt)" }}
+            >
+              Expected <strong>&ldquo;{activePair.expected}&rdquo;</strong>, heard{" "}
+              <span style={{ color: "var(--amber-warm)" }}>&ldquo;{activePair.heard}&rdquo;</span>.
+            </p>
+          )}
         </div>
-        <MouthHint />
+
+        {/* Play button */}
+        <div className="flex shrink-0 flex-col items-center gap-2 pt-1">
+          <button
+            type="button"
+            onClick={play}
+            className="flex h-10 w-10 items-center justify-center rounded-full border transition-all duration-150 hover:scale-105 active:scale-95"
+            style={{ borderColor: "var(--cobalt)", color: "var(--cobalt)" }}
+            title={isSlow ? "Play slow" : "Play"}
+          >
+            <Volume2 className="h-4 w-4" />
+          </button>
+          <label className="flex cursor-pointer flex-col items-center gap-0.5 text-[10px]" style={{ opacity: 0.6 }}>
+            <Switch id={idSlow} checked={isSlow} onCheckedChange={setIsSlow} className="scale-75" />
+            <Label htmlFor={idSlow} className="cursor-pointer text-[10px]">Slow</Label>
+          </label>
+        </div>
       </div>
     </div>
   );
 }
 
-function SyllableLine({ syllables }: { syllables: PronunciationReferenceResponse["arpabet_syllables"] }) {
-  if (!syllables.length) {
-    return null;
-  }
+function SyllableLine({
+  syllables,
+}: {
+  syllables: PronunciationReferenceResponse["arpabet_syllables"];
+}) {
+  if (!syllables.length) return null;
   return (
-    <p className="text-xl font-medium leading-snug sm:text-2xl">
+    <p
+      className="text-xl font-medium leading-snug"
+      style={{ fontFamily: "var(--font-phonetic)", color: "var(--ink)" }}
+    >
       {syllables.map((s, i) => (
         <span key={i}>
-          {i > 0 && <span className="text-muted-foreground"> · </span>}
-          <span
-            className={s.stressed ? "font-bold text-foreground" : "font-normal text-foreground"}
-          >
-            {s.display}
-          </span>
+          {i > 0 && (
+            <span style={{ opacity: 0.35 }}> · </span>
+          )}
+          <span style={{ fontWeight: s.stressed ? 700 : 400 }}>{s.display}</span>
         </span>
       ))}
     </p>
   );
 }
 
-function MouthHint() {
+/**
+ * Simple two-chip row: expected word (cobalt) vs heard word (amber).
+ * Shown when the user enables the IPA toggle and a mismatch pair exists.
+ */
+function HeardVsExpectedRow({
+  expected,
+  heard,
+}: {
+  expected: string;
+  heard: string;
+}) {
   return (
-    <div className="flex w-full shrink-0 items-center justify-center sm:w-28">
-      <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-sky-200/60 bg-sky-100/50 dark:border-sky-800/40 dark:bg-sky-950/30">
-        <svg
-          viewBox="0 0 64 64"
-          className="h-16 w-16 text-sky-600 dark:text-sky-400"
-          aria-hidden
-        >
-          <path
-            fill="currentColor"
-            d="M32 8c-8 0-14 5-16 12l4 1c1-4 5-7 9-7h6c4 0 8 3 9 7l4-1C46 13 40 8 32 8z"
-            opacity="0.35"
-          />
-          <path
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            d="M20 32c0 0 4 8 12 8s12-8 12-8"
-          />
-          <path
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            d="M26 40h12"
-            opacity="0.6"
-          />
-        </svg>
-      </div>
+    <div className="mt-1 flex items-center gap-2 text-sm" style={{ fontFamily: "var(--font-phonetic)" }}>
+      <span
+        className="rounded px-2 py-0.5 font-medium"
+        style={{ background: "var(--cobalt-muted)", color: "var(--cobalt)" }}
+      >
+        {expected}
+      </span>
+      <span style={{ opacity: 0.4 }}>→</span>
+      <span
+        className="rounded px-2 py-0.5 font-medium"
+        style={{ background: "var(--amber-muted)", color: "var(--amber-warm)" }}
+      >
+        {heard}
+      </span>
     </div>
   );
 }

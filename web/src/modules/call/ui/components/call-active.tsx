@@ -1,603 +1,691 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import {
-  Bot,
-  Mic,
-  MicOff,
-  PersonStanding,
-  PhoneOff,
-  Trash2,
-  User,
-} from "lucide-react";
-import { usePushToTalk } from "@/hooks/use-push-to-talk";
-import { useSpacebarControl } from "@/hooks/use-spacebar-control";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Bot, Mic, MicOff, PhoneOff, RotateCcw, Trash2, User } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { PronunciationReferenceCard } from "@/components/pronunciation-reference-card";
 import { WrongWordsBar } from "@/components/wrong-words-bar";
+import { HeardTextHighlight } from "@/components/heard-text-highlight";
 import { normalizeWord } from "@/lib/normalize-word";
 import { speakWord } from "@/lib/speak-word";
 import { splitTargetToWords } from "@/lib/split-target-words";
 import { cn } from "@/lib/utils";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { PhonemeRealTimeFeedback } from "./phoneme-real-time-feedback";
+import { usePushToTalk } from "@/hooks/use-push-to-talk";
+import { useSpacebarControl } from "@/hooks/use-spacebar-control";
 import { useUpdateMeeting } from "@/hooks/use-api";
 import type {
   MeetingPhonemeDataPersisted,
   PronunciationResultPayload,
 } from "@/types/pronunciation";
-import { HeardTextHighlight } from "@/components/heard-text-highlight";
-import { ChevronDown } from "lucide-react";
 
-const WAVE_BARS = [
-  "h-3", "h-6", "h-10", "h-5", "h-8", "h-12", "h-7", "h-4", "h-9", "h-4",
-] as const;
+/** Arc progress dial — tuning-meter metaphor for the pronunciation score. */
+function ArcDial({ score }: { score: number | null }) {
+  const radius = 40;
+  const stroke = 5;
+  const cx = 54;
+  const cy = 54;
+  const circumference = Math.PI * radius; // half-circle arc
+  const progress = score != null ? Math.min(100, Math.max(0, score)) / 100 : 0;
+  const offset = circumference * (1 - progress);
+  const colorStyle = score == null
+    ? "var(--muted-foreground)"
+    : score >= 80
+    ? "var(--primary)"
+    : score >= 50
+    ? "color-mix(in oklab, var(--primary) 70%, black)"
+    : "var(--destructive)";
 
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <svg width="108" height="62" viewBox="0 0 108 62" aria-hidden>
+        {/* Track */}
+        <path
+          d={`M ${cx - radius} ${cy} A ${radius} ${radius} 0 0 1 ${cx + radius} ${cy}`}
+          fill="none"
+          stroke="var(--border)"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+        />
+        {/* Fill */}
+        <path
+          d={`M ${cx - radius} ${cy} A ${radius} ${radius} 0 0 1 ${cx + radius} ${cy}`}
+          fill="none"
+          stroke={colorStyle}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 0.7s cubic-bezier(0.4,0,0.2,1), stroke 0.4s" }}
+        />
+        {/* Score numeral */}
+        <text
+          x={cx}
+          y={cy - 6}
+          textAnchor="middle"
+          fontSize="22"
+          fontWeight="700"
+          fill={score != null ? "var(--foreground)" : "var(--muted-foreground)"}
+          fontFamily="var(--font-display)"
+        >
+          {score != null ? score : "—"}
+        </text>
+        <text x={cx} y={cy + 8} textAnchor="middle" fontSize="9" fill="var(--muted-foreground)" fontFamily="sans-serif">
+          / 100
+        </text>
+      </svg>
+      <span
+        className="text-[10px] font-semibold uppercase tracking-widest"
+        style={{ color: "var(--muted-foreground)" }}
+      >
+        Score
+      </span>
+    </div>
+  );
+}
+/** Mini sparkline of last-5 scores. */
+function ScoreSparkline({ scores }: { scores: number[] }) {
+  if (scores.length < 2) return null;
+  const h = 20;
+  const w = 60;
+  const max = 100;
+  const pts = scores.slice(-5);
+  const step = w / (pts.length - 1);
+  const points = pts
+    .map((s, i) => `${i * step},${h - (s / max) * h}`)
+    .join(" ");
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-label="Score trend">
+      <polyline
+        points={points}
+        fill="none"
+        stroke="var(--primary)"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        opacity="0.7"
+      />
+    </svg>
+  );
+}
+
+function CoachPanel({
+  isConnected,
+  isTalking,
+  isAISpeaking,
+  streamingAIText,
+  isMicEnabled,
+  partialTranscript,
+  transcripts,
+  startTalking,
+  formatTime,
+}: {
+  isConnected: boolean;
+  isTalking: boolean;
+  isAISpeaking: boolean;
+  streamingAIText: string;
+  isMicEnabled: boolean;
+  partialTranscript: string;
+  transcripts: Array<{
+    id: string;
+    text: string;
+    timestamp: Date;
+    reply?: string;
+  }>;
+  startTalking: () => void;
+  formatTime: (date: Date) => string;
+}) {
+  return (
+    <section
+      className="flex h-full w-full flex-col rounded-xl p-4 sm:p-5"
+      style={{
+        background: "var(--sidebar)",
+        border: "1px solid color-mix(in oklab, var(--sidebar-accent) 45%, black)",
+      }}
+    >
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <span
+          className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+          style={{ color: "var(--sidebar-accent-foreground)" }}
+        >
+          Coach
+        </span>
+      </div>
+
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="flex flex-col gap-3 pr-3">
+          {isConnected && !isTalking && !isAISpeaking && !streamingAIText && isMicEnabled && (
+            <div
+              className="rounded-lg px-4 py-3 text-sm"
+              style={{ background: "var(--sidebar-accent)", border: "1px solid var(--sidebar-accent)", color: "var(--sidebar-accent-foreground)" }}
+            >
+              <p className="font-medium">Ready</p>
+              <p className="mt-0.5 text-xs opacity-80">Hold SPACE to speak, release to submit.</p>
+            </div>
+          )}
+
+          {isTalking && (
+            <div
+              className="rounded-lg px-4 py-3 text-sm"
+              style={{ background: "var(--sidebar-accent)", border: "1px solid var(--sidebar-accent)", color: "var(--sidebar-accent-foreground)" }}
+            >
+              <p className="font-medium">Listening…</p>
+              <p className="mt-0.5 text-xs opacity-80">Release SPACE when done.</p>
+            </div>
+          )}
+
+          {(isAISpeaking || streamingAIText) && (
+            <div
+              className="rounded-lg px-4 py-3 text-sm"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--sidebar-accent-foreground)" }}
+            >
+              <div className="mb-1 flex items-center gap-1.5">
+                <Bot className="h-3.5 w-3.5" style={{ color: "var(--sidebar-accent-foreground)" }} />
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--sidebar-accent-foreground)" }}>
+                  {streamingAIText ? "Replying…" : "Speaking…"}
+                </span>
+              </div>
+              {streamingAIText && <p className="leading-relaxed">{streamingAIText}</p>}
+            </div>
+          )}
+
+          {partialTranscript && (
+            <div className="flex justify-end">
+              <p
+                className="max-w-[85%] rounded-lg px-3 py-2 text-sm italic"
+                style={{ background: "rgba(255,255,255,0.08)", color: "var(--sidebar-foreground)" }}
+              >
+                {partialTranscript}
+              </p>
+            </div>
+          )}
+
+          {transcripts.length === 0 && !partialTranscript && !streamingAIText && !isTalking && (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div
+                className="mb-3 flex h-10 w-10 items-center justify-center rounded-full"
+                style={{ background: "rgba(255,255,255,0.08)" }}
+              >
+                <Mic className="h-5 w-5" style={{ color: "var(--sidebar-foreground)" }} />
+              </div>
+              <p className="text-xs" style={{ color: "var(--sidebar-foreground)" }}>
+                {isMicEnabled
+                  ? "Your turns and coach replies will appear here."
+                  : "Turn on the mic to start."}
+              </p>
+            </div>
+          )}
+
+          {transcripts.map((t) => (
+            <div key={t.id} className="flex flex-col gap-2">
+              <div className="flex items-start gap-2">
+                <div
+                  className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                  style={{ background: "rgba(255,255,255,0.08)", color: "var(--sidebar-foreground)" }}
+                >
+                  <User className="h-3 w-3" />
+                </div>
+                <div>
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--sidebar-accent-foreground)" }}>
+                    {t.text}
+                  </p>
+                  <p className="mt-0.5 text-[10px]" style={{ color: "var(--sidebar-foreground)" }}>
+                    {formatTime(t.timestamp)}
+                  </p>
+                </div>
+              </div>
+
+              {t.reply && (
+                <div
+                  className="ml-4 rounded-r-lg rounded-bl-lg px-3 py-2.5 text-sm leading-relaxed"
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    borderLeft: "3px solid var(--primary)",
+                    color: "var(--sidebar-accent-foreground)",
+                  }}
+                >
+                  <div className="mb-1 flex items-center gap-1">
+                    <Bot className="h-3 w-3" style={{ color: "var(--primary)" }} />
+                    <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: "var(--primary)" }}>
+                      Coach
+                    </span>
+                  </div>
+                  {t.reply.toLowerCase().startsWith("sorry") || t.reply.toLowerCase().includes("couldn't generate") ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <p style={{ color: "var(--sidebar-foreground)" }}>
+                        Didn&apos;t catch that clearly — try again.
+                      </p>
+                      <button
+                        type="button"
+                        className="flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs transition-colors hover:bg-white/10"
+                        style={{ color: "var(--primary)", border: "1px solid var(--primary)" }}
+                        onClick={startTalking}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        Retry
+                      </button>
+                    </div>
+                  ) : (
+                    <p>{t.reply}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </section>
+  );
+}
+
+/**
+ * Phonetic staff — target sentence rendered word-by-word with IPA beneath.
+ * After an attempt, "heard" IPA appears under each word in amber.
+ * Mismatched words get an underline bridge instead of a red ×.
+ */
+function PhoneticStaff({
+  targetText,
+  misExpectedNormSet,
+  activeWordKey,
+  onWordClick,
+}: {
+  targetText: string;
+  misExpectedNormSet: Set<string>;
+  activeWordKey: string;
+  onWordClick: (norm: string) => void;
+}) {
+  const words = targetText.split(/(\s+)/g);
+  return (
+    <div
+      className="flex flex-wrap items-end justify-center gap-x-3 gap-y-4 px-2"
+      aria-label="Target sentence"
+    >
+      {words.map((part, i) => {
+        if (!/\S/.test(part)) return <span key={i} className="w-2" />;
+        const norm = normalizeWord(part);
+        if (!norm) return <span key={i}>{part}</span>;
+        const wrong = misExpectedNormSet.has(norm);
+        const active = norm === activeWordKey;
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onWordClick(norm)}
+            className="group flex flex-col items-center gap-1 focus:outline-none"
+          >
+            {/* Target word */}
+            <span
+              className="text-3xl font-semibold leading-tight tracking-tight transition-colors sm:text-4xl"
+              style={{
+                fontFamily: "var(--font-display)",
+                color: active ? "var(--foreground)" : "var(--muted-foreground)",
+                borderBottom: wrong
+                  ? "2px solid var(--destructive)"
+                  : active
+                  ? "2px solid var(--primary)"
+                  : "2px solid transparent",
+                paddingBottom: "2px",
+              }}
+            >
+              {part}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 interface Props {
   onLeave: () => void;
   meetingName: string;
   meetingId: string;
 }
 
-export const CallActive = ({
-  onLeave,
-  meetingName,
-  meetingId,
-}: Props) => {
+export const CallActive = ({ onLeave, meetingName, meetingId }: Props) => {
   const updateMeeting = useUpdateMeeting();
   const phonemeEntriesRef = useRef<MeetingPhonemeDataPersisted["entries"]>([]);
   const persistDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scoreHistoryRef = useRef<number[]>([]);
 
   const {
-    isConnected,
-    isTalking,
-    isAISpeaking,
-    transcripts,
-    partialTranscript,
-    streamingAIText,
-    conversationStatus,
-    error: transcriptionError,
-    phonemeAnalysis,
-    lastPronunciation,
-    targetText,
-    connect,
-    disconnect,
-    startTalking,
-    stopTalking,
-    clearTranscripts,
+    isConnected, isTalking, isAISpeaking, transcripts, partialTranscript,
+    streamingAIText, conversationStatus, error: transcriptionError,
+    lastPronunciation, targetText,
+    connect, disconnect, startTalking, stopTalking, clearTranscripts,
   } = usePushToTalk();
 
-  const [isPhonemeOpen, setIsPhonemeOpen] = useState(true);
   const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [activeWordKey, setActiveWordKey] = useState("");
   const [speechLang, setSpeechLang] = useState("en-IN");
-  const lastUserTranscript = transcripts.length > 0 ? transcripts[transcripts.length - 1].text : "";
+  const [scoreHistory, setScoreHistory] = useState<number[]>([]);
 
   const targetWords = useMemo(() => splitTargetToWords(targetText), [targetText]);
+
   const misExpectedNormSet = useMemo(() => {
     const s = new Set<string>();
     for (const p of lastPronunciation?.misaligned_words || []) {
-      if (p?.expected) {
-        s.add(normalizeWord(p.expected));
-      }
+      if (p?.expected) s.add(normalizeWord(p.expected));
     }
     return s;
   }, [lastPronunciation?.misaligned_words]);
 
   const displayWord = useMemo(() => {
     const t = targetWords.find((w) => w.norm === activeWordKey);
-    if (t) {
-      return t.raw.replace(/[^a-zA-Z0-9']+$/g, "");
-    }
-    return activeWordKey;
+    return t ? t.raw.replace(/[^a-zA-Z0-9']+$/g, "") : activeWordKey;
   }, [targetWords, activeWordKey]);
 
+  const scoreDisplay = lastPronunciation
+    ? Math.min(100, Math.max(0, Math.round(Number(lastPronunciation.score))))
+    : null;
+
+  // Seed first active word when target loads
   useEffect(() => {
-    if (activeWordKey) {
-      return;
-    }
+    if (activeWordKey) return;
     const w = targetWords[0];
-    if (w) {
-      setActiveWordKey(normalizeWord(w.raw));
-    }
+    if (w) setActiveWordKey(normalizeWord(w.raw));
   }, [targetText, targetWords, activeWordKey]);
 
+  // Auto-focus first wrong word after attempt
   const lastPrRef = useRef(lastPronunciation);
   lastPrRef.current = lastPronunciation;
-
   useEffect(() => {
     const p = lastPrRef.current;
-    if (!p) {
-      return;
-    }
+    if (!p) return;
     const m = p.misaligned_words;
     const w0 = targetWords[0];
-    if (m?.length) {
-      setActiveWordKey(normalizeWord(m[0].expected));
-    } else if (w0) {
-      setActiveWordKey(normalizeWord(w0.raw));
-    }
+    if (m?.length) setActiveWordKey(normalizeWord(m[0].expected));
+    else if (w0) setActiveWordKey(normalizeWord(w0.raw));
   }, [lastPronunciation?.turn_id, targetWords]);
 
-  const appendPronunciationEntry = useCallback(
-    (p: PronunciationResultPayload) => {
-      if (phonemeEntriesRef.current.some((e) => e.turn_id === p.turn_id)) {
-        return;
-      }
-      const entry: MeetingPhonemeDataPersisted["entries"][number] = {
+  // Track score history
+  useEffect(() => {
+    if (scoreDisplay == null) return;
+    scoreHistoryRef.current = [...scoreHistoryRef.current, scoreDisplay].slice(-10);
+    setScoreHistory([...scoreHistoryRef.current]);
+  }, [scoreDisplay]);
+
+  const appendPronunciationEntry = useCallback((p: PronunciationResultPayload) => {
+    if (phonemeEntriesRef.current.some((e) => e.turn_id === p.turn_id)) return;
+    phonemeEntriesRef.current = [
+      ...phonemeEntriesRef.current,
+      {
         at: new Date().toISOString(),
         turn_id: p.turn_id,
         target_text: p.target_text,
         heard_text: p.heard_text,
         score: p.score,
         feedback: p.feedback.slice(0, 5),
-      };
-      phonemeEntriesRef.current = [...phonemeEntriesRef.current, entry].slice(-50);
-    },
-    []
-  );
+      },
+    ].slice(-50);
+  }, []);
 
   useEffect(() => {
     if (!lastPronunciation) return;
     if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current);
     persistDebounceRef.current = setTimeout(() => {
       appendPronunciationEntry(lastPronunciation);
-      updateMeeting.mutate({
-        id: meetingId,
-        phonemeData: { entries: phonemeEntriesRef.current },
-      });
+      updateMeeting.mutate({ id: meetingId, phonemeData: { entries: phonemeEntriesRef.current } });
     }, 2000);
-    return () => {
-      if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current);
-    };
+    return () => { if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current); };
   }, [lastPronunciation, meetingId, updateMeeting, appendPronunciationEntry]);
 
-  useSpacebarControl({
-    onSpaceDown: startTalking,
-    onSpaceUp: stopTalking,
-    enabled: isConnected && isMicEnabled,
-  });
+  useSpacebarControl({ onSpaceDown: startTalking, onSpaceUp: stopTalking, enabled: isConnected && isMicEnabled });
 
   useEffect(() => {
-    if (isMicEnabled && !isConnected) {
-      connect();
-    } else if (!isMicEnabled && isConnected) {
-      disconnect();
-    }
+    if (isMicEnabled && !isConnected) connect();
+    else if (!isMicEnabled && isConnected) disconnect();
   }, [isMicEnabled, isConnected, connect, disconnect]);
 
-  const handleMicToggle = () => {
-    setIsMicEnabled((c) => !c);
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  };
-
   const handleLeaveWithPersist = () => {
-    if (persistDebounceRef.current) {
-      clearTimeout(persistDebounceRef.current);
-      persistDebounceRef.current = null;
-    }
-    if (lastPronunciation) {
-      appendPronunciationEntry(lastPronunciation);
-    }
+    if (persistDebounceRef.current) { clearTimeout(persistDebounceRef.current); persistDebounceRef.current = null; }
+    if (lastPronunciation) appendPronunciationEntry(lastPronunciation);
     if (phonemeEntriesRef.current.length > 0) {
-      updateMeeting.mutate({
-        id: meetingId,
-        phonemeData: { entries: phonemeEntriesRef.current },
-      });
+      updateMeeting.mutate({ id: meetingId, phonemeData: { entries: phonemeEntriesRef.current } });
     }
     onLeave();
   };
 
   const mainMicPress = (e: React.PointerEvent) => {
-    if (!isMicEnabled) {
-      handleMicToggle();
-      return;
-    }
+    if (!isMicEnabled) { setIsMicEnabled(true); return; }
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     startTalking();
   };
-
   const mainMicRelease = (e: React.PointerEvent) => {
     if (!isMicEnabled) return;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
-    } catch {
-      // ignore
-    }
+    try { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); } catch { /* ignore */ }
     stopTalking();
   };
 
-  const scoreDisplay = lastPronunciation
-    ? Math.min(100, Math.max(0, Math.round(Number(lastPronunciation.score))))
-    : null;
+  const formatTime = (date: Date) =>
+    date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground font-sans">
-      <header className="flex h-12 shrink-0 items-center border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <h1 className="truncate text-sm font-semibold tracking-tight" title={meetingName}>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden" style={{ background: "var(--background)", color: "var(--foreground)" }}>
+
+      {/* ── Header bar ── */}
+      <header
+        className="flex h-11 shrink-0 items-center justify-between px-4 gap-2"
+        style={{ borderBottom: "1px solid var(--border)", background: "var(--background)" }}
+      >
+        <h1
+          className="truncate text-sm font-semibold tracking-tight"
+          style={{ fontFamily: "var(--font-display)", color: "var(--foreground)" }}
+          title={meetingName}
+        >
           {meetingName}
         </h1>
+        <div className="flex items-center gap-2">
+          {transcripts.length > 0 && (
+            <button
+              type="button"
+              onClick={clearTranscripts}
+              className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-white/10"
+              title="Clear conversation"
+            >
+              <Trash2 className="h-3.5 w-3.5" style={{ color: "var(--muted-foreground)" }} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleLeaveWithPersist}
+            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors hover:bg-white/10"
+            style={{ color: "var(--primary)", border: "1px solid var(--primary)" }}
+          >
+            <PhoneOff className="h-3 w-3" />
+            Leave
+          </button>
+        </div>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <section className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto p-6">
-          <div className="mx-auto flex w-full max-w-3xl flex-col items-center space-y-10">
-            <div className="space-y-2 text-center">
-              <span className="text-[13px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Repeat after me
-              </span>
-              <p className="text-[15px] text-muted-foreground">
-                Listen carefully and repeat the sentence.
-              </p>
+        <section className="relative flex min-h-0 flex-1 flex-col items-center justify-start overflow-y-auto p-6 gap-8">
+          <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-8">
+            {/*<p
+              className="text-[11px] font-semibold uppercase tracking-[0.2em]"
+              style={{ color: "var(--muted-foreground)" }}
+            >
+              Repeat after me
+            </p>*/}
+
+            {/* ── Arc score dial + sparkline ── */}
+            <div className="flex flex-col items-center gap-2">
+              <ArcDial score={scoreDisplay} />
+              <ScoreSparkline scores={scoreHistory} />
             </div>
 
-            <div className="flex min-h-[240px] w-full max-w-3xl flex-col items-stretch justify-center gap-3 rounded-xl border border-border/60 bg-card p-6 text-card-foreground shadow-sm sm:min-h-[300px] sm:p-10">
-              <h2 className="max-w-3xl text-center text-2xl font-semibold leading-relaxed tracking-tight sm:text-3xl sm:leading-normal md:text-4xl">
-                {targetText.split(/(\s+)/g).map((part, i) => {
-                  if (!/\S/.test(part)) {
-                    return <span key={i}>{part}</span>;
-                  }
-                  const norm = normalizeWord(part);
-                  if (!norm) {
-                    return <span key={i}>{part}</span>;
-                  }
-                  const wrong = misExpectedNormSet.has(norm);
-                  const active = norm === activeWordKey;
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      className={cn(
-                        "inline p-0 align-baseline transition-colors",
-                        "border-b-2 border-transparent bg-transparent",
-                        "hover:text-primary",
-                        active && "font-semibold text-primary",
-                        !active && "text-foreground"
-                      )}
-                      onClick={() => {
-                        setActiveWordKey(norm);
-                      }}
-                    >
-                      {part}
-                      {wrong && (
-                        <span className="ml-0.5 inline text-destructive" aria-label="Mismatched">
-                          ×
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </h2>
+            {/* ── Phonetic staff — target sentence ── */}
+            <div
+              className="w-full rounded-2xl px-6 py-8"
+              style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+            >
+              <PhoneticStaff
+                targetText={targetText}
+                misExpectedNormSet={misExpectedNormSet}
+                activeWordKey={activeWordKey}
+                onWordClick={setActiveWordKey}
+              />
+
+              {/* Feedback line: heard text */}
+              {lastPronunciation && (
+                <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--border)" }}>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--muted-foreground)" }}>
+                    Heard
+                  </p>
+                  <HeardTextHighlight
+                    className="text-base leading-relaxed"
+                    text={lastPronunciation.heard_text || "—"}
+                    misalignedWords={lastPronunciation.misaligned_words}
+                  />
+                  {lastPronunciation.feedback.slice(0, 2).map((line, i) => (
+                    <p key={i} className="mt-2 text-sm leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
 
+            {/* ── Wrong words bar ── */}
+            <WrongWordsBar
+              pairs={lastPronunciation?.misaligned_words}
+              activeKey={activeWordKey}
+              onSelectExpected={(expected, fromWrongBar) => {
+                setActiveWordKey(normalizeWord(expected));
+                if (fromWrongBar) speakWord(expected, { rate: 0.7, lang: speechLang });
+              }}
+            />
+
+            {/* ── Merged phonetic breakdown card ── */}
             <PronunciationReferenceCard
               displayWord={displayWord}
               activeWordKey={activeWordKey}
               lang={speechLang}
               onLangChange={setSpeechLang}
+              misalignedPairs={lastPronunciation?.misaligned_words}
             />
 
+            {/* ── Mic controls ── */}
             {transcriptionError && (
               <div
-                className="w-full max-w-md rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-sm text-destructive"
+                className="w-full max-w-md rounded-lg px-3 py-2 text-center text-sm"
+                style={{ background: "color-mix(in oklab, var(--destructive) 12%, white)", color: "var(--destructive)", border: "1px solid color-mix(in oklab, var(--destructive) 35%, white)" }}
                 role="alert"
               >
                 {transcriptionError}
               </div>
             )}
 
-            <div className="mt-2 flex flex-col items-center space-y-6">
-              <div
-                className={`flex h-12 w-64 items-center justify-center space-x-1.5 ${
-                  isTalking ? "opacity-100" : "opacity-50"
-                }`}
-              >
-                {WAVE_BARS.map((h, i) => (
+            <div className="flex flex-col items-center gap-4">
+              <div className={cn("flex h-10 items-center gap-1", isTalking ? "opacity-100" : "opacity-25")}>
+                {[3,6,10,5,8,12,7,4,9,4].map((h, i) => (
                   <div
                     key={i}
-                    className={`w-1.5 rounded-full transition-all ${h} ${
-                      isTalking ? "animate-pulse" : ""
-                    } bg-primary`}
-                    style={{ animationDelay: `${i * 80}ms` }}
+                    className={cn("w-1.5 rounded-full", isTalking && "animate-pulse")}
+                    style={{
+                      height: `${h * 4}px`,
+                      background: isTalking ? "var(--primary)" : "var(--muted-foreground)",
+                      animationDelay: `${i * 80}ms`,
+                    }}
                   />
                 ))}
               </div>
 
-              <button
-                type="button"
-                onPointerDown={mainMicPress}
-                onPointerUp={mainMicRelease}
-                onPointerCancel={mainMicRelease}
-                onPointerLeave={mainMicRelease}
-                className="group relative hidden lg:flex h-24 w-24 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-200 active:scale-95"
-                title={!isMicEnabled ? "Enable microphone" : "Hold to speak"}
-              >
-                <span className="absolute inset-0 rounded-full bg-primary-foreground/0 opacity-0 transition-opacity group-hover:opacity-10" />
-                {isMicEnabled ? <Mic className="h-9 w-9" /> : <MicOff className="h-9 w-9" />}
-              </button>
+              {/* Desktop hold-to-talk button */}
+              <div className="relative hidden lg:block">
+                {isTalking && (
+                  <span
+                    className="mic-pulse-ring absolute inset-0 rounded-full"
+                    style={{ background: "var(--primary)", opacity: 0.3 }}
+                  />
+                )}
+                <button
+                  type="button"
+                  onPointerDown={mainMicPress}
+                  onPointerUp={mainMicRelease}
+                  onPointerCancel={mainMicRelease}
+                  onPointerLeave={mainMicRelease}
+                  className="relative flex h-20 w-20 items-center justify-center rounded-full transition-all duration-150 active:scale-95"
+                  style={{
+                    background: isMicEnabled ? "var(--primary)" : "var(--card)",
+                    border: `2px solid ${isMicEnabled ? "var(--primary)" : "var(--border)"}`,
+                    color: isMicEnabled ? "var(--primary-foreground)" : "var(--muted-foreground)",
+                  }}
+                  title={!isMicEnabled ? "Enable mic" : "Hold to speak"}
+                >
+                  {isMicEnabled ? <Mic className="h-8 w-8" /> : <MicOff className="h-8 w-8" />}
+                </button>
+              </div>
 
-              {/* Mobile / iPad controls: show on screens smaller than lg */}
-              <div className="lg:hidden flex flex-col items-center gap-3">
+              {/* Mobile tap controls */}
+              <div className="flex flex-col items-center gap-2 lg:hidden">
                 {!isTalking ? (
-                  <Button
+                  <button
                     type="button"
-                    size="lg"
-                    className="w-48"
+                    className="rounded-lg px-8 py-2.5 text-sm font-semibold transition-all active:scale-95"
+                    style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
                     onClick={() => {
-                      if (!isMicEnabled) {
-                        setIsMicEnabled(true);
-                        // ensure connection before starting
-                        setTimeout(() => startTalking(), 250);
-                      } else {
-                        startTalking();
-                      }
+                      if (!isMicEnabled) { setIsMicEnabled(true); setTimeout(() => startTalking(), 250); }
+                      else startTalking();
                     }}
                   >
                     Start Talking
-                  </Button>
+                  </button>
                 ) : (
-                  <Button
+                  <button
                     type="button"
-                    size="lg"
-                    variant="destructive"
-                    className="w-48"
-                    onClick={() => stopTalking()}
+                    className="rounded-lg px-8 py-2.5 text-sm font-semibold transition-all active:scale-95"
+                    style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
+                    onClick={stopTalking}
                   >
                     Stop
-                  </Button>
+                  </button>
                 )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleMicToggle}
-                  className="rounded-full"
-                >
-                  {isMicEnabled ? "Turn off mic" : "Turn on mic"}
-                </Button>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
-                <div className="rounded-full border border-border bg-muted/60 px-4 py-2">
-                  <span className="hidden lg:inline">Hold{" "}</span>
-                  <kbd className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
+              {/* SPACE hint + mic toggle */}
+              <div className="flex items-center gap-3 text-xs" style={{ color: "var(--muted-foreground)" }}>
+                <span className="hidden lg:inline">
+                  Hold{" "}
+                  <kbd
+                    className="rounded px-1.5 py-0.5 font-mono"
+                    style={{ background: "var(--muted)", color: "var(--foreground)", border: "1px solid var(--border)" }}
+                  >
                     SPACE
                   </kbd>
-                  <span className="hidden lg:inline"> to talk</span>
-                </div>
-                <Button
+                  {" "}to talk
+                </span>
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleMicToggle}
-                  className="rounded-full"
+                  onClick={() => setIsMicEnabled((c) => !c)}
+                  className="rounded-full px-3 py-1 transition-colors hover:bg-white/10"
+                  style={{ border: "1px solid var(--border)" }}
                 >
                   {isMicEnabled ? "Turn off mic" : "Turn on mic"}
-                </Button>
+                </button>
               </div>
 
               {conversationStatus && (
-                <p className="text-center text-xs text-muted-foreground">{conversationStatus}</p>
+                <p className="text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
+                  {conversationStatus}
+                </p>
               )}
-
-            <WrongWordsBar
-              pairs={lastPronunciation?.misaligned_words}
-              activeKey={activeWordKey}
-              onSelectExpected={(expected, fromWrongBar) => {
-                setActiveWordKey(normalizeWord(expected));
-                if (fromWrongBar) {
-                  speakWord(expected, { rate: 0.7, lang: speechLang });
-                }
-              }}
-            />
             </div>
+
           </div>
         </section>
 
-        <aside className="flex h-full min-h-0 w-full flex-col border-t border-border bg-muted/50 lg:w-[32%] lg:max-w-md lg:border-t-0 lg:border-l">
-          <div className="z-10 flex shrink-0 items-start justify-between gap-3 border-b border-border/80 bg-muted/50 px-6 py-4 backdrop-blur-sm">
-            <h2 className="text-xl font-medium tracking-tight">Voice Conversation</h2>
-            <div className="flex shrink-0 items-center gap-2">
-              {transcripts.length > 0 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={clearTranscripts}
-                  className="h-8 w-8 text-muted-foreground"
-                  title="Clear conversation"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleLeaveWithPersist}
-                className="gap-1.5 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10"
-              >
-                <PhoneOff className="h-3.5 w-3.5" />
-                Leave
-              </Button>
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 space-y-8 overflow-y-auto p-6">
-            <section className="space-y-3">
-              <div className="flex items-baseline justify-between">
-                <h3 className="text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Pronunciation
-                </h3>
-                {scoreDisplay != null && (
-                  <div className="flex items-baseline gap-0.5">
-                    <span className="text-3xl font-bold tabular-nums text-primary">
-                      {scoreDisplay}
-                    </span>
-                    <span className="text-sm text-muted-foreground">/ 100</span>
-                  </div>
-                )}
-              </div>
-
-              {lastPronunciation ? (
-                <div className="space-y-4 rounded-lg border border-border/60 bg-card p-4 text-card-foreground shadow-sm">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Target
-                    </div>
-                    <p className="mt-1 text-base leading-relaxed">{lastPronunciation.target_text}</p>
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Heard
-                    </div>
-                    <HeardTextHighlight
-                      className="mt-1 text-base leading-relaxed"
-                      text={lastPronunciation.heard_text || "—"}
-                      misalignedWords={lastPronunciation.misaligned_words}
-                    />
-                  </div>
-                  {lastPronunciation.feedback.slice(0, 3).map((line, i) => (
-                    <p key={i} className="text-sm leading-relaxed text-muted-foreground">
-                      {line}
-                    </p>
-                  ))}
-                </div>
-              ) : phonemeAnalysis ? (
-                <Collapsible open={isPhonemeOpen} onOpenChange={setIsPhonemeOpen}>
-                  <CollapsibleTrigger asChild>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-card-foreground"
-                    >
-                      <span>Live · {Math.round(phonemeAnalysis.overall_accuracy)}%</span>
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${
-                          isPhonemeOpen ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-border bg-card p-2">
-                    <PhonemeRealTimeFeedback
-                      transcript={lastUserTranscript}
-                      analysis={phonemeAnalysis}
-                    />
-                  </CollapsibleContent>
-                </Collapsible>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Finish speaking to see your pronunciation score and feedback.
-                </p>
-              )}
-            </section>
-
-            <section className="space-y-3">
-              <h3 className="text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Conversation
-              </h3>
-              <ScrollArea className="h-[min(360px,40vh)] pr-2 lg:h-[min(400px,45vh)]">
-                <div className="space-y-3 pb-2">
-                  {isConnected &&
-                    !isTalking &&
-                    !isAISpeaking &&
-                    !streamingAIText &&
-                    isMicEnabled && (
-                      <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-card p-3 text-sm text-muted-foreground shadow-sm">
-                        <span className="text-xs text-primary">Ready</span>
-                        <p className="mt-1">Hold SPACE to talk.</p>
-                      </div>
-                    )}
-                  {isTalking && (
-                    <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-card p-3 text-sm shadow-sm">
-                      <span className="text-xs font-medium text-primary">Recording</span>
-                      <p className="mt-1 text-foreground">Release SPACE when you are done.</p>
-                    </div>
-                  )}
-                  {isAISpeaking && !streamingAIText && (
-                    <div className="flex max-w-[90%] items-start gap-3">
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                        <Bot className="h-4 w-4" />
-                      </div>
-                      <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-card p-3 text-sm text-muted-foreground shadow-sm">
-                        Assistant is speaking…
-                      </div>
-                    </div>
-                  )}
-                  {streamingAIText && (
-                    <div className="flex max-w-[90%] items-start gap-3 self-start">
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                        <Bot className="h-4 w-4" />
-                      </div>
-                      <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-card p-3 text-sm leading-relaxed text-foreground shadow-sm">
-                        <p className="text-xs text-muted-foreground">Assistant is replying…</p>
-                        <p className="mt-1">{streamingAIText}</p>
-                      </div>
-                    </div>
-                  )}
-                  {partialTranscript && (
-                    <div className="flex w-full justify-end">
-                      <div className="flex max-w-[90%] items-start gap-3 flex-row-reverse">
-                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
-                          <User className="h-4 w-4" />
-                        </div>
-                        <div className="rounded-2xl rounded-tr-sm border border-border/40 bg-muted p-3 text-sm italic text-foreground shadow-sm">
-                          {partialTranscript}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {transcripts.length === 0 && !partialTranscript && !streamingAIText ? (
-                    <div className="flex flex-col items-center justify-center py-6 text-center text-sm text-muted-foreground">
-                      <PersonStanding className="mb-2 h-6 w-6 opacity-50" />
-                      <p>
-                        {isMicEnabled
-                          ? "Your turns and AI replies will appear here."
-                          : "Turn on the microphone to start."}
-                      </p>
-                    </div>
-                  ) : (
-                    transcripts.map((t) => (
-                      <div key={t.id} className="space-y-3">
-                        <div className="ml-auto flex max-w-[90%] items-start gap-3 flex-row-reverse">
-                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
-                            <User className="h-4 w-4" />
-                          </div>
-                          <div className="rounded-2xl rounded-tr-sm border border-border/40 bg-muted p-3 text-sm leading-relaxed text-foreground shadow-sm">
-                            <p>{t.text}</p>
-                            <p className="mt-1 text-[10px] text-muted-foreground">
-                              {formatTime(t.timestamp)}
-                            </p>
-                          </div>
-                        </div>
-                        {t.reply && (
-                          <div className="flex max-w-[90%] items-start gap-3 self-start">
-                            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                              <Bot className="h-4 w-4" />
-                            </div>
-                            <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-card p-3 text-sm leading-relaxed text-foreground shadow-sm">
-                              {t.reply}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            </section>
+        <aside className="flex min-h-0 w-full shrink-0 lg:h-full lg:w-[340px]">
+          <div className="flex min-h-0 flex-1 p-4 lg:py-4 lg:pl-0 lg:pr-4">
+            <CoachPanel
+              isConnected={isConnected}
+              isTalking={isTalking}
+              isAISpeaking={isAISpeaking}
+              streamingAIText={streamingAIText}
+              isMicEnabled={isMicEnabled}
+              partialTranscript={partialTranscript}
+              transcripts={transcripts}
+              startTalking={startTalking}
+              formatTime={formatTime}
+            />
           </div>
         </aside>
       </div>

@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Startup
     if settings.ENABLE_WAV2VEC2 and settings.WARM_WAV2VEC2_ON_STARTUP:
         try:
             from app.services.wav2vec2_asr import warm_wav2vec2
@@ -21,7 +22,29 @@ async def lifespan(app: FastAPI):
             await asyncio.to_thread(warm_wav2vec2)
         except Exception:
             logger.exception("Wav2Vec2 warm failed; falling back to Deepgram transcripts")
+
+    if settings.ENABLE_ACOUSTIC_SCORING and settings.WARM_ACOUSTIC_ON_STARTUP:
+        try:
+            from app.services.pronunciation.wav2vec2_phonemes import warm_phoneme_model
+
+            await asyncio.to_thread(warm_phoneme_model)
+        except Exception:
+            logger.exception("Acoustic phoneme model warm failed; using text proxy")
+
+    # Start session cleanup task
+    from app.api.routes.voice_websocket import cleanup_stale_sessions
+    cleanup_task = asyncio.create_task(cleanup_stale_sessions())
+    logger.info("Started session cleanup background task in lifespan")
+    
     yield
+    
+    # Shutdown
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+    logger.info("Stopped session cleanup background task")
 
 
 # Initialize FastAPI app

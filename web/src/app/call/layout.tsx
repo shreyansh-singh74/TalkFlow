@@ -1,4 +1,3 @@
-import { DashboardShell } from "@/modules/dashboard/ui/components/dashboard-shell";
 import type { ReactNode } from "react";
 
 interface Props {
@@ -6,7 +5,11 @@ interface Props {
 }
 
 const Layout = ({ children }: Props) => {
-    return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <main className="flex min-h-screen flex-col bg-background text-foreground">
+      {children}
+    </main>
+  );
 };
 
 export default Layout;

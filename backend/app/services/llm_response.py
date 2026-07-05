@@ -4,11 +4,9 @@ import logging
 import os
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from functools import partial
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-import requests
+import httpx
 
 from app.core.config import settings
 from app.services.pronunciation_coach import PRONUNCIATION_COACH_SYSTEM_SUFFIX
@@ -19,8 +17,8 @@ os.environ['GLOG_minloglevel'] = '2'
 
 logger = logging.getLogger(__name__)
 
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.0-flash-001")
+OPENROUTER_API_URL = settings.OPENROUTER_API_URL
+OPENROUTER_MODEL = settings.OPENROUTER_MODEL
 
 MAX_TOKENS_DEFAULT = 150
 MAX_TOKENS_WITH_PRONUNCIATION_COACH = 256
@@ -33,7 +31,7 @@ BASE_SYSTEM_PROMPT = (
 )
 
 
-def _call_openrouter(
+async def _call_openrouter(
     prompt: str, pronunciation_coach: Optional[Dict[str, Any]] = None
 ) -> str:
     """Call OpenRouter chat completions and return the full response text."""
@@ -74,18 +72,19 @@ def _call_openrouter(
     }
 
     try:
-        resp = requests.post(
-            OPENROUTER_API_URL,
-            headers=headers,
-            json=payload,
-            timeout=20,
-        )
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                OPENROUTER_API_URL,
+                headers=headers,
+                json=payload,
+                timeout=20.0,
+            )
     except Exception as e:  # Network error, timeout, etc.
         raise RuntimeError(f"Failed to call OpenRouter: {e}") from e
 
     try:
         resp.raise_for_status()
-    except requests.HTTPError as http_err:
+    except httpx.HTTPStatusError as http_err:
         try:
             err_json = resp.json()
             err_message = err_json.get("error", {}).get("message") or str(err_json)
@@ -128,10 +127,7 @@ async def stream_llm_response(
         token_count = 0
         last_flush_time = time.time() * 1000
 
-        loop = asyncio.get_event_loop()
-        reply_text = await loop.run_in_executor(
-            None, partial(_call_openrouter, full_prompt, pronunciation_coach)
-        )
+        reply_text = await _call_openrouter(full_prompt, pronunciation_coach)
 
         words = reply_text.split()
 
@@ -187,36 +183,3 @@ async def stream_llm_response(
         else:
             yield "Sorry, I couldn't generate a response. Please try again."
 
-
-def get_llm_response(
-    current_text: str,
-    conversation_history: Optional[List[Dict]] = None
-) -> str:
-    """Generate a single LLM response with conversation context."""
-    try:
-        full_prompt = _build_prompt(current_text, conversation_history)
-        logger.debug("Calling OpenRouter with prompt length %s", len(full_prompt))
-
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_call_openrouter, full_prompt)
-            try:
-                reply_text = future.result(timeout=10)
-                return reply_text
-            except TimeoutError:
-                logger.warning("OpenRouter response timed out after 10 seconds")
-                return "I'm thinking too long. Can you try again?"
-
-    except Exception as e:
-        logger.exception("OpenRouter response failed")
-
-        error_str = str(e).lower()
-        error_type = type(e).__name__
-
-        if "quota" in error_str or "429" in error_str or "ResourceExhausted" in error_type:
-            return "API quota exceeded. Please check your OpenRouter account limits."
-        elif "401" in error_str or "403" in error_str or "invalid" in error_str:
-            return "Invalid API key. Please check your OpenRouter configuration."
-        elif isinstance(e, ValueError) and "Content blocked" in str(e):
-            return "I was blocked from answering that. Could you rephrase your question?"
-
-        return "Sorry, I couldn't generate a response. Please try again."

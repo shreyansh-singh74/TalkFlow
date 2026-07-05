@@ -21,7 +21,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-_WORD_RE = re.compile(r"[a-z']+")
 _STRESS_RE = re.compile(r"\d+$")
 
 IPA_FEEDBACK_MAP: Dict[str, Dict[str, str]] = {
@@ -90,8 +89,7 @@ def _normalize_phoneme(token: str) -> str:
     return _STRESS_RE.sub("", token).strip()
 
 
-def _tokenize_words(text: str) -> List[str]:
-    return _WORD_RE.findall(text.lower())
+from app.utils.text import tokenize_words as _tokenize_words
 
 
 class PhonemeAnalyzer:

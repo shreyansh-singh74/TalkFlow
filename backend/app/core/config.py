@@ -37,6 +37,16 @@ class Settings:
     DEEPGRAM_API_KEY: str = os.getenv("DEEPGRAM_API_KEY", "")
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
     
+    # API URLs & Models
+    OPENROUTER_API_URL: str = os.getenv(
+        "OPENROUTER_API_URL", "https://openrouter.ai/api/v1/chat/completions"
+    )
+    OPENROUTER_MODEL: str = os.getenv(
+        "OPENROUTER_MODEL", "google/gemini-2.5-flash"
+    )
+    DEEPGRAM_MODEL: str = os.getenv("DEEPGRAM_MODEL", "nova-2")
+    DEEPGRAM_LANGUAGE: str = os.getenv("DEEPGRAM_LANGUAGE", "en-US")
+    
     # Google Cloud Credentials - Support both file path and base64 encoded JSON
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
     
@@ -117,6 +127,23 @@ class Settings:
     )
     WAV2VEC2_MODEL_ID: str = os.getenv("WAV2VEC2_MODEL_ID", "facebook/wav2vec2-base-960h")
     TURN_AUDIO_MAX_BYTES: int = int(os.getenv("TURN_AUDIO_MAX_BYTES", str(16_000 * 2 * 5)))
+
+    # Acoustic pronunciation scoring (Phase 1): score the raw audio waveform with
+    # a wav2vec2 phoneme recognizer + GOP-style alignment instead of comparing
+    # transcript text. When disabled, the legacy text-proxy scorer is used.
+    ENABLE_ACOUSTIC_SCORING: bool = os.getenv("ENABLE_ACOUSTIC_SCORING", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    WARM_ACOUSTIC_ON_STARTUP: bool = os.getenv("WARM_ACOUSTIC_ON_STARTUP", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    ACOUSTIC_PHONEME_MODEL_ID: str = os.getenv(
+        "ACOUSTIC_PHONEME_MODEL_ID", "facebook/wav2vec2-lv-60-espeak-cv-ft"
+    )
     
     def validate(self):
         """Validate required settings"""

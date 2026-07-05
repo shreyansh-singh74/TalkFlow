@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -8,6 +9,15 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* TalkFlow custom tokens */
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-phonetic: "JetBrains Mono", "Fira Mono", monospace;
+  --color-ink: var(--ink);
+  --color-parchment: var(--parchment);
+  --color-cobalt: var(--cobalt);
+  --color-cobalt-muted: var(--cobalt-muted);
+  --color-amber-warm: var(--amber-warm);
+  --color-amber-muted: var(--amber-muted);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -45,6 +55,13 @@
 
 :root {
   --radius: 0.625rem;
+  /* TalkFlow palette */
+  --ink: #14161A;
+  --parchment: #EFEAE1;
+  --cobalt: #3457D5;
+  --cobalt-muted: rgba(52, 87, 213, 0.15);
+  --amber-warm: #C25E2F;
+  --amber-muted: rgba(194, 94, 47, 0.15);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -84,6 +101,13 @@
 }
 
 .dark {
+  /* TalkFlow palette — same values work on both themes */
+  --ink: #14161A;
+  --parchment: #EFEAE1;
+  --cobalt: #3457D5;
+  --cobalt-muted: rgba(52, 87, 213, 0.2);
+  --amber-warm: #C25E2F;
+  --amber-muted: rgba(194, 94, 47, 0.2);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -156,4 +180,50 @@
     transform: translateX(100%);
     opacity: 0;
   }
+}
+
+/* Arc score dial */
+@property --arc-progress {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@keyframes arc-fill {
+  from { --arc-progress: 0; }
+  to   { --arc-progress: 1; }
+}
+
+.arc-dial-track {
+  stroke: oklch(0.922 0 0);
+}
+.dark .arc-dial-track {
+  stroke: oklch(1 0 0 / 10%);
+}
+.arc-dial-fill {
+  stroke: var(--cobalt);
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Phonetic staff */
+.phonetic-staff-word {
+  font-family: var(--font-display);
+}
+.phonetic-staff-ipa {
+  font-family: var(--font-phonetic);
+}
+
+/* Coach rail distinct background */
+.coach-rail {
+  background: var(--ink);
+  color: var(--parchment);
+}
+
+/* Mic pulse ring */
+@keyframes mic-ring {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  100% { transform: scale(1.8); opacity: 0;   }
+}
+.mic-pulse-ring {
+  animation: mic-ring 1.2s ease-out infinite;
 }

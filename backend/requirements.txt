@@ -4,14 +4,9 @@ python-multipart
 python-dotenv
 google-cloud-texttospeech
 deepgram-sdk
-requests
 g2p-en
 pyphen
-librosa
-soundfile
 numpy
-scipy
-dtaidistance
 # CPU: pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch
 transformers

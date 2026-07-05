@@ -58,3 +58,6 @@ class PronunciationResultMessage(BaseModel):
     errors: List[dict] = Field(default_factory=list)
     feedback: List[str] = Field(default_factory=list)
     misaligned_words: List[dict] = Field(default_factory=list)
+    # Phase-1 acoustic scoring fields (additive; older clients ignore them).
+    method: str = "text_proxy"
+    per_phoneme: List[dict] = Field(default_factory=list)

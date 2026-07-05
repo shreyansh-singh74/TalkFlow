@@ -1,5 +1,4 @@
 # app/services/tts_service.py
-import base64
 import logging
 from google.cloud import texttospeech
 from app.core.config import settings
@@ -18,15 +17,15 @@ class TTSService:
             logger.exception("Failed to initialize TTS client")
             self.client = None
     
-    def text_to_speech(self, text: str) -> str | None:
+    def text_to_speech(self, text: str) -> bytes | None:
         """
-        Convert text to speech and return base64 encoded audio
+        Convert text to speech and return raw audio bytes
         
         Args:
             text: The text to convert to speech
             
         Returns:
-            Base64 encoded audio string or None if conversion fails
+            Raw audio bytes or None if conversion fails
         """
         if not self.client:
             logger.warning("TTS client not initialized")
@@ -60,11 +59,8 @@ class TTSService:
                 audio_config=audio_config
             )
             
-            # Encode audio content to base64
-            audio_base64 = base64.b64encode(response.audio_content).decode('utf-8')
-            
             logger.debug("Generated TTS audio (%s bytes)", len(response.audio_content))
-            return audio_base64
+            return response.audio_content
             
         except Exception:
             logger.exception("TTS conversion failed")
