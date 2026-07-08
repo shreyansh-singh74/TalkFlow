@@ -23,12 +23,12 @@ const firstSection = [
   {
     icon: VideoIcon,
     label: "Meetings",
-    href: "/meetings",
+    href: "/dashboard/meetings",
   },
   {
     icon: BotIcon,
     label: "Agents",
-    href: "/agents",
+    href: "/dashboard/agents",
   },
 ];
 
@@ -38,7 +38,7 @@ export const DashboardSidebar = () => {
   return (
     <Sidebar>
       <SidebarHeader className="text-sidebar-accent-foreground">
-        <Link href="/" className="flex items-center gap-2 px-2 pt-2">
+        <Link href="/dashboard" className="flex items-center gap-2 px-2 pt-2">
           <Image src="/logo.svg" height={36} width={36} alt="TalkFlow" />
           <p className="text-2xl font-semibold ">TalkFlow</p>
         </Link>

@@ -35,7 +35,7 @@ export const AgentIdView = ({ agentId }: Props) => {
     removeAgent.mutate(agentId, {
       onSuccess: () => {
         toast.success("Agent deleted successfully");
-        router.push("/agents");
+        router.push("/dashboard/agents");
       },
       onError: (error) => {
         toast.error(error.message || "Failed to delete agent");

@@ -24,7 +24,7 @@ export const CallLobby = ({ onJoin }: Props) => {
           className="gap-2 rounded-full px-3 text-sm"
           style={{ color: "var(--primary)", border: "1px solid var(--primary)" }}
         >
-          <Link href="/meetings">
+          <Link href="/dashboard/meetings">
             <X className="h-4 w-4" />
             Close
           </Link>

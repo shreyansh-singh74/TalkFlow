@@ -79,7 +79,7 @@ export const MeetingIdView = ({ meetingId }: Props) => {
     removeMeeting.mutate(meetingId, {
       onSuccess: () => {
         toast.success("Meeting deleted successfully");
-        router.push("/meetings");
+        router.push("/dashboard/meetings");
       },
       onError: (error) => {
         toast.error(error.message || "Failed to delete meeting");

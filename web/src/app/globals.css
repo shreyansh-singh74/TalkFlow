@@ -16,6 +16,8 @@
   --color-parchment: var(--parchment);
   --color-cobalt: var(--cobalt);
   --color-cobalt-muted: var(--cobalt-muted);
+  --color-emerald: var(--emerald);
+  --color-emerald-muted: var(--emerald-muted);
   --color-amber-warm: var(--amber-warm);
   --color-amber-muted: var(--amber-muted);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -60,6 +62,8 @@
   --parchment: #EFEAE1;
   --cobalt: #3457D5;
   --cobalt-muted: rgba(52, 87, 213, 0.15);
+  --emerald: #00A878;
+  --emerald-muted: rgba(0, 168, 120, 0.15);
   --amber-warm: #C25E2F;
   --amber-muted: rgba(194, 94, 47, 0.15);
   --background: oklch(1 0 0);
@@ -106,6 +110,8 @@
   --parchment: #EFEAE1;
   --cobalt: #3457D5;
   --cobalt-muted: rgba(52, 87, 213, 0.2);
+  --emerald: #00A878;
+  --emerald-muted: rgba(0, 168, 120, 0.25);
   --amber-warm: #C25E2F;
   --amber-muted: rgba(194, 94, 47, 0.2);
   --background: oklch(0.145 0 0);
@@ -142,6 +148,9 @@
 }
 
 @layer base {
+  html, body {
+    overscroll-behavior: none;
+  }
   * {
     @apply border-border outline-ring/50;
   }
@@ -217,6 +226,21 @@
 .coach-rail {
   background: var(--ink);
   color: var(--parchment);
+}
+
+/* Logo marquee */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@layer utilities {
+  .animate-marquee {
+    animation: marquee 28s linear infinite;
+  }
+  .animate-marquee:hover {
+    animation-play-state: paused;
+  }
 }
 
 /* Mic pulse ring */
