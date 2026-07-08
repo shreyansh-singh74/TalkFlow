@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from app.core.config import settings
 from app.services.pronunciation.alignment import AlignedPair
 from app.services.pronunciation.phone_set import ARPABET_TO_IPA
 
@@ -18,9 +19,11 @@ from app.services.pronunciation.phone_set import ARPABET_TO_IPA
 from app.services.phoneme_analysis_service import CONFUSION_TIPS, IPA_FEEDBACK_MAP
 
 # A phone counts as "correct" when its articulatory distance is at/under this.
-CORRECT_DISTANCE_THRESHOLD = 0.34
-INSERTION_PENALTY = 0.5  # per extra phone, in "expected-phone" units
-SOFTEN_ON_UNCERTAINTY = 0.5  # how much low confidence forgives an apparent error
+# All three are env-overridable (see config.py) so they can be tuned against the
+# L2-ARCTIC/speechocean762 eval set without a redeploy.
+CORRECT_DISTANCE_THRESHOLD = settings.CORRECT_DISTANCE_THRESHOLD
+INSERTION_PENALTY = settings.INSERTION_PENALTY  # per extra phone
+SOFTEN_ON_UNCERTAINTY = settings.SOFTEN_ON_UNCERTAINTY
 
 
 def _ipa(phone: Optional[str]) -> str:

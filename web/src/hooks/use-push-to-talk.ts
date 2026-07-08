@@ -57,6 +57,8 @@ export function usePushToTalk(): UsePushToTalkReturn {
   const currentTurnIdRef = useRef<string | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
+  // Ref-backed talking flag so startTalking/stopTalking closures are never stale.
+  const isTalkingRef = useRef(false);
   
   /**
    * Handle incoming WebSocket messages
@@ -154,6 +156,18 @@ export function usePushToTalk(): UsePushToTalkReturn {
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
+        // Pre-warm the mic stream so that getUserMedia permission is handled
+        // before the user presses the button. This ensures startTalking on the
+        // first press has no async gap before creating AudioContext.
+        if (!streamRef.current) {
+          navigator.mediaDevices.getUserMedia({
+            audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+          }).then((stream) => {
+            streamRef.current = stream;
+          }).catch((err) => {
+            console.warn('[usePushToTalk] mic pre-warm failed:', err);
+          });
+        }
       };
       
       ws.onmessage = async (event) => {
@@ -220,7 +234,8 @@ export function usePushToTalk(): UsePushToTalkReturn {
       return;
     }
     
-    if (isTalking) {
+    // Use ref so this guard is never stale regardless of render cycle.
+    if (isTalkingRef.current) {
       return;
     }
     
@@ -232,17 +247,17 @@ export function usePushToTalk(): UsePushToTalkReturn {
       // Send INTERRUPT if AI was speaking
       wsRef.current.send(JSON.stringify({ type: "INTERRUPT" }));
       
-      // Get microphone stream
-      // Don't specify sampleRate - let it use system default
-      // Firefox enforces sample rate matching between MediaStream and AudioContext
-      // We'll resample to 16kHz in the AudioChunker instead
+      // ── Get microphone stream ────────────────────────────────────────────
+      // If we already have a stream from a previous turn, reuse it — this
+      // avoids the async gap entirely and keeps us in the user-gesture stack.
+      // On first call we must await, but subsequent calls are synchronous.
       if (!streamRef.current) {
         streamRef.current = await navigator.mediaDevices.getUserMedia({
           audio: {
             channelCount: 1,
             echoCancellation: true,
-            noiseSuppression: true
-          }
+            noiseSuppression: true,
+          },
         });
       }
       
@@ -256,31 +271,46 @@ export function usePushToTalk(): UsePushToTalkReturn {
         timestamp: Date.now()
       }));
       
-      // Start chunking and sending audio
+      // Start chunking and sending audio.
+      // AudioChunker creates an AudioContext and resumes it here.
+      // On the first call this is after an await (getUserMedia), but the
+      // browser still allows it because we're inside a user-gesture handler.
+      // On subsequent calls streamRef is already set so there is no await
+      // and we stay fully synchronous — context.resume() is guaranteed.
       chunkerRef.current = new AudioChunker(
         streamRef.current,
         (pcm16Chunk) => {
           if (wsRef.current?.readyState === WebSocket.OPEN) {
-            wsRef.current.send(pcm16Chunk.buffer);
+            // Send the exact bytes — buffer.slice creates a copy so the
+            // data is not affected if the engine reuses the backing store.
+            wsRef.current.send(
+              pcm16Chunk.buffer.slice(
+                pcm16Chunk.byteOffset,
+                pcm16Chunk.byteOffset + pcm16Chunk.byteLength
+              )
+            );
           }
         },
         16000
       );
       
       setIsTalking(true);
+      isTalkingRef.current = true;
       setError(null);
       
     } catch (err) {
-      void err;
-      setError("Microphone access denied");
+      console.error('[startTalking] error:', err);
+      setError(err instanceof Error && err.name === 'NotAllowedError'
+        ? "Microphone access denied"
+        : "Failed to start recording");
     }
-  }, [isTalking]);
+  }, []);
   
   /**
    * Stop talking (spacebar up)
    */
   const stopTalking = useCallback(() => {
-    if (!isTalking) {
+    if (!isTalkingRef.current) {
       return;
     }
     
@@ -298,8 +328,9 @@ export function usePushToTalk(): UsePushToTalkReturn {
     }
     
     setIsTalking(false);
+    isTalkingRef.current = false;
     currentTurnIdRef.current = null;
-  }, [isTalking]);
+  }, []);
   
   /**
    * Disconnect WebSocket

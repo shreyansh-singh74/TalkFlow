@@ -445,9 +445,15 @@ export const CallActive = ({ onLeave, meetingName, meetingId }: Props) => {
   };
 
   const mainMicPress = (e: React.PointerEvent) => {
-    if (!isMicEnabled) { setIsMicEnabled(true); return; }
+    if (!isMicEnabled) {
+      setIsMicEnabled(true);
+      // startTalking will be called by the useEffect that watches isMicEnabled→connect,
+      // but we also kick it here after a short delay to ensure the WS is open.
+      setTimeout(() => { void startTalking(); }, 300);
+      return;
+    }
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-    startTalking();
+    void startTalking();
   };
   const mainMicRelease = (e: React.PointerEvent) => {
     if (!isMicEnabled) return;

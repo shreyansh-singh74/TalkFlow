@@ -15,10 +15,22 @@ from app.services.pronunciation.base import (
     PronunciationResult,
     PronunciationScorer,
 )
+from app.services.pronunciation.prosody_types import (
+    IntonationResult,
+    Pause,
+    StressResult,
+    SyllableStress,
+    TimingResult,
+)
 from app.services.pronunciation.registry import get_scorer
 
 __all__ = [
     "PronunciationResult",
     "PronunciationScorer",
     "get_scorer",
+    "StressResult",
+    "SyllableStress",
+    "TimingResult",
+    "Pause",
+    "IntonationResult",
 ]

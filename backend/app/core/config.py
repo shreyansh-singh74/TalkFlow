@@ -144,7 +144,62 @@ class Settings:
     ACOUSTIC_PHONEME_MODEL_ID: str = os.getenv(
         "ACOUSTIC_PHONEME_MODEL_ID", "facebook/wav2vec2-lv-60-espeak-cv-ft"
     )
-    
+
+    # Scoring thresholds (env-overridable so they can be tuned without redeploy).
+    # A phone counts as "correct" when its articulatory distance is at/under this.
+    CORRECT_DISTANCE_THRESHOLD: float = float(
+        os.getenv("CORRECT_DISTANCE_THRESHOLD", "0.34")
+    )
+    INSERTION_PENALTY: float = float(os.getenv("INSERTION_PENALTY", "0.5"))
+    SOFTEN_ON_UNCERTAINTY: float = float(os.getenv("SOFTEN_ON_UNCERTAINTY", "0.5"))
+
+    # Prosody scoring (Phase 2/3). Each dimension is independently flag-gated so
+    # they can be rolled out one at a time. All run CPU-only, load-once.
+    ENABLE_PROSODY_SCORING: bool = os.getenv("ENABLE_PROSODY_SCORING", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    ENABLE_INTONATION_SCORING: bool = os.getenv(
+        "ENABLE_INTONATION_SCORING", "0"
+    ).lower() in ("1", "true", "yes")
+
+    # Voice-activity detection (silero-vad) used by timing + noisy-audio guards.
+    ENABLE_VAD: bool = os.getenv("ENABLE_VAD", "1").lower() in ("1", "true", "yes")
+    SILERO_VAD_THRESHOLD: float = float(os.getenv("SILERO_VAD_THRESHOLD", "0.5"))
+    # Reject a turn as empty/noisy if VAD finds less than this fraction of speech.
+    MIN_SPEECH_FRACTION: float = float(os.getenv("MIN_SPEECH_FRACTION", "0.15"))
+
+    # Target accent the scorer evaluates against (US/UK/Indian/AU). Sets the
+    # reference contour + TTS voice used for prosody comparisons.
+    TARGET_ACCENT: str = os.getenv("TARGET_ACCENT", "en-US")
+
+    # L1-aware coaching (Phase 4). When on, the user's native language steers
+    # which sounds the LLM coaches toward.
+    L1_AWARE_ENABLED: bool = os.getenv("L1_AWARE_ENABLED", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+    # Raw turn audio persistence (Phase 0 + Phase 5 eval datasets). Consent-gated:
+    # never writes to disk unless PERSIST_TURN_AUDIO is set. The retention sweep
+    # deletes files older than TURN_AUDIO_RETENTION_HOURS.
+    PERSIST_TURN_AUDIO: bool = os.getenv("PERSIST_TURN_AUDIO", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    TURN_AUDIO_DIR: str = os.getenv("TURN_AUDIO_DIR", os.path.join(TEMP_DIR, "talkflow_audio"))
+    TURN_AUDIO_RETENTION_HOURS: int = int(os.getenv("TURN_AUDIO_RETENTION_HOURS", "24"))
+    AUDIO_RETENTION_SWEEP_INTERVAL_SECONDS: int = int(
+        os.getenv("AUDIO_RETENTION_SWEEP_INTERVAL_SECONDS", "600")
+    )
+
+    # Resilience (Phase 6).
+    SCORE_TIMEOUT_SECONDS: float = float(os.getenv("SCORE_TIMEOUT_SECONDS", "8.0"))
+    MAX_TURNS_PER_MINUTE: int = int(os.getenv("MAX_TURNS_PER_MINUTE", "20"))
+
     def validate(self):
         """Validate required settings"""
         if not self.OPENROUTER_API_KEY:

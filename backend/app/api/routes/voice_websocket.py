@@ -1,5 +1,6 @@
 # app/api/routes/voice_websocket.py
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from app.services.audio_store import save_turn_audio
 from app.services.deepgram_service import DeepgramLiveService
 from app.services.llm_response import stream_llm_response
 from app.services.pronunciation import get_scorer
@@ -109,9 +110,10 @@ Essentially, this module brings together session lifecycle management, speech-to
 """
 
 class VoiceSession:
-    def __init__(self, websocket: WebSocket):
+    def __init__(self, websocket: WebSocket, meeting_id: Optional[str] = None):
         self.websocket = websocket
         self.session_id = str(uuid.uuid4())
+        self.meeting_id = meeting_id  # optional, used for audio persistence paths
         self.conversation_history = []
         self.deepgram_service: Optional[DeepgramLiveService] = None
         self.current_turn_id: Optional[str] = None
@@ -139,6 +141,9 @@ class VoiceSession:
     ) -> Optional[Dict]:
         cap = settings.TURN_AUDIO_MAX_BYTES
         pcm = full_pcm[:cap] if cap > 0 else full_pcm
+
+        # Persist raw audio for eval datasets + later replay (consent-gated).
+        audio_path = save_turn_audio(self.meeting_id or "", self.current_turn_id or "", pcm)
 
         # The transcript still drives word-level coaching and the text-proxy
         # fallback. Optional local ASR can override the displayed "heard" text.

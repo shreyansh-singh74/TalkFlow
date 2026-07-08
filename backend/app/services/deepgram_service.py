@@ -80,23 +80,28 @@ class DeepgramLiveService:
             with open(temp_file_path, 'rb') as f:
                 audio_content = f.read()
             
-            # Transcribe using Deepgram
-            response = await asyncio.to_thread(
-                self.deepgram.listen.v1.media.transcribe_file,
-                request=audio_content,
-                model=settings.DEEPGRAM_MODEL,
-                language=settings.DEEPGRAM_LANGUAGE,
-                smart_format=True,
-                punctuate=True,
-            )
-            
-            # Extract transcript
-            if hasattr(response, 'results') and hasattr(response.results, 'channels'):
-                transcript = response.results.channels[0].alternatives[0].transcript.strip()
-                
-                if transcript:
-                    # Send as final transcript (no partial for buffered mode)
-                    self.on_final(transcript, 1.0)
+            # Transcribe using Deepgram SDK 7.x
+            # transcribe_file() is synchronous and all params are keyword-only.
+            def _transcribe():
+                return self.deepgram.listen.v1.media.transcribe_file(
+                    request=audio_content,
+                    model=settings.DEEPGRAM_MODEL,
+                    language=settings.DEEPGRAM_LANGUAGE,
+                    smart_format=True,
+                    punctuate=True,
+                )
+
+            response = await asyncio.to_thread(_transcribe)
+
+            # Extract transcript — channels is List[...] and alternatives is Optional[List[...]]
+            channels = getattr(getattr(response, "results", None), "channels", None)
+            if channels:
+                alternatives = getattr(channels[0], "alternatives", None)
+                if alternatives:
+                    transcript = (alternatives[0].transcript or "").strip()
+                    if transcript:
+                        # Send as final transcript (no partial for buffered mode)
+                        self.on_final(transcript, 1.0)
             
         except Exception:
             logger.exception("Deepgram transcription failed")

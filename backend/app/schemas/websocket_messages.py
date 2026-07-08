@@ -61,3 +61,10 @@ class PronunciationResultMessage(BaseModel):
     # Phase-1 acoustic scoring fields (additive; older clients ignore them).
     method: str = "text_proxy"
     per_phoneme: List[dict] = Field(default_factory=list)
+    # Phase 0/2/3 additive fields.
+    accent: str = "en-US"
+    audio_path: Optional[str] = None
+    stress: Optional[dict] = None
+    timing: Optional[dict] = None
+    intonation: Optional[dict] = None
+    diagnosis: dict = Field(default_factory=dict)
