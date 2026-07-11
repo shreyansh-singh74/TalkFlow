@@ -49,7 +49,7 @@ export const CallEnded = () => {
             Session complete
           </h1>
           <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-            Your phoneme data has been saved. A session summary will appear in your meetings list shortly.
+            Your phoneme data has been saved. A session summary will appear in your practice history shortly.
           </p>
         </div>
 

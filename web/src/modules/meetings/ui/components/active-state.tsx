@@ -12,14 +12,14 @@ export const ActiveState = ({ meetingId }: Props) => {
     <div className="bg-white rounded-lg px-4 py-5 flex flex-col gap-y-8 items-center justify-center">
       <EmptyState
         image="/upcoming.svg"
-        title="Meeting is Active"
-        description="Meeting will end once all participants leave."
+        title="Practice Session is Active"
+        description="The session will finish when you leave."
       />
       <div className="flex flex-col-reverse lg:flex-row lg:justify-center items-center gap-2 w-full">
         <Button className="w-full lg:w-auto">
           <Link href={`/call/${meetingId}`}>
             <VideoIcon />
-            Join meeting
+            Join Session
           </Link>
         </Button>
       </div>

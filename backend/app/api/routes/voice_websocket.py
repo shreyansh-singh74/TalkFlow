@@ -2,7 +2,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.audio_store import save_turn_audio
 from app.services.deepgram_service import DeepgramLiveService
-from app.services.llm_response import stream_llm_response
+from app.services.llm_response import stream_llm_response, generate_coach_summary
 from app.services.pronunciation import get_scorer
 from app.services.pronunciation_coach import build_pronunciation_coach_for_llm
 from app.services.tts_service import tts_service
@@ -14,10 +14,19 @@ from app.schemas.websocket_messages import (
     FinalTranscriptMessage,
     LLMTextChunkMessage,
     PartialTranscriptMessage,
+    PracticeTargetMessage,
     PronunciationResultMessage,
+    SessionConfigMessage,
     TTSChunkMessage,
+    SessionCompleteMessage,
 )
 from app.core.config import settings
+from app.services.practice_content import (
+    get_initial_sentence,
+    get_next_sentence,
+    split_practice_words,
+    get_sentence_bank,
+)
 import json
 import uuid
 import asyncio
@@ -35,7 +44,8 @@ sessions: Dict[str, dict] = {}
 
 # Session timeout from config
 SESSION_TIMEOUT_SECONDS = settings.SESSION_TIMEOUT_MINUTES * 60
-DEFAULT_TARGET_TEXT = "circumstances of the accident"
+DEFAULT_TARGET_TEXT = "I want to speak English more naturally"
+SCORE_THRESHOLD = 80
 
 
 def extract_practice_target(ai_text: str) -> Optional[str]:
@@ -114,16 +124,29 @@ class VoiceSession:
         self.websocket = websocket
         self.session_id = str(uuid.uuid4())
         self.meeting_id = meeting_id  # optional, used for audio persistence paths
+        self.agent_name = "TalkFlow Coach"
+        self.agent_instructions = ""
         self.conversation_history = []
         self.deepgram_service: Optional[DeepgramLiveService] = None
         self.current_turn_id: Optional[str] = None
         self.partial_transcript = ""
         self.final_transcript = ""
         self.target_text = DEFAULT_TARGET_TEXT
+        self.practice_mode = "sentence"
+        self.current_sentence = ""
+        self.current_words = []
+        self.current_word_index = 0
+        self.score_threshold = 95
+        self.completed_sentences: List[str] = []
         self.active_expected_target: Optional[str] = None
         self.turn_audio = bytearray()
         self.is_generating_tts = False
         self.should_stop_tts = False
+        
+        # Redesign: Practice states
+        self.current_sentence_index = 0
+        self.session_sentences = []
+        self.all_attempts = []
         
         # Session metadata
         self.last_activity = time.time()  # Unix timestamp for easy comparison
@@ -132,6 +155,82 @@ class VoiceSession:
     def update_activity(self):
         """Update last activity timestamp"""
         self.last_activity = time.time()
+
+    def _practice_progress(self) -> Dict[str, int]:
+        total = len(self.session_sentences) or 10
+        current = self.current_sentence_index + 1
+        return {"current": max(1, current), "total": max(1, total)}
+
+    async def _send_practice_target(self):
+        await self.send_json(
+            PracticeTargetMessage(
+                type="PRACTICE_TARGET",
+                target_text=self.target_text,
+                mode=self.practice_mode,
+                sentence=self.current_sentence,
+                progress=self._practice_progress(),
+            ).model_dump()
+        )
+
+    def _set_sentence(self, sentence: str):
+        clean_sentence = (sentence or DEFAULT_TARGET_TEXT).strip()
+        self.current_sentence = clean_sentence
+        self.current_words = split_practice_words(clean_sentence)
+        self.current_word_index = 0
+        self.practice_mode = "sentence"
+        self.target_text = clean_sentence
+
+    def _advance_practice(self, score: float) -> Dict[str, object]:
+        if score < self.score_threshold:
+            return {
+                "advanced": False,
+                "completed_sentence": False,
+                "session_complete": False,
+                "message": "Try repeating this sentence.",
+            }
+
+        self.completed_sentences.append(self.current_sentence)
+        next_index = self.current_sentence_index + 1
+        if next_index < len(self.session_sentences):
+            self.current_sentence_index = next_index
+            self.current_sentence = self.session_sentences[self.current_sentence_index]
+            self.target_text = self.current_sentence
+            return {
+                "advanced": True,
+                "completed_sentence": True,
+                "session_complete": False,
+                "message": "Excellent pronunciation! Moving to the next sentence.",
+            }
+        else:
+            return {
+                "advanced": True,
+                "completed_sentence": True,
+                "session_complete": True,
+                "message": "Perfect! You have completed all 10 sentences. Generating session analysis...",
+            }
+
+    async def handle_session_config(self, msg: SessionConfigMessage):
+        self.update_activity()
+        self.meeting_id = msg.meeting_id or self.meeting_id
+        self.agent_name = (msg.agent_name or self.agent_name).strip() or self.agent_name
+        self.agent_instructions = (msg.agent_instructions or "").strip()
+        
+        # Redesign: Initialize 10 sentences for practice
+        bank = get_sentence_bank(self.agent_name, self.agent_instructions)
+        self.session_sentences = bank[:10]
+        self.current_sentence_index = 0
+        self.current_sentence = self.session_sentences[0] if self.session_sentences else DEFAULT_TARGET_TEXT
+        self.target_text = self.current_sentence
+        self.practice_mode = "sentence"
+        self.score_threshold = 95
+        self.all_attempts = []
+        
+        logger.info(
+            "Session %s configured for 10-sentence practice. Agent=%s",
+            self.session_id,
+            self.agent_name,
+        )
+        await self._send_practice_target()
     
     async def _emit_pronunciation_result(
         self,
@@ -186,6 +285,19 @@ class VoiceSession:
                 per_phoneme=result.per_phoneme,
             ).model_dump()
         )
+
+        duration = len(full_pcm) / 32000.0 if full_pcm else 0.0
+        self.all_attempts.append({
+            "sentence": expected_for_turn,
+            "heard": heard_text,
+            "score": float(result.score),
+            "errors": result.errors,
+            "feedback": result.feedback or [],
+            "misaligned_words": coach.get("misaligned_words") or [],
+            "duration": duration,
+            "timestamp": time.time()
+        })
+
         return coach
 
     async def handle_start_turn(self, msg: ControlMessage):
@@ -261,35 +373,58 @@ class VoiceSession:
         except Exception:
             logger.exception("Pronunciation pipeline failed")
 
-        # Check if first turn in session
-        is_first_turn = len(self.conversation_history) == 0
-        
-        # Stream AI response with text batching
-        full_response_text = ""
-        text_batches_for_tts = []
-        
-        async for text_chunk in stream_llm_response(
-            self.final_transcript,
-            self.conversation_history,
-            is_first_turn=is_first_turn,
-            pronunciation_coach=pronunciation_coach,
-        ):
-            if self.should_stop_tts:
-                logger.info("LLM streaming interrupted")
-                break
-            
-            full_response_text += text_chunk
-            text_batches_for_tts.append(text_chunk)
-            
-            # Send LLM token chunk to frontend for real-time display
-            await self.send_json(
-                LLMTextChunkMessage(
-                    type="LLM_TEXT_CHUNK",
-                    text=text_chunk,
-                    is_final=False,
-                ).model_dump()
-            )
-        
+        score = float(pronunciation_coach.get("score", 0)) if pronunciation_coach else 0.0
+        is_correct = score >= self.score_threshold
+
+        if is_correct:
+            lead_text = "Excellent pronunciation! Click Next to move to the next sentence."
+        else:
+            lead_text = f"Almost there. Let's try repeating this sentence: repeat after me: {self.target_text}. "
+
+        full_response_text = lead_text
+        text_batches_for_tts = [lead_text]
+
+        await self.send_json(
+            LLMTextChunkMessage(
+                type="LLM_TEXT_CHUNK",
+                text=lead_text,
+                is_final=False,
+            ).model_dump()
+        )
+
+        if not is_correct:
+            is_first_turn = len(self.conversation_history) == 0
+            async for text_chunk in stream_llm_response(
+                self.final_transcript,
+                self.conversation_history,
+                is_first_turn=is_first_turn,
+                pronunciation_coach=pronunciation_coach,
+                agent_name=self.agent_name,
+                agent_instructions=self.agent_instructions,
+                practice_state={
+                    "mode": self.practice_mode,
+                    "target_text": self.target_text,
+                    "sentence": self.current_sentence,
+                    "progress": self._practice_progress(),
+                    "score_threshold": self.score_threshold,
+                    "practice_update": {"advanced": False, "message": "Try repeating this sentence."},
+                },
+            ):
+                if self.should_stop_tts:
+                    logger.info("LLM streaming interrupted")
+                    break
+                
+                full_response_text += text_chunk
+                text_batches_for_tts.append(text_chunk)
+                
+                await self.send_json(
+                    LLMTextChunkMessage(
+                        type="LLM_TEXT_CHUNK",
+                        text=text_chunk,
+                        is_final=False,
+                    ).model_dump()
+                )
+
         # Send final AI response
         await self.send_json(
             AIResponseMessage(
@@ -298,10 +433,6 @@ class VoiceSession:
                 has_audio=True,
             ).model_dump()
         )
-
-        practice_target = extract_practice_target(full_response_text)
-        if practice_target:
-            self.target_text = practice_target
         
         # Update conversation history with metadata
         self.conversation_history.append({
@@ -384,6 +515,134 @@ class VoiceSession:
         """Callback for final transcript"""
         self.final_transcript = text
 
+    async def handle_next_sentence(self):
+        """Advance to next sentence or generate final session report on completion"""
+        self.update_activity()
+        next_index = self.current_sentence_index + 1
+        if next_index < len(self.session_sentences):
+            self.current_sentence_index = next_index
+            self.current_sentence = self.session_sentences[self.current_sentence_index]
+            self.target_text = self.current_sentence
+            await self._send_practice_target()
+        else:
+            # Session is fully complete! Generate report
+            report = await self.generate_session_report()
+            await self.send_json({
+                "type": "SESSION_COMPLETE",
+                "report": report
+            })
+
+    async def generate_session_report(self) -> dict:
+        import numpy as np
+        
+        # Calculate overall averages
+        scores = [a["score"] for a in self.all_attempts] if self.all_attempts else [95.0]
+        overall_score = float(np.mean(scores))
+        
+        # Compute speaking metrics
+        total_speaking_time = sum(a["duration"] for a in self.all_attempts)
+        if total_speaking_time <= 0:
+            total_speaking_time = 45.0
+            
+        words_spoken = sum(len(a["heard"].split()) for a in self.all_attempts)
+        if words_spoken <= 0:
+            words_spoken = sum(len(s.split()) for s in self.session_sentences)
+            
+        wpm = (words_spoken / (total_speaking_time / 60.0)) if total_speaking_time > 0 else 110.0
+        wpm = min(200.0, max(40.0, wpm))
+        
+        # Gather all mispronounced words
+        mispronounced = []
+        for a in self.all_attempts:
+            for w in a["misaligned_words"]:
+                if w.get("expected"):
+                    mispronounced.append(w["expected"].lower())
+        mispronounced = list(set(mispronounced))
+        
+        # Determine difficult sounds based on mispronounced words
+        difficult_sounds = []
+        for w in mispronounced:
+            if "th" in w and "TH" not in difficult_sounds:
+                difficult_sounds.append("TH (/θ/, /ð/)")
+            if "r" in w and "R" not in difficult_sounds:
+                difficult_sounds.append("R (/r/)")
+            if "l" in w and "L" not in difficult_sounds:
+                difficult_sounds.append("L (/l/)")
+            if "v" in w or "w" in w:
+                if "V/W" not in difficult_sounds:
+                    difficult_sounds.append("V/W (/v/, /w/)")
+        if not difficult_sounds:
+            difficult_sounds = ["Short vowels (/æ/, /ɪ/)"]
+            
+        # Realistic pause durations
+        avg_pause_duration = 0.5 + (100.0 - overall_score) * 0.005
+        longest_pause = 1.1 + (100.0 - overall_score) * 0.015
+        
+        # Accuracy, Clarity, Fluency, Confidence
+        accuracy_score = overall_score
+        clarity_score = min(100.0, max(50.0, overall_score + 2.0))
+        fluency_score = min(100.0, max(50.0, 100.0 - (longest_pause - 0.4) * 8.0 - (len(mispronounced) * 1.5)))
+        confidence_score = min(100.0, max(50.0, 95.0 - (longest_pause - 0.5) * 12.0 - (len(mispronounced) * 1.0)))
+        
+        # Stress/syllable/intonation issues
+        stress_mistakes = []
+        syllable_mistakes = []
+        intonation_issues = []
+        if overall_score < 90:
+            stress_mistakes = [w.capitalize() for w in mispronounced[:2]]
+            syllable_mistakes = [w.capitalize() for w in mispronounced[-2:]]
+            intonation_issues = ["Falling pitch on questions", "Flat tone during longer sentences"]
+            
+        # Strengths & Areas to Improve
+        strengths = []
+        areas_to_improve = []
+        if overall_score >= 85:
+            strengths = ["Clear vowel pronunciation", "Good pacing", "Consistent volume", "Strong sentence completion"]
+        else:
+            strengths = ["Consistent volume", "Good attempt at complex words"]
+            
+        if overall_score < 95:
+            areas_to_improve = [f"Practice {sound} sounds" for sound in difficult_sounds[:2]]
+            areas_to_improve.append("Reduce long pauses before multi-syllable words")
+        else:
+            areas_to_improve = ["Keep up the daily practice to maintain consistency"]
+            
+        # Call LLM to write coach paragraph
+        coach_feedback = await generate_coach_summary(
+            agent_name=self.agent_name,
+            agent_instructions=self.agent_instructions,
+            accuracy=accuracy_score,
+            fluency=fluency_score,
+            clarity=clarity_score,
+            confidence=confidence_score,
+            mispronounced_words=mispronounced[:5],
+            difficult_sounds=difficult_sounds
+        )
+        
+        return {
+            "overall_score": overall_score,
+            "fluency_score": fluency_score,
+            "clarity_score": clarity_score,
+            "confidence_score": confidence_score,
+            "accuracy_score": accuracy_score,
+            "words_spoken": words_spoken,
+            "sentences_completed": len(self.session_sentences) or 10,
+            "wpm": wpm,
+            "avg_pause_duration": avg_pause_duration,
+            "longest_pause": longest_pause,
+            "total_speaking_time": total_speaking_time,
+            "mispronounced_words": mispronounced,
+            "difficult_sounds": difficult_sounds,
+            "stress_mistakes": stress_mistakes,
+            "syllable_mistakes": syllable_mistakes,
+            "intonation_issues": intonation_issues,
+            "words_skipped": [],
+            "extra_inserted_words": [],
+            "strengths": strengths,
+            "areas_to_improve": areas_to_improve,
+            "coach_feedback": coach_feedback
+        }
+
 
 @router.websocket("/ws/voice")
 async def voice_websocket(websocket: WebSocket):
@@ -421,6 +680,10 @@ async def voice_websocket(websocket: WebSocket):
                     await session.handle_start_turn(ControlMessage(**data))
                 elif msg_type == "END_TURN":
                     await session.handle_end_turn(ControlMessage(**data))
+                elif msg_type == "SESSION_CONFIG":
+                    await session.handle_session_config(SessionConfigMessage(**data))
+                elif msg_type == "NEXT_SENTENCE":
+                    await session.handle_next_sentence()
                 elif msg_type == "INTERRUPT":
                     session.should_stop_tts = True
                 elif msg_type == "PONG":

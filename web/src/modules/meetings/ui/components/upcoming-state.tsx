@@ -16,7 +16,7 @@ export const UpcomingState = ({meetingId, onCancelMeeting, isCancelling}:Props) 
       <EmptyState
         image="/upcoming.svg"
         title="Not Started Yet"
-        description="Once you start the meeting, a summary will appear here."
+        description="Once you start the session, pronunciation history will appear here."
       />
       <div className="flex flex-col-reverse lg:flex-row lg:justify-center items-center gap-2 w-full">
         <Button
@@ -26,7 +26,7 @@ export const UpcomingState = ({meetingId, onCancelMeeting, isCancelling}:Props) 
             disabled={isCancelling}
         >
             <BanIcon />
-            Cancel Meeting
+            Cancel Session
         </Button>
         <Button 
             asChild 
@@ -35,7 +35,7 @@ export const UpcomingState = ({meetingId, onCancelMeeting, isCancelling}:Props) 
         >
             <Link href={`/call/${meetingId}`}>
                 <VideoIcon />
-                Start meeting
+                Start Session
 
             </Link>
         </Button>

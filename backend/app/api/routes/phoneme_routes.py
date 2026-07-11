@@ -2,8 +2,10 @@
 
 import logging
 import re
+import asyncio
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
+from app.services.tts_service import tts_service
 
 from app.schemas.responses import (
     IpaResponse,
@@ -131,3 +133,16 @@ async def compare_phonemes(request: PhonemeCompareRequest) -> PhonemeCompareResp
         accuracy_score=accuracy,
         segments=[segment_to_response(s) for s in segments],
     )
+
+
+@router.get("/tts")
+async def get_word_tts(text: str, lang: str = None, rate: float = None):
+    raw = (text or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Text is required")
+    
+    audio = await asyncio.to_thread(tts_service.text_to_speech, raw, lang, rate)
+    if not audio:
+        raise HTTPException(status_code=500, detail="Failed to synthesize audio")
+        
+    return Response(content=audio, media_type="audio/mpeg")

@@ -24,7 +24,7 @@ export const MeetingIdViewHeader = ({
                     <BreadcrumbItem>
                         <BreadcrumbLink asChild className="font-medium text-xl">
                             <Link href="/dashboard/meetings">
-                                My Meetings
+                                Practice Sessions
                             </Link>
                         </BreadcrumbLink>
                     </BreadcrumbItem>

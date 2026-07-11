@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 import { usePushToTalk } from "@/hooks/use-push-to-talk";
 import { useSpacebarControl } from "@/hooks/use-spacebar-control";
 import { useUpdateMeeting } from "@/hooks/use-api";
+import { MeetingStatus } from "@/modules/meetings/types";
+import { useRouter } from "next/navigation";
 import type {
   MeetingPhonemeDataPersisted,
   PronunciationResultPayload,
@@ -118,6 +120,7 @@ function CoachPanel({
   transcripts,
   startTalking,
   formatTime,
+  practiceMode,
 }: {
   isConnected: boolean;
   isTalking: boolean;
@@ -133,6 +136,7 @@ function CoachPanel({
   }>;
   startTalking: () => void;
   formatTime: (date: Date) => string;
+  practiceMode: "word" | "sentence";
 }) {
   return (
     <section
@@ -158,7 +162,9 @@ function CoachPanel({
               className="rounded-lg px-4 py-3 text-sm"
               style={{ background: "var(--sidebar-accent)", border: "1px solid var(--sidebar-accent)", color: "var(--sidebar-accent-foreground)" }}
             >
-              <p className="font-medium">Ready</p>
+              <p className="font-medium">
+                {practiceMode === "word" ? "Repeat the word" : "Repeat the sentence"}
+              </p>
               <p className="mt-0.5 text-xs opacity-80">Hold SPACE to speak, release to submit.</p>
             </div>
           )}
@@ -338,20 +344,31 @@ interface Props {
   onLeave: () => void;
   meetingName: string;
   meetingId: string;
+  agentName: string;
+  agentInstructions: string;
 }
 
-export const CallActive = ({ onLeave, meetingName, meetingId }: Props) => {
+export const CallActive = ({
+  onLeave,
+  meetingName,
+  meetingId,
+  agentName,
+  agentInstructions,
+}: Props) => {
   const updateMeeting = useUpdateMeeting();
   const phonemeEntriesRef = useRef<MeetingPhonemeDataPersisted["entries"]>([]);
   const persistDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scoreHistoryRef = useRef<number[]>([]);
 
+  const router = useRouter();
   const {
     isConnected, isTalking, isAISpeaking, transcripts, partialTranscript,
     streamingAIText, conversationStatus, error: transcriptionError,
     lastPronunciation, targetText,
+    practiceMode, practiceSentence, practiceProgress,
     connect, disconnect, startTalking, stopTalking, clearTranscripts,
-  } = usePushToTalk();
+    sessionReport, sendNextSentence,
+  } = usePushToTalk({ meetingId, agentName, agentInstructions });
 
   const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [activeWordKey, setActiveWordKey] = useState("");
@@ -377,12 +394,11 @@ export const CallActive = ({ onLeave, meetingName, meetingId }: Props) => {
     ? Math.min(100, Math.max(0, Math.round(Number(lastPronunciation.score))))
     : null;
 
-  // Seed first active word when target loads
+  // Seed first active word when target changes
   useEffect(() => {
-    if (activeWordKey) return;
     const w = targetWords[0];
     if (w) setActiveWordKey(normalizeWord(w.raw));
-  }, [targetText, targetWords, activeWordKey]);
+  }, [targetText, targetWords]);
 
   // Auto-focus first wrong word after attempt
   const lastPrRef = useRef(lastPronunciation);
@@ -413,10 +429,12 @@ export const CallActive = ({ onLeave, meetingName, meetingId }: Props) => {
         target_text: p.target_text,
         heard_text: p.heard_text,
         score: p.score,
+        mode: practiceMode,
+        agent_name: agentName,
         feedback: p.feedback.slice(0, 5),
       },
     ].slice(-50);
-  }, []);
+  }, [agentName, practiceMode]);
 
   useEffect(() => {
     if (!lastPronunciation) return;
@@ -434,6 +452,34 @@ export const CallActive = ({ onLeave, meetingName, meetingId }: Props) => {
     if (isMicEnabled && !isConnected) connect();
     else if (!isMicEnabled && isConnected) disconnect();
   }, [isMicEnabled, isConnected, connect, disconnect]);
+
+  // Redirect when session report is received from websocket
+  useEffect(() => {
+    if (sessionReport) {
+      if (persistDebounceRef.current) {
+        clearTimeout(persistDebounceRef.current);
+        persistDebounceRef.current = null;
+      }
+      
+      if (lastPronunciation) {
+        appendPronunciationEntry(lastPronunciation);
+      }
+      
+      updateMeeting.mutate({
+        id: meetingId,
+        status: MeetingStatus.Completed,
+        endedAt: new Date().toISOString(),
+        phonemeData: {
+          entries: phonemeEntriesRef.current,
+          report: sessionReport
+        }
+      }, {
+        onSuccess: () => {
+          router.push(`/dashboard/analysis/${meetingId}`);
+        }
+      });
+    }
+  }, [sessionReport, meetingId, lastPronunciation, appendPronunciationEntry, router, updateMeeting]);
 
   const handleLeaveWithPersist = () => {
     if (persistDebounceRef.current) { clearTimeout(persistDebounceRef.current); persistDebounceRef.current = null; }
@@ -523,12 +569,30 @@ export const CallActive = ({ onLeave, meetingName, meetingId }: Props) => {
               className="w-full rounded-2xl px-6 py-8"
               style={{ background: "var(--card)", border: "1px solid var(--border)" }}
             >
+              <div className="mb-5 flex flex-wrap items-center justify-center gap-2 text-xs">
+                <span
+                  className="rounded-full px-3 py-1 font-medium"
+                  style={{ background: "var(--muted)", color: "var(--foreground)" }}
+                >
+                  {practiceMode === "word" ? "Word Practice" : "Sentence Practice"}
+                </span>
+                <span style={{ color: "var(--muted-foreground)" }}>
+                  {practiceMode === "word"
+                    ? `Word ${practiceProgress.current} of ${practiceProgress.total}`
+                    : "Full sentence"}
+                </span>
+              </div>
               <PhoneticStaff
                 targetText={targetText}
                 misExpectedNormSet={misExpectedNormSet}
                 activeWordKey={activeWordKey}
                 onWordClick={setActiveWordKey}
               />
+              {practiceMode === "word" && practiceSentence !== targetText && (
+                <p className="mt-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+                  Sentence: {practiceSentence}
+                </p>
+              )}
 
               {/* Feedback line: heard text */}
               {lastPronunciation && (
@@ -568,6 +632,38 @@ export const CallActive = ({ onLeave, meetingName, meetingId }: Props) => {
               onLangChange={setSpeechLang}
               misalignedPairs={lastPronunciation?.misaligned_words}
             />
+
+            {/* ── Navigation / Progress controls ── */}
+            {lastPronunciation && (
+              <div className="w-full max-w-md mt-2">
+                {scoreDisplay !== null && scoreDisplay >= 95 ? (
+                  <div className="flex flex-col items-center gap-2 border border-emerald-500/20 bg-emerald-500/5 rounded-xl px-6 py-4 w-full text-center">
+                    <p className="text-sm font-semibold text-emerald-500 flex items-center gap-1.5 justify-center">
+                      ✓ Correct pronunciation! (Score: {scoreDisplay}%)
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      You are ready to advance to the next sentence.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={sendNextSentence}
+                      className="mt-3 w-full bg-emerald-600 hover:bg-emerald-500 active:scale-98 transition-all text-white font-medium py-2 rounded-lg text-sm shadow-md"
+                    >
+                      Next Sentence
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 border border-amber-500/20 bg-amber-500/5 rounded-xl px-6 py-4 w-full text-center">
+                    <p className="text-sm font-semibold text-amber-500 flex items-center gap-1.5 justify-center">
+                      ⚠ Score: {scoreDisplay}% (Goal: 95%)
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Pronunciation was slightly off. Repeat the sentence to improve!
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ── Mic controls ── */}
             {transcriptionError && (
@@ -679,7 +775,7 @@ export const CallActive = ({ onLeave, meetingName, meetingId }: Props) => {
           </div>
         </section>
 
-        <aside className="flex min-h-0 w-full shrink-0 lg:h-full lg:w-[340px]">
+        <aside className="flex min-h-0 h-[300px] lg:h-full w-full shrink-0 lg:w-[340px]">
           <div className="flex min-h-0 flex-1 p-4 lg:py-4 lg:pl-0 lg:pr-4">
             <CoachPanel
               isConnected={isConnected}
@@ -691,6 +787,7 @@ export const CallActive = ({ onLeave, meetingName, meetingId }: Props) => {
               transcripts={transcripts}
               startTalking={startTalking}
               formatTime={formatTime}
+              practiceMode={practiceMode}
             />
           </div>
         </aside>

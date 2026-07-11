@@ -17,12 +17,14 @@ class TTSService:
             logger.exception("Failed to initialize TTS client")
             self.client = None
     
-    def text_to_speech(self, text: str) -> bytes | None:
+    def text_to_speech(self, text: str, lang: str = None, rate: float = None) -> bytes | None:
         """
         Convert text to speech and return raw audio bytes
         
         Args:
             text: The text to convert to speech
+            lang: Optional BCP-47 locale code (e.g. en-US, en-IN, en-GB)
+            rate: Optional speed factor (e.g. 1.0 or 0.65)
             
         Returns:
             Raw audio bytes or None if conversion fails
@@ -35,24 +37,33 @@ class TTSService:
             logger.debug("Empty text provided for TTS")
             return None
         
+        # Select voice based on dialect
+        voice_lang = lang or settings.TTS_LANGUAGE_CODE
+        voice_name = settings.TTS_VOICE_NAME
+        
+        if lang:
+            if lang == "en-IN":
+                voice_name = "en-IN-Neural2-A"
+            elif lang == "en-GB":
+                voice_name = "en-GB-Neural2-A"
+            elif lang == "en-US":
+                voice_name = "en-US-Neural2-F"
+        
         try:
-            # Set the text input to be synthesized
             synthesis_input = texttospeech.SynthesisInput(text=text)
             
-            # Build the voice request
             voice = texttospeech.VoiceSelectionParams(
-                language_code=settings.TTS_LANGUAGE_CODE,
-                name=settings.TTS_VOICE_NAME
+                language_code=voice_lang,
+                name=voice_name
             )
             
-            # Select the type of audio file
+            speaking_rate = rate if rate is not None else settings.TTS_SPEAKING_RATE
             audio_config = texttospeech.AudioConfig(
                 audio_encoding=texttospeech.AudioEncoding.MP3,
-                speaking_rate=settings.TTS_SPEAKING_RATE,
+                speaking_rate=speaking_rate,
                 pitch=settings.TTS_PITCH
             )
             
-            # Perform the text-to-speech request
             response = self.client.synthesize_speech(
                 input=synthesis_input,
                 voice=voice,

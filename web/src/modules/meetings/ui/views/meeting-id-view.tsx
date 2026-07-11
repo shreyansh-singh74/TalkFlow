@@ -138,6 +138,9 @@ export const MeetingIdView = ({ meetingId }: Props) => {
                         <span className="text-gray-500">Heard:</span> {e.heard_text}
                       </p>
                       <p className="text-gray-600">Score: {e.score.toFixed(0)}%</p>
+                      {e.mode && (
+                        <p className="text-gray-500 capitalize">Mode: {e.mode} practice</p>
+                      )}
                     </li>
                   ))}
                 </ul>

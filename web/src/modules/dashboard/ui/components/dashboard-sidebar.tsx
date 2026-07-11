@@ -1,6 +1,6 @@
 "use client";
 
-import { BotIcon, VideoIcon } from "lucide-react";
+import { BotIcon, VideoIcon, TrendingUpIcon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -22,8 +22,13 @@ import DashboardUserButton from "./dashboard-user-button";
 const firstSection = [
   {
     icon: VideoIcon,
-    label: "Meetings",
+    label: "Practice Sessions",
     href: "/dashboard/meetings",
+  },
+  {
+    icon: TrendingUpIcon,
+    label: "Analysis",
+    href: "/dashboard/analysis",
   },
   {
     icon: BotIcon,

@@ -15,8 +15,8 @@ export const NewMeetingDialog = ({
 
   return (
     <ResponsiveDialog
-      title="New Meeting"
-      description="Create a new Meeting"
+      title="New Practice Session"
+      description="Create a new practice session"
       open={open}
       onOpenChange={onOpenChange}
     >

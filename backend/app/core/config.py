@@ -22,7 +22,9 @@ class Settings:
     # Use FRONTEND_URL or NEXT_PUBLIC_APP_URL (both should be set to the same value)
     _default_origins = [
         "http://localhost:3000",
-        "http://localhost:3002"
+        "http://localhost:3002",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3002",
     ]
     _production_origins = [
         os.getenv("FRONTEND_URL", ""),

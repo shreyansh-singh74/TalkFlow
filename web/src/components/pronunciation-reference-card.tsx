@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Volume2 } from "lucide-react";
 import { usePronunciationReference } from "@/hooks/use-pronunciation-reference";
-import { DIALECTS, requestSpeechVoices, speakWord } from "@/lib/speak-word";
+import { DIALECTS, requestSpeechVoices } from "@/lib/speak-word";
+import { getBackendUrl } from "@/lib/backend-config";
 import type { PronunciationReferenceResponse } from "@/types/pronunciation";
 import type { MisalignedWordPair } from "@/types/pronunciation";
 
@@ -18,11 +19,6 @@ type Props = {
   misalignedPairs?: MisalignedWordPair[];
 };
 
-/**
- * Merged phonetic breakdown panel.
- * Shows: word → target IPA (cobalt) → heard IPA (amber) in one aligned view.
- * Syllable respelling and IPA toggle so beginners and advanced users both win.
- */
 export function PronunciationReferenceCard({
   displayWord,
   activeWordKey,
@@ -42,7 +38,12 @@ export function PronunciationReferenceCard({
 
   const play = () => {
     const text = (data?.word || displayWord || activeWordKey || "").trim();
-    if (text) speakWord(text, { lang, rate: isSlow ? 0.65 : 1 });
+    if (text) {
+      // Use backend speech synthesis to guarantee audio output across all OS systems (including Linux/Chrome synthesis blocks)
+      const url = `${getBackendUrl()}/api/phonemes/tts?text=${encodeURIComponent(text)}&lang=${lang}&rate=${isSlow ? 0.65 : 1.0}`;
+      const audio = new Audio(url);
+      audio.play().catch((err) => console.error("Error playing word TTS:", err));
+    }
   };
 
   // Find the misaligned pair for the active word to show heard IPA
@@ -52,7 +53,7 @@ export function PronunciationReferenceCard({
 
   return (
     <div
-      className="w-full max-w-2xl rounded-xl border p-5 shadow-sm"
+      className="w-full max-w-2xl rounded-xl border p-6 shadow-sm"
       style={{
         background: "var(--parchment)",
         borderColor: "oklch(0.85 0.02 80)",
@@ -60,23 +61,23 @@ export function PronunciationReferenceCard({
       }}
     >
       {/* Header row */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3" style={{ borderColor: "oklch(0.9 0.02 80)" }}>
         <span
-          className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+          className="text-[11px] font-bold uppercase tracking-[0.18em]"
           style={{ color: "var(--cobalt)" }}
         >
           Phonetic Breakdown
         </span>
         <div className="flex items-center gap-3">
           {/* IPA toggle */}
-          <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--ink)", opacity: 0.6 }}>
+          <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer" style={{ color: "var(--ink)", opacity: 0.7 }}>
             <Switch checked={showIPA} onCheckedChange={setShowIPA} className="scale-75" />
             IPA
           </label>
           {/* Dialect select */}
           <select
-            className="rounded-md border px-2 py-0.5 text-xs"
-            style={{ borderColor: "oklch(0.85 0.02 80)", background: "transparent", color: "var(--ink)" }}
+            className="rounded-md border px-2 py-0.5 text-xs bg-white/50 backdrop-blur-xs font-semibold cursor-pointer"
+            style={{ borderColor: "oklch(0.85 0.02 80)", color: "var(--ink)" }}
             value={lang}
             onChange={(e) => onLangChange(e.target.value)}
           >
@@ -87,65 +88,104 @@ export function PronunciationReferenceCard({
         </div>
       </div>
 
-      {/* Word + playback */}
-      <div className="flex items-start gap-4">
-        <div className="min-w-0 flex-1">
-          <h4
-            className="text-3xl font-semibold capitalize leading-tight tracking-tight"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {displayWord}
-          </h4>
-
-          {loading && (
-            <p className="mt-1 text-sm" style={{ opacity: 0.5 }}>Loading…</p>
-          )}
-          {error && (
-            <p className="mt-1 text-sm" style={{ color: "var(--amber-warm)" }}>{error}</p>
-          )}
-
-          {data && !loading && (
-            <div className="mt-3 space-y-2">
-              {/* Syllable respelling — always visible */}
-              <SyllableLine syllables={data.arpabet_syllables} />
-
-              {/* Show "heard" word when there's a mismatch */}
-              {showIPA && activePair && (
-                <HeardVsExpectedRow
-                  expected={activePair.expected}
-                  heard={activePair.heard}
-                />
+      {/* Main Pronunciation Section */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div className="flex-1 space-y-3 w-full">
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sounds like</p>
+            <div className="flex items-center gap-3 mt-1">
+              {loading ? (
+                <p className="text-xl font-medium" style={{ opacity: 0.5 }}>Loading phonetic breakdown…</p>
+              ) : error ? (
+                <p className="text-sm font-medium" style={{ color: "var(--amber-warm)" }}>{error}</p>
+              ) : data ? (
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-bold tracking-tight text-gray-900">
+                    <SyllableLine syllables={data.arpabet_syllables} />
+                  </div>
+                </div>
+              ) : (
+                <p className="text-2xl font-semibold capitalize">{displayWord}</p>
               )}
+              
+              {/* Play icon button directly next to sounds-like spelling */}
+              <button
+                type="button"
+                onClick={play}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-blue-50/50 hover:bg-blue-100 hover:scale-105 active:scale-95 transition-all text-blue-600 shadow-xs"
+                title={isSlow ? "Play slow" : "Play"}
+              >
+                <Volume2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Slow toggle below the spelling */}
+          <div className="flex items-center gap-2 mt-2">
+            <Switch id={idSlow} checked={isSlow} onCheckedChange={setIsSlow} className="scale-75" />
+            <Label htmlFor={idSlow} className="cursor-pointer text-xs font-semibold text-gray-500">Slow speed</Label>
+          </div>
+
+          {/* Show expected vs heard comparison row if IPA toggle is on */}
+          {showIPA && activePair && (
+            <div className="pt-2 border-t border-dashed" style={{ borderColor: "oklch(0.9 0.02 80)" }}>
+              <HeardVsExpectedRow
+                expected={activePair.expected}
+                heard={activePair.heard}
+              />
             </div>
           )}
 
           {/* Mismatch coaching note */}
           {activePair && (
             <p
-              className="mt-3 rounded-md px-3 py-2 text-sm leading-relaxed"
+              className="mt-3 rounded-lg px-3 py-2 text-xs leading-relaxed border border-blue-100/50"
               style={{ background: "var(--cobalt-muted)", color: "var(--cobalt)" }}
             >
               Expected <strong>&ldquo;{activePair.expected}&rdquo;</strong>, heard{" "}
-              <span style={{ color: "var(--amber-warm)" }}>&ldquo;{activePair.heard}&rdquo;</span>.
+              <span className="font-semibold text-red-500">&ldquo;{activePair.heard}&rdquo;</span>.
             </p>
           )}
         </div>
 
-        {/* Play button */}
-        <div className="flex shrink-0 flex-col items-center gap-2 pt-1">
-          <button
-            type="button"
-            onClick={play}
-            className="flex h-10 w-10 items-center justify-center rounded-full border transition-all duration-150 hover:scale-105 active:scale-95"
-            style={{ borderColor: "var(--cobalt)", color: "var(--cobalt)" }}
-            title={isSlow ? "Play slow" : "Play"}
-          >
-            <Volume2 className="h-4 w-4" />
-          </button>
-          <label className="flex cursor-pointer flex-col items-center gap-0.5 text-[10px]" style={{ opacity: 0.6 }}>
-            <Switch id={idSlow} checked={isSlow} onCheckedChange={setIsSlow} className="scale-75" />
-            <Label htmlFor={idSlow} className="cursor-pointer text-[10px]">Slow</Label>
-          </label>
+        {/* Dynamic Mouth articulation animation SVG on the right */}
+        <div className="flex flex-col items-center justify-center rounded-xl bg-blue-50/40 border border-blue-100/60 p-4 shrink-0 relative overflow-hidden h-28 w-28 shadow-2xs">
+          <svg className="w-full h-full text-blue-500/85" viewBox="0 0 100 100" fill="none">
+            {/* Outline Face Profile */}
+            <path
+              d="M15,20 C15,80 85,80 85,20"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeDasharray="3 3"
+              className="opacity-30"
+            />
+            {/* Lips / Mouth outline */}
+            <path
+              d="M25,50 Q50,32 75,50 Q50,68 25,50"
+              fill="#DBEAFE"
+              stroke="#2563EB"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {/* Upper Teeth */}
+            <path
+              d="M32,48 Q50,44 68,48"
+              stroke="white"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+            {/* Tongue */}
+            <path
+              d="M38,53 Q50,48 62,53 Q50,60 38,53"
+              fill="#FECACA"
+              stroke="#EF4444"
+              strokeWidth="1.2"
+            />
+          </svg>
+          <span className="absolute bottom-2 text-[8px] font-bold text-blue-600 uppercase tracking-widest">
+            Mouth Shape
+          </span>
         </div>
       </div>
     </div>
@@ -159,8 +199,8 @@ function SyllableLine({
 }) {
   if (!syllables.length) return null;
   return (
-    <p
-      className="text-xl font-medium leading-snug"
+    <span
+      className="text-2xl font-semibold leading-snug"
       style={{ fontFamily: "var(--font-phonetic)", color: "var(--ink)" }}
     >
       {syllables.map((s, i) => (
@@ -171,7 +211,7 @@ function SyllableLine({
           <span style={{ fontWeight: s.stressed ? 700 : 400 }}>{s.display}</span>
         </span>
       ))}
-    </p>
+    </span>
   );
 }
 
@@ -187,16 +227,16 @@ function HeardVsExpectedRow({
   heard: string;
 }) {
   return (
-    <div className="mt-1 flex items-center gap-2 text-sm" style={{ fontFamily: "var(--font-phonetic)" }}>
+    <div className="mt-1 flex items-center gap-2 text-sm font-medium" style={{ fontFamily: "var(--font-phonetic)" }}>
       <span
-        className="rounded px-2 py-0.5 font-medium"
+        className="rounded px-2 py-0.5"
         style={{ background: "var(--cobalt-muted)", color: "var(--cobalt)" }}
       >
         {expected}
       </span>
       <span style={{ opacity: 0.4 }}>→</span>
       <span
-        className="rounded px-2 py-0.5 font-medium"
+        className="rounded px-2 py-0.5"
         style={{ background: "var(--amber-muted)", color: "var(--amber-warm)" }}
       >
         {heard}

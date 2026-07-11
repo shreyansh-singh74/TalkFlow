@@ -15,7 +15,7 @@ export const CallView = ({ meetingId }: Props) => {
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-white">Loading meeting...</p>
+          <p className="mt-2 text-white">Loading practice session...</p>
         </div>
       </div>
     );
@@ -25,8 +25,8 @@ export const CallView = ({ meetingId }: Props) => {
     return (
       <div className="flex flex-1 items-center justify-center">
         <ErrorState 
-          title="Failed to Load Meeting"
-          description="Could not load the meeting details. Please try again."
+          title="Failed to Load Practice Session"
+          description="Could not load the practice session details. Please try again."
         />
       </div>
     );
@@ -36,18 +36,20 @@ export const CallView = ({ meetingId }: Props) => {
     return (
       <div className="flex flex-1 items-center justify-center">
             <ErrorState 
-                title="Meeting has Ended"
-                description="You can no longer join this meeting."
+                title="Practice Session has Ended"
+                description="You can no longer join this practice session."
             />
         </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen flex-1 flex-col">
+    <div className="flex h-screen max-h-screen flex-1 flex-col overflow-hidden">
       <CallUI
         meetingId={meetingId}
         meetingName={data.name}
+        agentName={data.agent?.name ?? "TalkFlow Coach"}
+        agentInstructions={data.agent?.instructions ?? ""}
       />
     </div>
   )

@@ -22,12 +22,12 @@ export function getBackendUrl(): string {
     return backendUrlCache;
   }
 
-  const configuredUrl = getEnv('NEXT_PUBLIC_BACKEND_URL');
+  const configuredUrl = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_BACKEND_URL : undefined;
   const isLocalhost =
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1');
-  const url = (configuredUrl || (isLocalhost ? 'http://localhost:8000' : '')).replace(/\/$/, '');
+  const url = (isLocalhost ? 'http://localhost:8000' : (configuredUrl || '')).replace(/\/$/, '');
 
   if (!url) {
     throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');

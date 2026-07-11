@@ -23,16 +23,22 @@ OPENROUTER_MODEL = settings.OPENROUTER_MODEL
 MAX_TOKENS_DEFAULT = 150
 MAX_TOKENS_WITH_PRONUNCIATION_COACH = 256
 BASE_SYSTEM_PROMPT = (
-    "You are an English-speaking coach helping users improve conversational English.\n"
-    "Be concise and encouraging. Keep responses to 2-3 sentences.\n"
-    "If you notice grammar errors, gently correct them and ask the user to repeat.\n"
-    "Ask follow-up questions to keep the conversation going.\n"
-    "Remember the context of previous messages in the conversation."
+    "You are TalkFlow, an AI spoken-English coach.\n"
+    "Help the user improve pronunciation, vocabulary, and spoken confidence through short interactive practice.\n"
+    "Keep responses short, spoken-friendly, and under 3 sentences.\n"
+    "Give only one practice item at a time.\n"
+    "When giving practice, use this exact format: repeat after me: <practice text>\n"
+    "If pronunciation is good, move to the next item. If pronunciation is weak, repeat the same item slower and give one clear correction.\n"
+    "Do not give long explanations."
 )
 
 
 async def _call_openrouter(
-    prompt: str, pronunciation_coach: Optional[Dict[str, Any]] = None
+    prompt: str,
+    pronunciation_coach: Optional[Dict[str, Any]] = None,
+    agent_name: Optional[str] = None,
+    agent_instructions: Optional[str] = None,
+    practice_state: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Call OpenRouter chat completions and return the full response text."""
     if not settings.OPENROUTER_API_KEY:
@@ -45,16 +51,35 @@ async def _call_openrouter(
         "X-Title": os.getenv("OPENROUTER_APP_NAME", "TalkFlow"),
     }
 
+    system_parts = [BASE_SYSTEM_PROMPT]
+    if agent_name or agent_instructions:
+        system_parts.append(
+            "Selected agent:\n"
+            f"Name: {agent_name or 'TalkFlow Coach'}\n"
+            f"Instructions: {agent_instructions or 'General spoken English practice.'}"
+        )
     if pronunciation_coach:
-        system_content = BASE_SYSTEM_PROMPT + "\n\n" + PRONUNCIATION_COACH_SYSTEM_SUFFIX
-        user_content = (
-            prompt
-            + "\n\nPRONUNCIATION_ASSESSMENT:\n"
+        system_parts.append(PRONUNCIATION_COACH_SYSTEM_SUFFIX)
+    system_content = "\n\n".join(system_parts)
+
+    extra_blocks = []
+    if pronunciation_coach:
+        extra_blocks.append(
+            "PRONUNCIATION_ASSESSMENT:\n"
             + json.dumps(pronunciation_coach, ensure_ascii=False)
         )
+    if practice_state:
+        extra_blocks.append(
+            "PRACTICE_STATE:\n"
+            + json.dumps(practice_state, ensure_ascii=False)
+            + "\nYou must coach this exact next target. Say it first using: repeat after me: "
+            + str(practice_state.get("target_text", ""))
+        )
+
+    if pronunciation_coach or practice_state:
+        user_content = prompt + "\n\n" + "\n\n".join(extra_blocks)
         max_tokens = MAX_TOKENS_WITH_PRONUNCIATION_COACH
     else:
-        system_content = BASE_SYSTEM_PROMPT
         user_content = prompt
         max_tokens = MAX_TOKENS_DEFAULT
 
@@ -117,6 +142,9 @@ async def stream_llm_response(
     conversation_history: Optional[List[Dict]] = None,
     is_first_turn: bool = False,
     pronunciation_coach: Optional[Dict[str, Any]] = None,
+    agent_name: Optional[str] = None,
+    agent_instructions: Optional[str] = None,
+    practice_state: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream an LLM response as batched text chunks."""
     try:
@@ -127,7 +155,13 @@ async def stream_llm_response(
         token_count = 0
         last_flush_time = time.time() * 1000
 
-        reply_text = await _call_openrouter(full_prompt, pronunciation_coach)
+        reply_text = await _call_openrouter(
+            full_prompt,
+            pronunciation_coach,
+            agent_name=agent_name,
+            agent_instructions=agent_instructions,
+            practice_state=practice_state,
+        )
 
         words = reply_text.split()
 
@@ -183,3 +217,67 @@ async def stream_llm_response(
         else:
             yield "Sorry, I couldn't generate a response. Please try again."
 
+
+async def generate_coach_summary(
+    agent_name: str,
+    agent_instructions: str,
+    accuracy: float,
+    fluency: float,
+    clarity: float,
+    confidence: float,
+    mispronounced_words: list,
+    difficult_sounds: list,
+) -> str:
+    """Generate a personalized AI coach feedback paragraph at the end of a session."""
+    prompt = (
+        f"The user has completed a spoken English practice session with you ({agent_name}).\n"
+        f"Instructions you follow: {agent_instructions}\n\n"
+        "Here are their final scores:\n"
+        f"- Pronunciation Accuracy: {accuracy:.0f}/100\n"
+        f"- Fluency: {fluency:.0f}/100\n"
+        f"- Clarity: {clarity:.0f}/100\n"
+        f"- Confidence: {confidence:.0f}/100\n\n"
+        f"Mispronounced words: {', '.join(mispronounced_words) if mispronounced_words else 'None'}\n"
+        f"Difficult sounds identified: {', '.join(difficult_sounds) if difficult_sounds else 'None'}\n\n"
+        "Please write a personalized, encouraging, and constructive coaching feedback paragraph (4-5 sentences) summarizing their performance. "
+        "Address them as a supportive spoken English coach. Highlight what they did well, where they should focus next, and how they can improve. "
+        "Keep it under 150 words. Do not output headings, bullet points, or generic introductions. Write it as a single cohesive paragraph."
+    )
+
+    try:
+        if not settings.OPENROUTER_API_KEY:
+            return "Excellent work today! You showed solid pronunciation accuracy and spoke clearly. For the next session, focus on your word pacing and practice vowel sounds."
+
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:3000"),
+            "X-Title": os.getenv("OPENROUTER_APP_NAME", "TalkFlow"),
+        }
+
+        payload = {
+            "model": OPENROUTER_MODEL,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are TalkFlow, a highly experienced and supportive spoken English coach.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.7,
+            "max_tokens": 200,
+        }
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                OPENROUTER_API_URL,
+                headers=headers,
+                json=payload,
+                timeout=15.0,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        logger.exception("Failed to generate coach summary via OpenRouter")
+        return f"Fantastic job completing your practice session! Your accuracy reached {accuracy:.0f}%. Focus on practicing the tricky sounds like {', '.join(difficult_sounds) if difficult_sounds else 'TH and R'} in your next session, and keep speaking with confidence!"

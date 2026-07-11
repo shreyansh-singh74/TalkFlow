@@ -160,6 +160,9 @@ export function useUpdateMeeting() {
       name?: string;
       agentId?: string;
       phonemeData?: unknown;
+      status?: string;
+      startedAt?: string;
+      endedAt?: string;
     }) => {
       const { id, ...data } = variables;
       return apiCall<unknown>(`/api/meetings/${id}`, {

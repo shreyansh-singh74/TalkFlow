@@ -9,6 +9,26 @@ class ControlMessage(BaseModel):
     timestamp: float
 
 
+class SessionConfigMessage(BaseModel):
+    type: Literal["SESSION_CONFIG"]
+    meeting_id: Optional[str] = None
+    agent_name: Optional[str] = None
+    agent_instructions: Optional[str] = None
+
+
+class PracticeProgressMessage(BaseModel):
+    current: int
+    total: int
+
+
+class PracticeTargetMessage(BaseModel):
+    type: Literal["PRACTICE_TARGET"]
+    target_text: str
+    mode: Literal["word", "sentence"]
+    sentence: str
+    progress: PracticeProgressMessage
+
+
 class PartialTranscriptMessage(BaseModel):
     type: Literal["PARTIAL_TRANSCRIPT"]
     text: str
@@ -68,3 +88,8 @@ class PronunciationResultMessage(BaseModel):
     timing: Optional[dict] = None
     intonation: Optional[dict] = None
     diagnosis: dict = Field(default_factory=dict)
+
+
+class SessionCompleteMessage(BaseModel):
+    type: Literal["SESSION_COMPLETE"]
+    report: dict

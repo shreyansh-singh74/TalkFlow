@@ -4,14 +4,19 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export default async function Page() {
-  const session = await auth.api.getSession({
+  let session = null;
+  try {
+    session = await auth.api.getSession({
       headers: await headers(),
     });
+  } catch (error) {
+    console.error("Failed to get session on sign-up page:", error);
+  }
   
-    if (!!session) {
-      redirect("/");
-    }
+  if (!!session) {
+    redirect("/");
+  }
   return (
-        <SignUpView />
+    <SignUpView />
   );
 }

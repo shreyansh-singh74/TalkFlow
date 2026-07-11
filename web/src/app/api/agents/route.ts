@@ -29,6 +29,32 @@ export async function GET(request: NextRequest) {
       search: searchParams.get("search") || undefined,
     });
 
+    const [overallCount] = await db
+      .select({ count: count() })
+      .from(agents)
+      .where(eq(agents.userId, session.user.id));
+
+    if (overallCount.count === 0) {
+      const defaultAgents = [
+        {
+          name: "Daily Conversation Coach",
+          instructions: "You are a spoken English coach. Keep responses short. Give one practice item at a time. First say the word or sentence. Use this exact format for practice: repeat after me: <text>. If pronunciation is good, move to the next item. If pronunciation is weak, repeat the same item slower and give one correction.",
+          userId: session.user.id,
+        },
+        {
+          name: "Interview English Coach",
+          instructions: "You are a spoken English coach. Keep responses short. Give one practice item at a time. First say the word or sentence. Use this exact format for practice: repeat after me: <text>. If pronunciation is good, move to the next item. If pronunciation is weak, repeat the same item slower and give one correction.",
+          userId: session.user.id,
+        },
+        {
+          name: "Pronunciation Drill Coach",
+          instructions: "You are a spoken English coach. Keep responses short. Give one practice item at a time. First say the word or sentence. Use this exact format for practice: repeat after me: <text>. If pronunciation is good, move to the next item. If pronunciation is weak, repeat the same item slower and give one correction.",
+          userId: session.user.id,
+        },
+      ];
+      await db.insert(agents).values(defaultAgents);
+    }
+
     const { search, page, pageSize } = params;
 
     const data = await db

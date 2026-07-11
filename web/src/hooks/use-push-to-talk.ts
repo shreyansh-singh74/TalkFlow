@@ -5,10 +5,10 @@ import { AudioChunker } from "@/lib/audio-processing";
 import { StreamingAudioPlayer } from "@/lib/streaming-audio-player";
 import { getWebSocketUrl } from "@/lib/backend-config";
 import { SentencePhonemeAnalysis } from "@/hooks/use-phoneme-analysis";
-import type { PronunciationResultPayload } from "@/types/pronunciation";
+import type { PracticeTargetPayload, PronunciationResultPayload, SessionAnalysisReport } from "@/types/pronunciation";
 import { v4 as uuidv4 } from "uuid";
 
-const DEFAULT_TARGET_TEXT = "circumstances of the accident";
+const DEFAULT_TARGET_TEXT = "I want to speak English more naturally";
 
 export interface TranscriptEntry {
   id: string;
@@ -30,14 +30,29 @@ export interface UsePushToTalkReturn {
   phonemeAnalysis: SentencePhonemeAnalysis | null;
   lastPronunciation: PronunciationResultPayload | null;
   targetText: string;
+  practiceMode: "word" | "sentence";
+  practiceSentence: string;
+  practiceProgress: { current: number; total: number };
   connect: () => Promise<void>;
   disconnect: () => void;
   startTalking: () => void;
   stopTalking: () => void;
   clearTranscripts: () => void;
+  sessionReport: SessionAnalysisReport | null;
+  sendNextSentence: () => void;
 }
 
-export function usePushToTalk(): UsePushToTalkReturn {
+interface UsePushToTalkOptions {
+  meetingId: string;
+  agentName: string;
+  agentInstructions: string;
+}
+
+export function usePushToTalk({
+  meetingId,
+  agentName,
+  agentInstructions,
+}: UsePushToTalkOptions): UsePushToTalkReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [isTalking, setIsTalking] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
@@ -49,6 +64,10 @@ export function usePushToTalk(): UsePushToTalkReturn {
   const [lastPronunciation, setLastPronunciation] =
     useState<PronunciationResultPayload | null>(null);
   const [targetText, setTargetText] = useState(DEFAULT_TARGET_TEXT);
+  const [practiceMode, setPracticeMode] = useState<"word" | "sentence">("sentence");
+  const [practiceSentence, setPracticeSentence] = useState(DEFAULT_TARGET_TEXT);
+  const [practiceProgress, setPracticeProgress] = useState({ current: 1, total: 1 });
+  const [sessionReport, setSessionReport] = useState<SessionAnalysisReport | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -115,6 +134,20 @@ export function usePushToTalk(): UsePushToTalkReturn {
         setTargetText(p.target_text || DEFAULT_TARGET_TEXT);
         break;
       }
+
+      case "PRACTICE_TARGET": {
+        const target = message as PracticeTargetPayload;
+        setTargetText(target.target_text || DEFAULT_TARGET_TEXT);
+        setPracticeMode(target.mode);
+        setPracticeSentence(target.sentence || target.target_text || DEFAULT_TARGET_TEXT);
+        setPracticeProgress(target.progress || { current: 1, total: 1 });
+        break;
+      }
+
+      case "SESSION_COMPLETE": {
+        setSessionReport(message.report);
+        break;
+      }
         
       case "TTS_CHUNK":
         // Binary chunk will arrive separately
@@ -156,6 +189,12 @@ export function usePushToTalk(): UsePushToTalkReturn {
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
+        ws.send(JSON.stringify({
+          type: "SESSION_CONFIG",
+          meeting_id: meetingId,
+          agent_name: agentName,
+          agent_instructions: agentInstructions,
+        }));
         // Pre-warm the mic stream so that getUserMedia permission is handled
         // before the user presses the button. This ensures startTalking on the
         // first press has no async gap before creating AudioContext.
@@ -223,7 +262,7 @@ export function usePushToTalk(): UsePushToTalkReturn {
       void err;
       setError("Failed to connect");
     }
-  }, [handleMessage]);
+  }, [agentInstructions, agentName, handleMessage, meetingId]);
   
   /**
    * Start talking (spacebar down)
@@ -381,6 +420,12 @@ export function usePushToTalk(): UsePushToTalkReturn {
     return "Hold SPACE to talk";
   }, [isConnected, isAISpeaking, streamingAIText, isTalking]);
   
+  const sendNextSentence = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "NEXT_SENTENCE" }));
+    }
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -400,10 +445,15 @@ export function usePushToTalk(): UsePushToTalkReturn {
     phonemeAnalysis,
     lastPronunciation,
     targetText,
+    practiceMode,
+    practiceSentence,
+    practiceProgress,
     connect,
     disconnect,
     startTalking,
     stopTalking,
-    clearTranscripts
+    clearTranscripts,
+    sessionReport,
+    sendNextSentence
   };
 }

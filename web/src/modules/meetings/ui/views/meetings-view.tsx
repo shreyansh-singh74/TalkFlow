@@ -41,8 +41,8 @@ export const MeetingsView = () => {
   if (!data || data.items.length === 0) {
     return (
       <EmptyState
-        title="Create Your First Meeting"
-        description="Create a meeting to start collaborating with your agents."
+        title="Create Your First Practice Session"
+        description="Create a session to start practicing with your speaking coach."
       />
     );
   }
