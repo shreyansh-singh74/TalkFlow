@@ -11,7 +11,7 @@ import {
 import {
   SentencePhonemeAnalysis,
   WordPhonemeAnalysis,
-} from "@/hooks/use-phoneme-analysis";
+} from "@/types/pronunciation";
 
 interface PhonemeRealTimeFeedbackProps {
   transcript: string;

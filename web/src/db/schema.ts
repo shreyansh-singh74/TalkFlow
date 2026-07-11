@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { pgTable, text, timestamp, boolean, pgEnum, jsonb, real } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, pgEnum, jsonb } from "drizzle-orm/pg-core";
 import type { MeetingPhonemeDataPersisted } from "@/types/pronunciation";
 
 export const user = pgTable("user", {
@@ -105,19 +105,3 @@ export const meetings = pgTable("meetings", {
   updatedAt: timestamp("updated_at").notNull().defaultNow()
 });
 
-export const phonemeAnalysis = pgTable("phoneme_analysis", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => nanoid()),
-  meetingId: text("meeting_id")
-    .notNull()
-    .references(() => meetings.id, { onDelete: "cascade" }),
-  word: text("word").notNull(),
-  expectedIpa: text("expected_ipa").notNull(),
-  actualPhonemes: jsonb("actual_phonemes").$type<string[]>().notNull(),
-  accuracyScore: real("accuracy_score").notNull(),
-  feedback: text("feedback"),
-  suggestions: jsonb("suggestions").$type<string[]>(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow()
-});

@@ -86,3 +86,39 @@ export type PronunciationReferenceResponse = {
   word: string;
   arpabet_syllables: ArpabetSyllableItem[];
 };
+
+export interface PhonemeSegment {
+  phoneme: string;
+  expected: string;
+  actual: string;
+  accuracy: number;
+  is_correct: boolean;
+  feedback?: string | null;
+  suggestions?: string[] | null;
+}
+
+export interface WordPhonemeAnalysis {
+  word: string;
+  expected_ipa: string;
+  expected_phonemes: string[];
+  actual_phonemes: string[];
+  segments: PhonemeSegment[];
+  word_accuracy: number;
+  phoneme_matches: number;
+  total_phonemes: number;
+  suggestions: string[];
+}
+
+export interface PhonemeErrorCount {
+  phoneme: string;
+  count: number;
+}
+
+export interface SentencePhonemeAnalysis {
+  sentence: string;
+  words: WordPhonemeAnalysis[];
+  overall_accuracy: number;
+  problematic_phonemes: string[];
+  mastered_phonemes: string[];
+  most_common_errors: PhonemeErrorCount[];
+}

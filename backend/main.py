@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.routes import health, voice_websocket, phoneme_routes
+from app.api.routes import health, voice_websocket
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,6 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router, tags=["Health"])
 app.include_router(voice_websocket.router, tags=["Voice WebSocket"])
-app.include_router(phoneme_routes.router, tags=["Phoneme Analysis"])
 
 if __name__ == "__main__":
     import uvicorn

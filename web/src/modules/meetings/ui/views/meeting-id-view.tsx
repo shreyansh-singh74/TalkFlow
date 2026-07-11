@@ -1,8 +1,6 @@
 "use client";
 
 import { LoadingState } from "@/components/loading-state";
-import { PhonemeDetailsPanel } from "@/components/phoneme-details-panel";
-import { SentencePhonemeAnalysis } from "@/hooks/use-phoneme-analysis";
 import { useMeeting, useDeleteMeeting } from "@/hooks/use-api";
 import { MeetingIdViewHeader } from "../components/meeting-id-view-header";
 import { useRouter } from "next/navigation";
@@ -15,19 +13,6 @@ import { CancelledState } from "../components/cancelled-state";
 import { ProcessingState } from "../components/processing-state";
 import { toast } from "sonner";
 import type { MeetingPhonemeDataPersisted } from "@/types/pronunciation";
-
-function isSentencePhonemeAnalysis(value: unknown): value is SentencePhonemeAnalysis {
-  if (!value || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v.sentence === "string" &&
-    Array.isArray(v.words) &&
-    typeof v.overall_accuracy === "number" &&
-    Array.isArray(v.problematic_phonemes) &&
-    Array.isArray(v.mastered_phonemes) &&
-    Array.isArray(v.most_common_errors)
-  );
-}
 
 function isPersistedPronunciationEntries(
   value: unknown
@@ -120,9 +105,7 @@ export const MeetingIdView = ({ meetingId }: Props) => {
         )}
         {isCompleted && (
           <div className="space-y-4">
-            {isSentencePhonemeAnalysis(data.phonemeData) ? (
-              <PhonemeDetailsPanel analysis={data.phonemeData} />
-            ) : isPersistedPronunciationEntries(data.phonemeData) && data.phonemeData.entries.length > 0 ? (
+            {isPersistedPronunciationEntries(data.phonemeData) && data.phonemeData.entries.length > 0 ? (
               <div className="rounded-lg border bg-white p-6 text-left text-gray-800">
                 <p className="font-medium mb-3">Pronunciation history</p>
                 <ul className="space-y-3 text-sm">
@@ -148,7 +131,6 @@ export const MeetingIdView = ({ meetingId }: Props) => {
             ) : (
               <div className="rounded-lg border bg-white p-6 text-center text-gray-600">
                 <p className="font-medium">Meeting completed</p>
-                <p className="text-sm mt-1">No pronunciation analysis is available for this session.</p>
               </div>
             )}
           </div>

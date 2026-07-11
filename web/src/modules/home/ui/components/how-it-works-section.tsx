@@ -21,28 +21,6 @@ const STEPS = [
   },
 ];
 
-const MOCK_PHONEMES: ({ s: string; ok: boolean } | null)[] = [
-  { s: "ð", ok: true },
-  { s: "ə", ok: true },
-  null,
-  { s: "p", ok: true },
-  { s: "r", ok: true },
-  { s: "ə", ok: false }, // mismatch
-  null,
-  { s: "n", ok: true },
-  { s: "ʌ", ok: false }, // mismatch
-  { s: "n", ok: true },
-  null,
-  { s: "s", ok: true },
-  { s: "i", ok: true },
-  null,
-  { s: "eɪ", ok: true },
-  null,
-  { s: "ʃ", ok: true },
-  { s: "ə", ok: true },
-  { s: "n", ok: true },
-];
-
 export function HowItWorksSection() {
   return (
     <section
@@ -148,51 +126,7 @@ export function HowItWorksSection() {
                 </p>
               </div>
 
-              {/* Phoneme analysis */}
-              <div className="px-5 pb-5">
-                <p
-                  className="text-[10px] uppercase tracking-widest mb-3 font-mono"
-                  style={{ color: "rgba(239, 234, 225, 0.4)" }}
-                >
-                  Phoneme analysis
-                </p>
-                <div className="flex flex-wrap gap-1.5 items-center">
-                  {MOCK_PHONEMES.map((ph, i) => {
-                    if (!ph) {
-                      return (
-                        <span
-                          key={i}
-                          className="text-xs px-0.5"
-                          style={{ color: "rgba(239, 234, 225, 0.15)" }}
-                        >
-                          ·
-                        </span>
-                      );
-                    }
-                    return (
-                      <span
-                        key={i}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded text-xs font-mono"
-                        style={
-                          ph.ok
-                            ? {
-                                backgroundColor: "rgba(239, 234, 225, 0.06)",
-                                border: "1px solid rgba(239, 234, 225, 0.15)",
-                                color: "var(--parchment)",
-                              }
-                            : {
-                                backgroundColor: "var(--amber-muted)",
-                                border: "1px solid rgba(194, 94, 47, 0.35)",
-                                color: "var(--amber-warm)",
-                              }
-                        }
-                      >
-                        {ph.s}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
+
 
               {/* Accuracy bar */}
               <div

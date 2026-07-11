@@ -475,7 +475,7 @@ export const CallActive = ({
         }
       }, {
         onSuccess: () => {
-          router.push(`/dashboard/analysis/${meetingId}`);
+          router.push(`/dashboard/meetings`);
         }
       });
     }

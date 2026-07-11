@@ -7,7 +7,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
-import { PhonemeSegment, WordPhonemeAnalysis } from "@/hooks/use-phoneme-analysis";
+import { PhonemeSegment, WordPhonemeAnalysis } from "@/types/pronunciation";
 
 interface PhonemeFeedbackProps {
   word: WordPhonemeAnalysis;

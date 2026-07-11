@@ -1,6 +1,6 @@
 "use client";
 
-import { BotIcon, VideoIcon, TrendingUpIcon } from "lucide-react";
+import { BotIcon, VideoIcon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -26,11 +26,6 @@ const firstSection = [
     href: "/dashboard/meetings",
   },
   {
-    icon: TrendingUpIcon,
-    label: "Analysis",
-    href: "/dashboard/analysis",
-  },
-  {
     icon: BotIcon,
     label: "Agents",
     href: "/dashboard/agents",
@@ -41,8 +36,8 @@ export const DashboardSidebar = () => {
   const pathname = usePathname();
 
   return (
-    <Sidebar>
-      <SidebarHeader className="text-sidebar-accent-foreground">
+    <Sidebar style={{ borderRightWidth: "0px" }}>
+      <SidebarHeader>
         <Link href="/dashboard" className="flex items-center gap-2 px-2 pt-2">
           <Image src="/logo.svg" height={36} width={36} alt="TalkFlow" />
           <p className="text-2xl font-semibold ">TalkFlow</p>
@@ -62,7 +57,7 @@ export const DashboardSidebar = () => {
                     className={cn(
                       "h-10 hover:bg-linear-to-r/oklch border border-transparent hover:border-[#5D6B68]/10 from-sidebar-accent from-5% via-30% via-sidebar/50 to/sidebar/50",
                       pathname === item.href &&
-                        "bg-linear-to-r/oklch border-[#5D6B68]/10"
+                      "bg-linear-to-r/oklch border-[#5D6B68]/10"
                     )}
                     isActive={pathname === item.href}
                   >
@@ -79,7 +74,7 @@ export const DashboardSidebar = () => {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="text-white">
+      <SidebarFooter>
         <DashboardUserButton />
       </SidebarFooter>
     </Sidebar>

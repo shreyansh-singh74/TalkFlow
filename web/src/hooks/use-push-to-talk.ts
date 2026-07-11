@@ -4,7 +4,7 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { AudioChunker } from "@/lib/audio-processing";
 import { StreamingAudioPlayer } from "@/lib/streaming-audio-player";
 import { getWebSocketUrl } from "@/lib/backend-config";
-import { SentencePhonemeAnalysis } from "@/hooks/use-phoneme-analysis";
+import { SentencePhonemeAnalysis } from "@/types/pronunciation";
 import type { PracticeTargetPayload, PronunciationResultPayload, SessionAnalysisReport } from "@/types/pronunciation";
 import { v4 as uuidv4 } from "uuid";
 
