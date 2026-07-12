@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.services.tts_service import tts_service
 from app.services.phoneme_analysis_service import phoneme_analyzer
-from app.utils.pronunciation_reference import build_syllable_rows
+from app.services.phoneme_respelling_service import phoneme_respelling_service
 from app.utils.text import WORD_RE as _WORD_RE
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class PronunciationReferenceResponse(BaseModel):
 
 
 @router.get("/reference/{word}", response_model=PronunciationReferenceResponse)
-async def get_pronunciation_reference(word: str) -> PronunciationReferenceResponse:
+async def get_pronunciation_reference(word: str, lang: str = "en-US") -> PronunciationReferenceResponse:
     raw = (word or "").strip()
     if not raw:
         raise HTTPException(status_code=400, detail="Word is required")
@@ -36,12 +36,8 @@ async def get_pronunciation_reference(word: str) -> PronunciationReferenceRespon
     key = m.group(0).lower() if m else re.sub(r"[^\w]", "", raw).lower()
     if not key:
         raise HTTPException(status_code=400, detail="Word is required")
-    try:
-        tokens = phoneme_analyzer.raw_arpabet_tokens_for_word(key)
-    except Exception:
-        logger.exception("get_pronunciation_reference g2p failed for %r", key)
-        raise HTTPException(status_code=500, detail="Pronunciation reference failed")
-    rows = build_syllable_rows(key, tokens)
+    
+    rows = await phoneme_respelling_service.get_dialect_respelling(key, lang)
     return PronunciationReferenceResponse(
         word=key,
         arpabet_syllables=[ArpabetSyllableItem(**r) for r in rows],

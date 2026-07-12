@@ -1,0 +1,16 @@
+{
+  "hello": {
+    "en-us": [
+      {
+        "display": "heh",
+        "stressed": false,
+        "phones": ""
+      },
+      {
+        "display": "loh",
+        "stressed": true,
+        "phones": ""
+      }
+    ]
+  }
+}

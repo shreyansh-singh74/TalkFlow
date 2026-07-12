@@ -29,20 +29,39 @@ export function PronunciationReferenceCard({
   const idSlow = useId();
   const [isSlow, setIsSlow] = useState(false);
   const [showIPA, setShowIPA] = useState(false);
-  const { data, loading, error } = usePronunciationReference(activeWordKey);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [mouthFrame, setMouthFrame] = useState(0);
+  const { data, loading, error } = usePronunciationReference(activeWordKey, lang);
 
   useEffect(() => {
     requestSpeechVoices();
     if (typeof window !== "undefined") window.speechSynthesis?.getVoices();
   }, []);
 
+  useEffect(() => {
+    if (!isPlaying) {
+      setMouthFrame(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setMouthFrame((f) => (f + 1) % 3);
+    }, 120);
+    return () => clearInterval(interval);
+  }, [isPlaying]);
+
   const play = () => {
     const text = (data?.word || displayWord || activeWordKey || "").trim();
     if (text) {
+      setIsPlaying(true);
       // Use backend speech synthesis to guarantee audio output across all OS systems (including Linux/Chrome synthesis blocks)
       const url = `${getBackendUrl()}/api/phonemes/tts?text=${encodeURIComponent(text)}&lang=${lang}&rate=${isSlow ? 0.65 : 1.0}`;
       const audio = new Audio(url);
-      audio.play().catch((err) => console.error("Error playing word TTS:", err));
+      audio.onended = () => setIsPlaying(false);
+      audio.onerror = () => setIsPlaying(false);
+      audio.play().catch((err) => {
+        console.error("Error playing word TTS:", err);
+        setIsPlaying(false);
+      });
     }
   };
 
@@ -161,30 +180,51 @@ export function PronunciationReferenceCard({
             />
             {/* Lips / Mouth outline */}
             <path
-              d="M25,50 Q50,32 75,50 Q50,68 25,50"
+              d={
+                mouthFrame === 0
+                  ? "M25,50 Q50,42 75,50 Q50,58 25,50"
+                  : mouthFrame === 1
+                  ? "M25,50 Q50,32 75,50 Q50,68 25,50"
+                  : "M25,50 Q50,22 75,50 Q50,78 25,50"
+              }
               fill="#DBEAFE"
               stroke="#2563EB"
               strokeWidth="3.5"
               strokeLinecap="round"
               strokeLinejoin="round"
+              className="transition-all duration-100 ease-in-out"
             />
             {/* Upper Teeth */}
             <path
-              d="M32,48 Q50,44 68,48"
+              d={
+                mouthFrame === 0
+                  ? "M32,48 Q50,45 68,48"
+                  : mouthFrame === 1
+                  ? "M32,44 Q50,41 68,44"
+                  : "M32,40 Q50,37 68,40"
+              }
               stroke="white"
               strokeWidth="2.5"
               strokeLinecap="round"
+              className="transition-all duration-100 ease-in-out"
             />
             {/* Tongue */}
             <path
-              d="M38,53 Q50,48 62,53 Q50,60 38,53"
+              d={
+                mouthFrame === 0
+                  ? "M38,52 Q50,49 62,52 Q50,55 38,52"
+                  : mouthFrame === 1
+                  ? "M38,54 Q50,49 62,54 Q50,59 38,54"
+                  : "M38,57 Q50,49 62,57 Q50,65 38,57"
+              }
               fill="#FECACA"
               stroke="#EF4444"
               strokeWidth="1.2"
+              className="transition-all duration-100 ease-in-out"
             />
           </svg>
           <span className="absolute bottom-2 text-[8px] font-bold text-blue-600 uppercase tracking-widest">
-            Mouth Shape
+            {isPlaying ? "Speaking..." : "Mouth Shape"}
           </span>
         </div>
       </div>

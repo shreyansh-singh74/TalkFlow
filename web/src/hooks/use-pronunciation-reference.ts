@@ -8,26 +8,28 @@ import { useEffect, useState } from "react";
 const cache = new Map<string, PronunciationReferenceResponse>();
 
 async function fetchPronunciationReference(
-  key: string
+  key: string,
+  lang: string
 ): Promise<PronunciationReferenceResponse | null> {
   const k = normalizeWord(key);
   if (!k) {
     return null;
   }
-  if (cache.has(k)) {
-    return cache.get(k)!;
+  const cacheKey = `${k}:${lang.toLowerCase()}`;
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey)!;
   }
-  const url = `${getBackendUrl()}/api/phonemes/reference/${encodeURIComponent(k)}`;
+  const url = `${getBackendUrl()}/api/phonemes/reference/${encodeURIComponent(k)}?lang=${encodeURIComponent(lang)}`;
   const res = await fetch(url);
   if (!res.ok) {
     return null;
   }
   const data = (await res.json()) as PronunciationReferenceResponse;
-  cache.set(k, data);
+  cache.set(cacheKey, data);
   return data;
 }
 
-export function usePronunciationReference(activeKey: string) {
+export function usePronunciationReference(activeKey: string, lang: string) {
   const [data, setData] = useState<PronunciationReferenceResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,8 +41,9 @@ export function usePronunciationReference(activeKey: string) {
       setError(null);
       return;
     }
-    if (cache.has(k)) {
-      setData(cache.get(k)!);
+    const cacheKey = `${k}:${lang.toLowerCase()}`;
+    if (cache.has(cacheKey)) {
+      setData(cache.get(cacheKey)!);
       setError(null);
       setLoading(false);
       return;
@@ -48,7 +51,7 @@ export function usePronunciationReference(activeKey: string) {
     let cancel = false;
     setLoading(true);
     setError(null);
-    fetchPronunciationReference(k)
+    fetchPronunciationReference(k, lang)
       .then((d) => {
         if (cancel) {
           return;
@@ -71,7 +74,7 @@ export function usePronunciationReference(activeKey: string) {
     return () => {
       cancel = true;
     };
-  }, [activeKey]);
+  }, [activeKey, lang]);
 
   return { data, loading, error };
 }
