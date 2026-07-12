@@ -21,7 +21,7 @@ export function getBackendUrl(): string {
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1');
-  const url = (isLocalhost ? 'http://localhost:8000' : (configuredUrl || '')).replace(/\/$/, '');
+  const url = (configuredUrl || (isLocalhost ? 'http://localhost:8000' : '')).replace(/\/$/, '');
 
   if (!url) {
     throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');

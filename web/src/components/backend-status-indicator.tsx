@@ -2,13 +2,12 @@
 
 import { useEffect, useState, useRef } from "react";
 import { getBackendUrl } from "@/lib/backend-config";
-import { Loader2, WifiOff, CheckCircle2 } from "lucide-react";
+import { Loader2, WifiOff } from "lucide-react";
 
 type Status = "checking" | "sleeping" | "offline" | "online";
 
 export function BackendStatusIndicator() {
   const [status, setStatus] = useState<Status>("checking");
-  const [visible, setVisible] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0);
   const checkTimerRef = useRef<NodeJS.Timeout | null>(null);
   const timeCounterRef = useRef<NodeJS.Timeout | null>(null);
@@ -16,11 +15,11 @@ export function BackendStatusIndicator() {
 
   const checkHealth = async () => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
     try {
       const backendUrl = getBackendUrl();
-      const response = await fetch(`${backendUrl}/health`, {
+      const response = await fetch(`${backendUrl}/`, {
         signal: controller.signal,
         cache: "no-store",
       });
@@ -77,47 +76,32 @@ export function BackendStatusIndicator() {
     };
   }, []);
 
-  // Handle visibility of the "Online" success banner (dismiss after 3s)
-  useEffect(() => {
-    if (status === "online") {
-      const timer = setTimeout(() => {
-        setVisible(false);
-      }, 3000);
-      return () => clearTimeout(timer);
-    } else {
-      setVisible(true);
-    }
-  }, [status]);
-
-  if (!visible) return null;
+  if (status === "online" || status === "checking") return null;
 
   return (
     <div
       className={`fixed top-0 left-0 w-full z-[9999] transition-transform duration-500 ease-in-out border-b text-sm font-medium ${
-        status === "online"
-          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 translate-y-0"
-          : status === "sleeping"
+        status === "sleeping"
           ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400 translate-y-0"
-          : status === "offline"
-          ? "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400 translate-y-0"
-          : "-translate-y-full" // Hidden when checking and starts transitioning
+          : "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400 translate-y-0"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          {status === "online" && (
-            <>
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              <span>Backend connection established. TalkFlow is ready!</span>
-            </>
-          )}
-
           {status === "sleeping" && (
             <>
               <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
-              <span className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1.5 flex-wrap">
                 Connecting to backend... Server is spinning up (may take 1-2 minutes).
                 <span className="text-xs opacity-85">({elapsedTime}s elapsed)</span>
+                <a
+                  href={getBackendUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-amber-700 dark:hover:text-amber-300 font-semibold inline-flex items-center gap-1 transition-colors"
+                >
+                  [Check Backend Link]
+                </a>
               </span>
             </>
           )}
@@ -125,14 +109,17 @@ export function BackendStatusIndicator() {
           {status === "offline" && (
             <>
               <WifiOff className="w-4 h-4 text-rose-500" />
-              <span>Cannot connect to the server. Please check your connection.</span>
-            </>
-          )}
-
-          {status === "checking" && (
-            <>
-              <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
-              <span>Verifying server status...</span>
+              <span className="flex items-center gap-1.5 flex-wrap">
+                Cannot connect to the server. Please verify your connection or check the
+                <a
+                  href={getBackendUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-rose-700 dark:hover:text-rose-300 font-semibold inline-flex items-center gap-1 transition-colors"
+                >
+                  [Backend Link]
+                </a>
+              </span>
             </>
           )}
         </div>
@@ -141,13 +128,6 @@ export function BackendStatusIndicator() {
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-amber-500/80 bg-amber-500/5 px-2 py-0.5 rounded-full border border-amber-500/10 animate-pulse">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             Waking up Render instance
-          </div>
-        )}
-
-        {status === "online" && (
-          <div className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-500/80 bg-emerald-500/5 px-2 py-0.5 rounded-full border border-emerald-500/10">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Connected
           </div>
         )}
       </div>
