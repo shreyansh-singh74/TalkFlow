@@ -4,12 +4,6 @@ declare const process: {
   };
 };
 
-function getEnv(key: string): string | undefined {
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env[key];
-  }
-  return undefined;
-}
 
 interface WindowWithBackendLog extends Window {
   __backendUrlLogged?: boolean;

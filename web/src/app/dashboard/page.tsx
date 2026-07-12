@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth"
 import { DashboardView } from "@/modules/home/ui/views/dashboard-view"
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default async function Page(){
   let session = null;
   try {
