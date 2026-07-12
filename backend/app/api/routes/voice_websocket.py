@@ -671,6 +671,9 @@ async def voice_websocket(websocket: WebSocket):
             # Receive message (can be text or bytes)
             message = await websocket.receive()
             
+            if message.get("type") == "websocket.disconnect":
+                raise WebSocketDisconnect(code=message.get("code", 1000))
+                
             if "text" in message:
                 # Control message (JSON)
                 data = json.loads(message["text"])
