@@ -8,8 +8,11 @@ import { CodeSection } from "../components/code-section";
 import { FeaturesSection } from "../components/features-section";
 import { HowItWorksSection } from "../components/how-it-works-section";
 import { FooterSection } from "../components/footer-section";
+import { authClient } from "@/lib/auth-client";
 
 export function LandingView() {
+  const { data: session } = authClient.useSession();
+
   useEffect(() => {
     // Prevent browser overscroll bounce (sliding down) and white background reveal
     const originalBodyBg = document.body.style.backgroundColor;
@@ -54,21 +57,21 @@ export function LandingView() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
             <Link
-              href="/sign-in"
+              href={session?.user ? "/dashboard" : "/sign-in"}
               className="inline-flex items-center justify-center px-6 py-3 rounded-md text-sm font-medium transition-colors"
               style={{ border: "1px solid rgba(239, 234, 225, 0.15)", color: "var(--parchment)" }}
             >
-              Talk to us
+              {session?.user ? "Dashboard" : "Talk to us"}
             </Link>
             <Link
-              href="/sign-up"
+              href={session?.user ? "/dashboard" : "/sign-up"}
               className="inline-flex items-center justify-center px-6 py-3 rounded-md text-white text-sm font-medium transition-all"
               style={{
                 backgroundColor: "var(--emerald)",
                 boxShadow: "0 0 24px rgba(0, 168, 120, 0.4)",
               }}
             >
-              Sign up for free
+              {session?.user ? "Go to Dashboard" : "Sign up for free"}
             </Link>
           </div>
         </div>

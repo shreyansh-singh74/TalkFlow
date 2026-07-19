@@ -40,6 +40,9 @@ export interface UsePushToTalkReturn {
   clearTranscripts: () => void;
   sessionReport: SessionAnalysisReport | null;
   sendNextSentence: () => void;
+  sendPrevSentence: () => void;
+  isTransitioning: boolean;
+  restartSession: () => void;
 }
 
 interface UsePushToTalkOptions {
@@ -68,6 +71,12 @@ export function usePushToTalk({
   const [practiceSentence, setPracticeSentence] = useState(DEFAULT_TARGET_TEXT);
   const [practiceProgress, setPracticeProgress] = useState({ current: 1, total: 1 });
   const [sessionReport, setSessionReport] = useState<SessionAnalysisReport | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const targetTextRef = useRef(targetText);
+  useEffect(() => {
+    targetTextRef.current = targetText;
+  }, [targetText]);
   
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -129,6 +138,15 @@ export function usePushToTalk({
 
       case "PRONUNCIATION_RESULT": {
         const p = message as PronunciationResultPayload;
+        const normalizeForMatching = (text: string) => {
+          return text.toLowerCase().replace(/[^a-z0-9]/g, "");
+        };
+        const cleanResultText = normalizeForMatching(p.target_text || "");
+        const cleanCurrentText = normalizeForMatching(targetTextRef.current || "");
+        if (cleanResultText !== cleanCurrentText) {
+          console.warn("Ignored stale pronunciation result for target:", p.target_text);
+          break;
+        }
         setLastPronunciation(p);
         setPhonemeAnalysis(null);
         setTargetText(p.target_text || DEFAULT_TARGET_TEXT);
@@ -137,15 +155,18 @@ export function usePushToTalk({
 
       case "PRACTICE_TARGET": {
         const target = message as PracticeTargetPayload;
+        setLastPronunciation(null);
         setTargetText(target.target_text || DEFAULT_TARGET_TEXT);
         setPracticeMode(target.mode);
         setPracticeSentence(target.sentence || target.target_text || DEFAULT_TARGET_TEXT);
         setPracticeProgress(target.progress || { current: 1, total: 1 });
+        setIsTransitioning(false);
         break;
       }
 
       case "SESSION_COMPLETE": {
         setSessionReport(message.report);
+        setIsTransitioning(false);
         break;
       }
         
@@ -422,9 +443,31 @@ export function usePushToTalk({
   
   const sendNextSentence = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      setIsTransitioning(true);
       wsRef.current.send(JSON.stringify({ type: "NEXT_SENTENCE" }));
     }
   }, []);
+
+  const sendPrevSentence = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      setIsTransitioning(true);
+      wsRef.current.send(JSON.stringify({ type: "PREV_SENTENCE" }));
+    }
+  }, []);
+
+  const restartSession = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      clearTranscripts();
+      setSessionReport(null);
+      setIsTransitioning(true);
+      wsRef.current.send(JSON.stringify({
+        type: "SESSION_CONFIG",
+        meeting_id: meetingId,
+        agent_name: agentName,
+        agent_instructions: agentInstructions,
+      }));
+    }
+  }, [meetingId, agentName, agentInstructions, clearTranscripts]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -454,6 +497,9 @@ export function usePushToTalk({
     stopTalking,
     clearTranscripts,
     sessionReport,
-    sendNextSentence
+    sendNextSentence,
+    sendPrevSentence,
+    isTransitioning,
+    restartSession
   };
 }

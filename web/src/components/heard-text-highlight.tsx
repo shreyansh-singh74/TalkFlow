@@ -18,20 +18,17 @@ type Props = {
 };
 
 /**
- * Renders the heard transcript with misaligned words styled in amber-warm
- * (the "actual/heard" accent) rather than destructive red.
- * Mismatched words get an underline + amber colour so the target→heard
- * contrast is clear even without colour vision (underline carries the signal).
+ * Renders the heard transcript with misaligned words styled in amber/red.
  */
 export function HeardTextHighlight({ text, misalignedWords, className }: Props) {
   const err = errorHeardSet(misalignedWords);
   if (!text.trim() || err.size === 0) {
-    return <p className={className}>{text}</p>;
+    return <p className={className} style={{ color: "#14161A" }}>{text}</p>;
   }
 
   const parts = text.split(/([A-Za-z']+)/);
   return (
-    <p className={className}>
+    <p className={className} style={{ color: "#14161A" }}>
       {parts.map((part, i) => {
         if (!/^[A-Za-z']+$/.test(part)) {
           return <span key={i}>{part}</span>;
@@ -40,8 +37,12 @@ export function HeardTextHighlight({ text, misalignedWords, className }: Props) 
           return (
             <span
               key={i}
-              className="font-medium underline underline-offset-4 decoration-2"
-              style={{ color: "var(--amber-warm)", textDecorationColor: "var(--amber-warm)" }}
+              className="font-bold underline underline-offset-4 decoration-wavy decoration-2 rounded px-1 py-0.5"
+              style={{
+                color: "#b45309",
+                textDecorationColor: "#d97706",
+                background: "rgba(254, 243, 199, 0.8)",
+              }}
               title="Mismatch — check phoneme breakdown"
             >
               {part}

@@ -532,6 +532,16 @@ class VoiceSession:
                 "report": report
             })
 
+    async def handle_prev_sentence(self):
+        """Go back to previous sentence"""
+        self.update_activity()
+        prev_index = max(0, self.current_sentence_index - 1)
+        if prev_index != self.current_sentence_index:
+            self.current_sentence_index = prev_index
+            self.current_sentence = self.session_sentences[self.current_sentence_index]
+            self.target_text = self.current_sentence
+            await self._send_practice_target()
+
     async def generate_session_report(self) -> dict:
         import numpy as np
         
@@ -687,6 +697,8 @@ async def voice_websocket(websocket: WebSocket):
                     await session.handle_session_config(SessionConfigMessage(**data))
                 elif msg_type == "NEXT_SENTENCE":
                     await session.handle_next_sentence()
+                elif msg_type == "PREV_SENTENCE":
+                    await session.handle_prev_sentence()
                 elif msg_type == "INTERRUPT":
                     session.should_stop_tts = True
                 elif msg_type == "PONG":

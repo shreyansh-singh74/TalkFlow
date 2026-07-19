@@ -71,32 +71,21 @@ export function PronunciationReferenceCard({
   );
 
   return (
-    <div
-      className="w-full max-w-2xl rounded-xl border p-6 shadow-sm"
-      style={{
-        background: "var(--parchment)",
-        borderColor: "oklch(0.85 0.02 80)",
-        color: "var(--ink)",
-      }}
-    >
+    <div className="w-full max-w-3xl rounded-2xl p-6 glass-panel shadow-xs">
       {/* Header row */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3" style={{ borderColor: "oklch(0.9 0.02 80)" }}>
-        <span
-          className="text-[11px] font-bold uppercase tracking-[0.18em]"
-          style={{ color: "var(--cobalt)" }}
-        >
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3 border-neutral-200/80">
+        <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">
           Phonetic Breakdown
         </span>
         <div className="flex items-center gap-3">
           {/* IPA toggle */}
-          <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer" style={{ color: "var(--ink)", opacity: 0.7 }}>
+          <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer text-neutral-600">
             <Switch checked={showIPA} onCheckedChange={setShowIPA} className="scale-75" />
             IPA
           </label>
           {/* Dialect select */}
           <select
-            className="rounded-md border px-2 py-0.5 text-xs bg-white/50 backdrop-blur-xs font-semibold cursor-pointer"
-            style={{ borderColor: "oklch(0.85 0.02 80)", color: "var(--ink)" }}
+            className="rounded-md border px-2 py-1 text-xs font-semibold cursor-pointer bg-neutral-100 border-neutral-300 text-neutral-800 shadow-2xs"
             value={lang}
             onChange={(e) => onLangChange(e.target.value)}
           >
@@ -111,30 +100,30 @@ export function PronunciationReferenceCard({
       <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
         <div className="flex-1 space-y-3 w-full">
           <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sounds like</p>
+            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Sounds like</p>
             <div className="flex items-center gap-3 mt-1">
               {loading ? (
-                <p className="text-xl font-medium" style={{ opacity: 0.5 }}>Loading phonetic breakdown…</p>
+                <p className="text-xl font-medium text-neutral-400">Loading phonetic breakdown…</p>
               ) : error ? (
-                <p className="text-sm font-medium" style={{ color: "var(--amber-warm)" }}>{error}</p>
+                <p className="text-sm font-semibold text-amber-600">{error}</p>
               ) : data ? (
                 <div className="flex items-center gap-2">
-                  <div className="text-2xl font-bold tracking-tight text-gray-900">
+                  <div className="text-3xl font-bold tracking-tight text-neutral-900">
                     <SyllableLine syllables={data.arpabet_syllables} />
                   </div>
                 </div>
               ) : (
-                <p className="text-2xl font-semibold capitalize">{displayWord}</p>
+                <p className="text-3xl font-bold capitalize text-neutral-900">{displayWord}</p>
               )}
               
               {/* Play icon button directly next to sounds-like spelling */}
               <button
                 type="button"
                 onClick={play}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-blue-50/50 hover:bg-blue-100 hover:scale-105 active:scale-95 transition-all text-blue-600 shadow-xs"
+                className="flex h-9 w-9 items-center justify-center rounded-full transition-all hover:scale-105 active:scale-95 cursor-pointer bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 shadow-2xs"
                 title={isSlow ? "Play slow" : "Play"}
               >
-                <Volume2 className="h-4 w-4" />
+                <Volume2 className="h-4.5 w-4.5" />
               </button>
             </div>
           </div>
@@ -142,12 +131,12 @@ export function PronunciationReferenceCard({
           {/* Slow toggle below the spelling */}
           <div className="flex items-center gap-2 mt-2">
             <Switch id={idSlow} checked={isSlow} onCheckedChange={setIsSlow} className="scale-75" />
-            <Label htmlFor={idSlow} className="cursor-pointer text-xs font-semibold text-gray-500">Slow speed</Label>
+            <Label htmlFor={idSlow} className="cursor-pointer text-xs font-semibold text-neutral-600">Slow speed</Label>
           </div>
 
           {/* Show expected vs heard comparison row if IPA toggle is on */}
           {showIPA && activePair && (
-            <div className="pt-2 border-t border-dashed" style={{ borderColor: "oklch(0.9 0.02 80)" }}>
+            <div className="pt-2 border-t border-dashed border-neutral-200">
               <HeardVsExpectedRow
                 expected={activePair.expected}
                 heard={activePair.heard}
@@ -157,26 +146,25 @@ export function PronunciationReferenceCard({
 
           {/* Mismatch coaching note */}
           {activePair && (
-            <p
-              className="mt-3 rounded-lg px-3 py-2 text-xs leading-relaxed border border-blue-100/50"
-              style={{ background: "var(--cobalt-muted)", color: "var(--cobalt)" }}
-            >
-              Expected <strong>&ldquo;{activePair.expected}&rdquo;</strong>, heard{" "}
-              <span className="font-semibold text-red-500">&ldquo;{activePair.heard}&rdquo;</span>.
+            <p className="mt-3 rounded-lg px-3.5 py-2 text-xs leading-relaxed bg-blue-50 border border-blue-200 text-blue-800 font-medium">
+              Expected <strong className="text-blue-950">&ldquo;{activePair.expected}&rdquo;</strong>, heard{" "}
+              <span className="font-bold text-red-600">&ldquo;{activePair.heard}&rdquo;</span>.
             </p>
           )}
         </div>
 
         {/* Dynamic Mouth articulation animation SVG on the right */}
-        <div className="flex flex-col items-center justify-center rounded-xl bg-blue-50/40 border border-blue-100/60 p-4 shrink-0 relative overflow-hidden h-28 w-28 shadow-2xs">
-          <svg className="w-full h-full text-blue-500/85" viewBox="0 0 100 100" fill="none">
+        <div
+          className="flex flex-col items-center justify-center rounded-xl p-4 shrink-0 relative overflow-hidden h-28 w-28 bg-emerald-50/60 border border-emerald-200/80 shadow-2xs"
+        >
+          <svg className="w-full h-full" viewBox="0 0 100 100" fill="none" style={{ color: "rgba(5,150,105,0.7)" }}>
             {/* Outline Face Profile */}
             <path
               d="M15,20 C15,80 85,80 85,20"
               stroke="currentColor"
               strokeWidth="1.5"
               strokeDasharray="3 3"
-              className="opacity-30"
+              className="opacity-40"
             />
             {/* Lips / Mouth outline */}
             <path
@@ -187,8 +175,8 @@ export function PronunciationReferenceCard({
                   ? "M25,50 Q50,32 75,50 Q50,68 25,50"
                   : "M25,50 Q50,22 75,50 Q50,78 25,50"
               }
-              fill="#DBEAFE"
-              stroke="#2563EB"
+              fill="rgba(5,150,105,0.1)"
+              stroke="#059669"
               strokeWidth="3.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -203,7 +191,7 @@ export function PronunciationReferenceCard({
                   ? "M32,44 Q50,41 68,44"
                   : "M32,40 Q50,37 68,40"
               }
-              stroke="white"
+              stroke="rgba(0,0,0,0.3)"
               strokeWidth="2.5"
               strokeLinecap="round"
               className="transition-all duration-100 ease-in-out"
@@ -217,13 +205,13 @@ export function PronunciationReferenceCard({
                   ? "M38,54 Q50,49 62,54 Q50,59 38,54"
                   : "M38,57 Q50,49 62,57 Q50,65 38,57"
               }
-              fill="#FECACA"
-              stroke="#EF4444"
+              fill="rgba(239,68,68,0.2)"
+              stroke="rgba(220,38,38,0.7)"
               strokeWidth="1.2"
               className="transition-all duration-100 ease-in-out"
             />
           </svg>
-          <span className="absolute bottom-2 text-[8px] font-bold text-blue-600 uppercase tracking-widest">
+          <span className="absolute bottom-2 text-[8px] font-bold text-emerald-800 uppercase tracking-widest">
             {isPlaying ? "Speaking..." : "Mouth Shape"}
           </span>
         </div>
@@ -240,15 +228,15 @@ function SyllableLine({
   if (!syllables.length) return null;
   return (
     <span
-      className="text-2xl font-semibold leading-snug"
-      style={{ fontFamily: "var(--font-phonetic)", color: "var(--ink)" }}
+      className="text-3xl font-bold leading-snug text-neutral-900"
+      style={{ fontFamily: "var(--font-phonetic)" }}
     >
       {syllables.map((s, i) => (
         <span key={i}>
           {i > 0 && (
-            <span style={{ opacity: 0.35 }}> · </span>
+            <span className="text-neutral-400"> · </span>
           )}
-          <span style={{ fontWeight: s.stressed ? 700 : 400 }}>{s.display}</span>
+          <span style={{ fontWeight: s.stressed ? 800 : 500 }}>{s.display}</span>
         </span>
       ))}
     </span>
@@ -256,7 +244,7 @@ function SyllableLine({
 }
 
 /**
- * Simple two-chip row: expected word (cobalt) vs heard word (amber).
+ * Simple two-chip row: expected word (emerald) vs heard word (amber).
  * Shown when the user enables the IPA toggle and a mismatch pair exists.
  */
 function HeardVsExpectedRow({
@@ -267,18 +255,12 @@ function HeardVsExpectedRow({
   heard: string;
 }) {
   return (
-    <div className="mt-1 flex items-center gap-2 text-sm font-medium" style={{ fontFamily: "var(--font-phonetic)" }}>
-      <span
-        className="rounded px-2 py-0.5"
-        style={{ background: "var(--cobalt-muted)", color: "var(--cobalt)" }}
-      >
+    <div className="mt-1 flex items-center gap-2 text-sm font-semibold" style={{ fontFamily: "var(--font-phonetic)" }}>
+      <span className="rounded px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
         {expected}
       </span>
-      <span style={{ opacity: 0.4 }}>→</span>
-      <span
-        className="rounded px-2 py-0.5"
-        style={{ background: "var(--amber-muted)", color: "var(--amber-warm)" }}
-      >
+      <span className="text-neutral-400">→</span>
+      <span className="rounded px-2.5 py-0.5 bg-red-50 text-red-700 border border-red-200">
         {heard}
       </span>
     </div>

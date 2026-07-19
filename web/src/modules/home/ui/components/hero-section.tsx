@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Mic, Play } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
 
 type Phoneme = { s: string; ok: boolean } | null;
 
@@ -46,6 +47,7 @@ const TECH_LOGOS = [
 export function HeroSection() {
   const [activeRealIdx, setActiveRealIdx] = useState(-1);
   const pausedRef = useRef(false);
+  const { data: session } = authClient.useSession();
 
   useEffect(() => {
     let idx = 0;
@@ -115,7 +117,7 @@ export function HeroSection() {
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-14">
           <Link
-            href="/sign-up"
+            href={session?.user ? "/dashboard" : "/sign-up"}
             className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-md text-white text-sm font-medium transition-all"
             style={{
               backgroundColor: "var(--emerald)",
@@ -123,7 +125,7 @@ export function HeroSection() {
             }}
           >
             <Mic className="w-4 h-4" />
-            Try for free
+            {session?.user ? "Go to Dashboard" : "Try for free"}
           </Link>
           <Link
             href="#demo"

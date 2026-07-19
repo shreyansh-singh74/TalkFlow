@@ -1,6 +1,7 @@
 "use client";
 
 import { normalizeWord } from "@/lib/normalize-word";
+import { cn } from "@/lib/utils";
 import type { MisalignedWordPair } from "@/types/pronunciation";
 
 type Props = {
@@ -11,7 +12,7 @@ type Props = {
 
 /**
  * Strip of mispronounced words the user should practise.
- * Active word → cobalt accent; inactive → amber tint (the "heard/actual" side).
+ * Active word → emerald accent; inactive → amber tint.
  */
 export function WrongWordsBar({ pairs, activeKey, onSelectExpected }: Props) {
   if (!pairs?.length) return null;
@@ -30,10 +31,7 @@ export function WrongWordsBar({ pairs, activeKey, onSelectExpected }: Props) {
 
   return (
     <div className="w-full max-w-2xl space-y-2">
-      <p
-        className="text-center text-[11px] font-semibold uppercase tracking-[0.18em]"
-        style={{ color: "var(--amber-warm)", opacity: 0.8 }}
-      >
+      <p className="text-center text-[11px] font-bold uppercase tracking-[0.18em] text-amber-700">
         Practice these words
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
@@ -45,20 +43,13 @@ export function WrongWordsBar({ pairs, activeKey, onSelectExpected }: Props) {
               key={n}
               type="button"
               onClick={() => onSelectExpected(p.expected, true)}
-              className="rounded-full px-3 py-1 text-sm font-medium transition-all duration-150 border"
-              style={
+              className={cn(
+                "rounded-full px-3.5 py-1 text-sm font-semibold transition-all duration-200 border cursor-pointer",
+                "hover:scale-105 active:scale-95 shadow-2xs",
                 isActive
-                  ? {
-                      background: "var(--cobalt)",
-                      color: "#fff",
-                      borderColor: "var(--cobalt)",
-                    }
-                  : {
-                      background: "var(--amber-muted)",
-                      color: "var(--amber-warm)",
-                      borderColor: "var(--amber-warm)",
-                    }
-              }
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-300 ring-2 ring-emerald-400/30"
+                  : "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
+              )}
             >
               {p.expected}
             </button>
