@@ -350,6 +350,13 @@ class VoiceSession:
 
         if not self.final_transcript:
             logger.info("No transcript received for turn %s", msg.turn_id)
+            await self.send_json(
+                ErrorMessage(
+                    type="ERROR",
+                    message="No speech detected. Please try again.",
+                    recoverable=True,
+                ).model_dump()
+            )
             return
 
         expected_for_turn = (self.active_expected_target or self.target_text or DEFAULT_TARGET_TEXT).strip()

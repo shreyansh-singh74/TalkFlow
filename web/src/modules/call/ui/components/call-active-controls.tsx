@@ -2,6 +2,7 @@
 
 import { Mic, MicOff, SkipForward, ArrowRight, ArrowLeft, RotateCcw, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LiveWaveform } from "@/components/ui/live-waveform";
 
 type UIState =
   | "Level Ready"
@@ -14,8 +15,10 @@ type UIState =
 
 interface CallActiveControlsProps {
   uiState: UIState;
+  isConnected?: boolean;
   isMicEnabled: boolean;
   isTalking: boolean;
+  micStream?: MediaStream | null;
   isTransitioning: boolean;
   isEvaluating: boolean;
   scoreDisplay: number | null;
@@ -35,8 +38,10 @@ interface CallActiveControlsProps {
 
 export function CallActiveControls({
   uiState,
+  isConnected = true,
   isMicEnabled,
   isTalking,
+  micStream,
   isTransitioning,
   isEvaluating,
   scoreDisplay,
@@ -64,6 +69,16 @@ export function CallActiveControls({
           role="alert"
         >
           {transcriptionError}
+        </div>
+      )}
+
+      {/* Connection warning banner if offline */}
+      {!isConnected && !transcriptionError && (
+        <div
+          className="mb-3 mx-auto max-w-md rounded-lg px-3.5 py-2 text-center text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center gap-2"
+        >
+          <div className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+          <span>Connecting to voice server... (Make sure FastAPI backend is running on port 8000)</span>
         </div>
       )}
 
@@ -138,54 +153,69 @@ export function CallActiveControls({
           </button>
         </div>
 
-        {/* Center: Waveform + Mic */}
-        <div className="flex items-center gap-3">
-          {/* Left waveform */}
-          <div className={cn("flex h-8 items-end gap-0.5", isTalking ? "opacity-100" : "opacity-30")}>
-            {[3, 6, 10, 5, 8].map((h, i) => (
-              <div
-                key={i}
-                className={cn("w-1 rounded-full", isTalking && "waveform-bar")}
-                style={{
-                  height: `${h * 3}px`,
-                  background: isTalking ? "#059669" : "oklch(0.7 0 0)",
-                  animationDelay: `${i * 120}ms`,
-                }}
-              />
-            ))}
+        {/* Center: Live Audio Waveform + Mic */}
+        <div className="flex items-center gap-2 sm:gap-4 justify-center">
+          {/* Left Live Waveform canvas */}
+          <div className="w-20 sm:w-28 h-10 flex items-center justify-end">
+            <LiveWaveform
+              active={isTalking}
+              processing={isEvaluating || isTransitioning}
+              stream={micStream}
+              mode="static"
+              height={36}
+              barWidth={3}
+              barGap={2}
+              barRadius={1.5}
+              barColor={isTalking ? "#059669" : isEvaluating ? "#3b82f6" : "#9ca3af"}
+              fadeEdges={true}
+              fadeWidth={12}
+            />
           </div>
 
-          {/* Mic button — desktop hold */}
+          {/* Mic button — desktop click or hold */}
           <div className="relative hidden lg:block">
             {isTalking && (
               <span
                 className="mic-pulse-ring absolute inset-0 rounded-full"
-                style={{ background: "#059669", opacity: 0.3 }}
+                style={{ background: "#dc2626", opacity: 0.3 }}
               />
             )}
             <button
               type="button"
-              onPointerDown={onMicPress}
-              onPointerUp={onMicRelease}
-              onPointerCancel={onMicRelease}
-              onPointerLeave={onMicRelease}
-              disabled={micDisabled}
+              onClick={() => {
+                if (!isTalking) {
+                  onMobileTalkStart();
+                } else {
+                  onMobileTalkStop();
+                }
+              }}
+              onPointerDown={(e) => {
+                onMicPress(e);
+              }}
+              onPointerUp={(e) => {
+                onMicRelease(e);
+              }}
+              disabled={micDisabled || !isConnected}
               className={cn(
                 "relative flex h-16 w-16 items-center justify-center rounded-full transition-all duration-200 active:scale-90 disabled:opacity-40 disabled:pointer-events-none cursor-pointer shadow-md",
-                isMicEnabled ? "shadow-[0_0_24px_rgba(5,150,105,0.3)]" : ""
+                isTalking ? "ring-4 ring-red-400" : isMicEnabled ? "shadow-[0_0_24px_rgba(5,150,105,0.3)]" : ""
               )}
               style={{
-                background: isMicEnabled
+                background: isTalking
+                  ? "#dc2626"
+                  : isMicEnabled
                   ? "linear-gradient(135deg, #059669, #0d9488)"
                   : "#f5f5f5",
-                border: isMicEnabled
+                border: isTalking
+                  ? "2px solid #ef4444"
+                  : isMicEnabled
                   ? "2px solid rgba(5,150,105,0.5)"
                   : "2px solid oklch(0.85 0 0)",
                 color: isMicEnabled ? "#fff" : "oklch(0.4 0 0)",
               }}
-              title={!isMicEnabled ? "Enable mic" : "Hold to speak"}
+              title={isTalking ? "Click to stop recording" : !isMicEnabled ? "Enable mic" : "Click mic or Hold SPACE to talk"}
             >
-              {isMicEnabled ? <Mic className="h-7 w-7" /> : <MicOff className="h-7 w-7" />}
+              {isTalking ? <MicOff className="h-7 w-7 text-white" /> : isMicEnabled ? <Mic className="h-7 w-7" /> : <MicOff className="h-7 w-7" />}
             </button>
           </div>
 
@@ -194,7 +224,7 @@ export function CallActiveControls({
             {!isTalking ? (
               <button
                 type="button"
-                disabled={micDisabled}
+                disabled={micDisabled || !isConnected}
                 className="flex h-14 w-14 items-center justify-center rounded-full transition-all active:scale-90 disabled:opacity-40 cursor-pointer shadow-sm"
                 style={{
                   background: "linear-gradient(135deg, #059669, #0d9488)",
@@ -219,19 +249,21 @@ export function CallActiveControls({
             )}
           </div>
 
-          {/* Right waveform */}
-          <div className={cn("flex h-8 items-end gap-0.5", isTalking ? "opacity-100" : "opacity-30")}>
-            {[7, 4, 9, 6, 3].map((h, i) => (
-              <div
-                key={i}
-                className={cn("w-1 rounded-full", isTalking && "waveform-bar")}
-                style={{
-                  height: `${h * 3}px`,
-                  background: isTalking ? "#059669" : "oklch(0.7 0 0)",
-                  animationDelay: `${(i + 5) * 120}ms`,
-                }}
-              />
-            ))}
+          {/* Right Live Waveform canvas */}
+          <div className="w-20 sm:w-28 h-10 flex items-center justify-start">
+            <LiveWaveform
+              active={isTalking}
+              processing={isEvaluating || isTransitioning}
+              stream={micStream}
+              mode="static"
+              height={36}
+              barWidth={3}
+              barGap={2}
+              barRadius={1.5}
+              barColor={isTalking ? "#059669" : isEvaluating ? "#3b82f6" : "#9ca3af"}
+              fadeEdges={true}
+              fadeWidth={12}
+            />
           </div>
         </div>
 
@@ -253,11 +285,16 @@ export function CallActiveControls({
       {/* Bottom hint row */}
       <div className="mt-2 flex items-center justify-center gap-3 text-[11px] font-medium text-neutral-500">
         <span className="hidden lg:inline">
-          Hold{" "}
+          Click mic or Hold{" "}
           <kbd className="rounded px-1.5 py-0.5 font-mono text-[10px] bg-neutral-100 border border-neutral-300 text-neutral-700 font-semibold shadow-2xs">
             SPACE
           </kbd>
           {" "}to talk
+        </span>
+        <span className="text-neutral-300">·</span>
+        <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold", isConnected ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200")}>
+          <span className={cn("h-1.5 w-1.5 rounded-full", isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />
+          {isConnected ? "Voice Ready" : "Connecting..."}
         </span>
         <span className="text-neutral-300">·</span>
         <button

@@ -12,16 +12,8 @@ import { ActiveState } from "../components/active-state";
 import { CancelledState } from "../components/cancelled-state";
 import { ProcessingState } from "../components/processing-state";
 import { toast } from "sonner";
-import type { MeetingPhonemeDataPersisted } from "@/types/pronunciation";
-
-function isPersistedPronunciationEntries(
-  value: unknown
-): value is { entries: Array<{ target_text: string; heard_text: string; score: number; at: string }> } {
-  if (!value || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  if (!Array.isArray(v.entries)) return false;
-  return v.entries.length === 0 || (typeof (v.entries[0] as { score?: number }).score === "number");
-}
+import type { MeetingPhonemeDataPersisted, SessionAnalysisReport } from "@/types/pronunciation";
+import { Bot, CheckCircle2, Sparkles, AlertCircle, Volume2 } from "lucide-react";
 
 interface Props {
   meetingId: string;
@@ -33,41 +25,36 @@ export const MeetingIdView = ({ meetingId }: Props) => {
   const [updateMeetingDialogOpen, setUpdateMeetingDialogOpen] = useState(false);
   const removeMeeting = useDeleteMeeting();
 
-  // Always call hooks unconditionally at the top-level
   const [RemoveConfirmation, confirmRemove] = useConfirm(
     "Are you sure?",
     "The following action will remove this meeting"
   );
 
   if (isLoading) {
-    return <LoadingState title="Loading Meeting" description="This may take a few seconds" />;
+    return <LoadingState title="Loading Practice Session" description="Fetching transcript and speech analytics..." />;
   }
 
   if (error || !data) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold">Failed to Load Meeting</h2>
-          <p className="text-gray-600">Could not load the meeting details. Please try again.</p>
+          <h2 className="text-2xl font-bold">Failed to Load Practice Session</h2>
+          <p className="text-gray-600">Could not load session details. Please try again.</p>
         </div>
       </div>
     );
   }
 
-  // removeMeeting is already defined above with useDeleteMeeting
-
   const handleRemoveMeeting = async () => {
     const ok = await confirmRemove();
-    if (!ok) {
-      return;
-    }
+    if (!ok) return;
     removeMeeting.mutate(meetingId, {
       onSuccess: () => {
         toast.success("Meeting deleted successfully");
         router.push("/dashboard/meetings");
       },
-      onError: (error) => {
-        toast.error(error.message || "Failed to delete meeting");
+      onError: (err) => {
+        toast.error(err.message || "Failed to delete meeting");
       },
     });
   };
@@ -78,6 +65,10 @@ export const MeetingIdView = ({ meetingId }: Props) => {
   const isCompleted = data.status === "completed";
   const isProcessing = data.status === "processing";
 
+  const phonemeData = data.phonemeData as MeetingPhonemeDataPersisted | null;
+  const entries = phonemeData?.entries || [];
+  const report: SessionAnalysisReport | undefined = phonemeData?.report;
+
   return (
     <>
       <RemoveConfirmation />
@@ -86,7 +77,7 @@ export const MeetingIdView = ({ meetingId }: Props) => {
         onOpenChange={setUpdateMeetingDialogOpen}
         initialValues={data}
       />
-      <div className="flex-1 py-4 px-4 md:px-8 flex flex-col gap-y-4">
+      <div className="flex-1 py-4 px-4 md:px-8 flex flex-col gap-y-6 max-w-6xl mx-auto w-full">
         <MeetingIdViewHeader
           meetingId={meetingId}
           meetingName={data.name}
@@ -103,34 +94,114 @@ export const MeetingIdView = ({ meetingId }: Props) => {
             isCancelling={false}
           />
         )}
+
         {isCompleted && (
-          <div className="space-y-4">
-            {isPersistedPronunciationEntries(data.phonemeData) && data.phonemeData.entries.length > 0 ? (
-              <div className="rounded-lg border bg-white p-6 text-left text-gray-800">
-                <p className="font-medium mb-3">Pronunciation history</p>
-                <ul className="space-y-3 text-sm">
-                  {data.phonemeData.entries.map((e: MeetingPhonemeDataPersisted["entries"][number]) => (
-                    <li
-                      key={`${e.at}-${e.target_text}`}
-                      className="border-b border-gray-100 pb-2 last:border-0"
-                    >
-                      <p>
-                        <span className="text-gray-500">Target:</span> {e.target_text}
-                      </p>
-                      <p>
-                        <span className="text-gray-500">Heard:</span> {e.heard_text}
-                      </p>
-                      <p className="text-gray-600">Score: {e.score.toFixed(0)}%</p>
-                      {e.mode && (
-                        <p className="text-gray-500 capitalize">Mode: {e.mode} practice</p>
-                      )}
-                    </li>
+          <div className="space-y-6 animate-fade-in">
+            {/* Report Header Card */}
+            {report ? (
+              <div className="rounded-2xl border border-emerald-100 bg-linear-to-br from-emerald-50/50 via-white to-teal-50/30 p-6 md:p-8 shadow-sm">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-gray-100">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Session Complete
+                      </span>
+                    </div>
+                    <h2 className="text-2xl font-extrabold text-gray-900">AI Speech Performance Analysis</h2>
+                    <p className="text-sm text-gray-500 mt-1">Generated by TalkFlow AI Coach</p>
+                  </div>
+
+                  {/* Overall Score Badge */}
+                  <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-emerald-200 shadow-xs">
+                    <div className="text-right">
+                      <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Overall Score</p>
+                      <p className="text-3xl font-black text-emerald-600">{Math.round(report.overall_score)}%</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Score breakdown metrics */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-6">
+                  {[
+                    { label: "Fluency", value: `${Math.round(report.fluency_score)}%` },
+                    { label: "Clarity", value: `${Math.round(report.clarity_score)}%` },
+                    { label: "Accuracy", value: `${Math.round(report.accuracy_score)}%` },
+                    { label: "Speaking Speed", value: `${Math.round(report.wpm)} WPM` },
+                  ].map((stat, i) => (
+                    <div key={i} className="bg-white/80 backdrop-blur-xs p-4 rounded-xl border border-gray-100 text-center">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{stat.label}</span>
+                      <p className="text-xl font-bold text-gray-800 mt-1">{stat.value}</p>
+                    </div>
                   ))}
-                </ul>
+                </div>
+
+                {/* AI Coach Summary text */}
+                {report.coach_feedback && (
+                  <div className="bg-white p-5 rounded-xl border border-emerald-100 text-gray-700 text-sm leading-relaxed italic relative">
+                    <div className="flex items-center gap-2 mb-2 not-italic font-bold text-xs uppercase tracking-wider text-emerald-700">
+                      <Bot className="w-4 h-4" />
+                      Coach Feedback
+                    </div>
+                    &ldquo;{report.coach_feedback}&rdquo;
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="rounded-lg border bg-white p-6 text-center text-gray-600">
-                <p className="font-medium">Meeting completed</p>
+            ) : entries.length === 0 ? (
+              /* Processing / Queue state card */
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-8 text-center space-y-3">
+                <div className="inline-flex items-center justify-center p-3 bg-amber-100 rounded-full text-amber-700 mb-2">
+                  <Sparkles className="w-6 h-6 animate-spin" />
+                </div>
+                <h3 className="text-lg font-bold text-amber-900">Analysis & Transcript Getting Ready</h3>
+                <p className="text-sm text-amber-700 max-w-md mx-auto">
+                  Your voice session audio is currently being processed by the AI evaluation pipeline. Refresh in a few seconds to see your report!
+                </p>
+              </div>
+            ) : null}
+
+            {/* Turn-by-Turn Practice Transcript Timeline */}
+            {entries.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-200 p-6 md:p-8 shadow-xs">
+                <h3 className="text-lg font-extrabold text-gray-900 mb-4 flex items-center gap-2">
+                  <Volume2 className="w-5 h-5 text-emerald-600" />
+                  Practice Transcript & Turn Analysis ({entries.length} turns)
+                </h3>
+                <div className="divide-y divide-gray-100">
+                  {entries.map((e, index) => {
+                    const score = e.score ?? 0;
+                    return (
+                      <div key={index} className="py-4 first:pt-0 last:pb-0 space-y-2">
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                            Sentence #{index + 1}
+                          </span>
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${score >= 90 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                            Score: {Math.round(score)}%
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                            <span className="text-xs font-semibold text-gray-500 block mb-1">Target Sentence:</span>
+                            <span className="font-semibold text-gray-900">{e.target_text}</span>
+                          </div>
+                          <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100">
+                            <span className="text-xs font-semibold text-emerald-700 block mb-1">Heard Speech:</span>
+                            <span className="font-semibold text-gray-900">{e.heard_text || "(Silence / Unclear)"}</span>
+                          </div>
+                        </div>
+
+                        {/* Misaligned words / feedback */}
+                        {e.misaligned_words && e.misaligned_words.length > 0 && (
+                          <div className="flex items-center gap-2 text-xs text-amber-800 pt-1">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span>Needs practice on: {e.misaligned_words.map(w => w.expected).join(", ")}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

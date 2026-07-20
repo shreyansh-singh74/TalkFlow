@@ -58,6 +58,7 @@ export const CallActive = ({
     practiceMode, practiceSentence, practiceProgress,
     connect, disconnect, startTalking, stopTalking,
     sessionReport, sendNextSentence, sendPrevSentence, isTransitioning, restartSession,
+    micStream,
   } = usePushToTalk({ meetingId, agentName, agentInstructions });
 
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -156,9 +157,12 @@ export const CallActive = ({
 
   const handleStopTalking = useCallback(() => {
     if (!isMicEnabled) return;
+    const wasTalking = isTalking;
     stopTalking();
-    setIsEvaluating(true);
-  }, [isMicEnabled, stopTalking]);
+    if (wasTalking) {
+      setIsEvaluating(true);
+    }
+  }, [isMicEnabled, stopTalking, isTalking]);
 
   useEffect(() => {
     if (lastPronunciation || transcriptionError) {
@@ -303,6 +307,9 @@ export const CallActive = ({
                 activeWordKey={activeWordKey}
                 onWordClick={setActiveWordKey}
                 isTalking={isTalking}
+                isEvaluating={isEvaluating}
+                micStream={micStream}
+                speechLang={speechLang}
               />
 
               {/* Feedback directly below sentence (Review) */}
@@ -352,8 +359,10 @@ export const CallActive = ({
       {!sessionReport && (
         <CallActiveControls
           uiState={uiState}
+          isConnected={isConnected}
           isMicEnabled={isMicEnabled}
           isTalking={isTalking}
+          micStream={micStream}
           isTransitioning={isTransitioning}
           isEvaluating={isEvaluating}
           scoreDisplay={scoreDisplay}

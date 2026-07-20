@@ -110,6 +110,29 @@ async def _call_openrouter(
     try:
         resp.raise_for_status()
     except httpx.HTTPStatusError as http_err:
+        if resp.status_code == 402:
+            logger.warning("OpenRouter returned 402 Payment Required for model %s. Attempting fallback to free model.", OPENROUTER_MODEL)
+            fallback_models = [
+                "google/gemini-2.0-flash-lite-preview-02-05:free",
+                "meta-llama/llama-3.2-1b-instruct:free",
+                "qwen/qwen-2.5-7b-instruct:free",
+            ]
+            for fb_model in fallback_models:
+                try:
+                    fallback_payload = {**payload, "model": fb_model}
+                    async with httpx.AsyncClient() as client:
+                        fb_resp = await client.post(
+                            OPENROUTER_API_URL,
+                            headers=headers,
+                            json=fallback_payload,
+                            timeout=20.0,
+                        )
+                        fb_resp.raise_for_status()
+                        fb_data = fb_resp.json()
+                        return fb_data["choices"][0]["message"]["content"]
+                except Exception as fb_err:
+                    logger.warning("Fallback to free model %s failed: %s", fb_model, fb_err)
+
         try:
             err_json = resp.json()
             err_message = err_json.get("error", {}).get("message") or str(err_json)

@@ -43,6 +43,7 @@ export interface UsePushToTalkReturn {
   sendPrevSentence: () => void;
   isTransitioning: boolean;
   restartSession: () => void;
+  micStream?: MediaStream | null;
 }
 
 interface UsePushToTalkOptions {
@@ -500,6 +501,7 @@ export function usePushToTalk({
     sendNextSentence,
     sendPrevSentence,
     isTransitioning,
-    restartSession
+    restartSession,
+    micStream: streamRef.current,
   };
 }

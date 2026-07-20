@@ -15,6 +15,10 @@ export function useSpacebarControl({
 }: UseSpacebarControlOptions) {
   
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+      return;
+    }
     // Only trigger if spacebar and not already held down
     if (e.code === "Space" && !e.repeat && enabled) {
       // Prevent page scroll
@@ -24,6 +28,10 @@ export function useSpacebarControl({
   }, [onSpaceDown, enabled]);
   
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+      return;
+    }
     if (e.code === "Space" && enabled) {
       e.preventDefault();
       onSpaceUp();

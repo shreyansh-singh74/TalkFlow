@@ -72,6 +72,7 @@ export type MeetingPhonemeDataPersisted = {
     mode?: "word" | "sentence";
     agent_name?: string;
     feedback: string[];
+    misaligned_words?: MisalignedWordPair[];
   }>;
   report?: SessionAnalysisReport;
 };

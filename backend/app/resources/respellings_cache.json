@@ -12,5 +12,151 @@
         "phones": ""
       }
     ]
+  },
+  "to": {
+    "en-us": [
+      {
+        "display": "too",
+        "stressed": true,
+        "phones": ""
+      }
+    ]
+  },
+  "want": {
+    "en-us": [
+      {
+        "display": "wont",
+        "stressed": true,
+        "phones": ""
+      }
+    ]
+  },
+  "please": {
+    "en-us": [
+      {
+        "display": "pleez",
+        "stressed": true,
+        "phones": ""
+      }
+    ]
+  },
+  "practice": {
+    "en-us": [
+      {
+        "display": "prak",
+        "stressed": true,
+        "phones": ""
+      },
+      {
+        "display": "tis",
+        "stressed": false,
+        "phones": ""
+      }
+    ]
+  },
+  "i": {
+    "en-us": [
+      {
+        "display": "eye",
+        "stressed": true,
+        "phones": ""
+      }
+    ]
+  },
+  "with": {
+    "en-us": [
+      {
+        "display": "with",
+        "stressed": true,
+        "phones": ""
+      }
+    ]
+  },
+  "daily": {
+    "en-us": [
+      {
+        "display": "day",
+        "stressed": true,
+        "phones": ""
+      },
+      {
+        "display": "lee",
+        "stressed": false,
+        "phones": ""
+      }
+    ]
+  },
+  "let": {
+    "en-us": [
+      {
+        "display": "let",
+        "stressed": true,
+        "phones": ""
+      }
+    ]
+  },
+  "us": {
+    "en-us": [
+      {
+        "display": "us",
+        "stressed": true,
+        "phones": ""
+      }
+    ]
+  },
+  "phrase": {
+    "en-us": [
+      {
+        "display": "frayz",
+        "stressed": true,
+        "phones": ""
+      }
+    ]
+  },
+  "speaking": {
+    "en-us": [
+      {
+        "display": "spee",
+        "stressed": true,
+        "phones": ""
+      },
+      {
+        "display": "king",
+        "stressed": false,
+        "phones": ""
+      }
+    ]
+  },
+  "takes": {
+    "en-us": [
+      {
+        "display": "tayks",
+        "stressed": true,
+        "phones": ""
+      }
+    ]
+  },
+  "good": {
+    "en-us": [
+      {
+        "display": "good",
+        "stressed": true,
+        "phones": ""
+      }
+    ]
+  },
+  "useful": {
+    "en-us": [
+      {
+        "display": "yoos",
+        "stressed": true,
+        "phones": ""
+      },
+      {
+        "display": "ful",
+        "stressed": false,
+        "phones": ""
+      }
+    ]
   }
 }
