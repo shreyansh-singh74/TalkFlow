@@ -201,6 +201,13 @@ class Settings:
     SCORE_TIMEOUT_SECONDS: float = float(os.getenv("SCORE_TIMEOUT_SECONDS", "8.0"))
     MAX_TURNS_PER_MINUTE: int = int(os.getenv("MAX_TURNS_PER_MINUTE", "20"))
 
+    # Forced Alignment (Phase 2).
+    ENABLE_ALIGNMENT: bool = os.getenv("ENABLE_ALIGNMENT", "1").lower() in ("1", "true", "yes")
+    ALIGNMENT_PROVIDER: str = os.getenv("ALIGNMENT_PROVIDER", "whisperx")
+    ALIGNMENT_TIMEOUT_SECONDS: float = float(os.getenv("ALIGNMENT_TIMEOUT_SECONDS", "15.0"))
+    ALIGNMENT_LANGUAGE: str = os.getenv("ALIGNMENT_LANGUAGE", "en")
+    WARM_ALIGNMENT_ON_STARTUP: bool = os.getenv("WARM_ALIGNMENT_ON_STARTUP", "0").lower() in ("1", "true", "yes")
+
     def validate(self):
         """Validate required settings"""
         if not self.OPENROUTER_API_KEY:

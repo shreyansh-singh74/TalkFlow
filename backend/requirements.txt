@@ -6,6 +6,7 @@ google-cloud-texttospeech
 deepgram-sdk
 g2p-en
 pyphen
+cmudict>=1.0.2
 numpy
 # CPU: pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch

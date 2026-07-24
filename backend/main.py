@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.routes import health, voice_websocket, phonemes
+from app.api.routes import health, voice_websocket, phonemes, pronunciation, pronunciation_analysis
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,6 +72,8 @@ app.add_middleware(
 app.include_router(health.router, tags=["Health"])
 app.include_router(voice_websocket.router, tags=["Voice WebSocket"])
 app.include_router(phonemes.router, tags=["Phonemes"])
+app.include_router(pronunciation.router, tags=["Pronunciation"])
+app.include_router(pronunciation_analysis.router, tags=["Pronunciation Analysis"])
 
 if __name__ == "__main__":
     import uvicorn

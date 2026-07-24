@@ -33,44 +33,44 @@ _VOWEL_BASES = frozenset(
 )
 
 _ARPABET_TO_DISPLAY: dict[str, str] = {
-    "AA": "a",
-    "AE": "a",
-    "AH": "uh",
-    "AO": "aw",
-    "AW": "ow",
-    "AY": "ay",
-    "B": "b",
+    "AA": "ah",    # father, spa  → 'ah' (not 'a' which reads like 'cat')
+    "AE": "a",     # cat, hat     → 'a'
+    "AH": "uh",   # about, sofa  → 'uh'
+    "AO": "oh",   # more, for    → 'oh' (was 'aw' which gave 'mawr'/'fawr')
+    "AW": "ow",   # how, cow     → 'ow'
+    "AY": "ay",   # kite, like   → 'ay'
+    "B":  "b",
     "CH": "ch",
-    "D": "d",
+    "D":  "d",
     "DH": "th",
-    "EH": "e",
-    "ER": "er",
-    "EY": "ay",
-    "F": "f",
-    "G": "g",
+    "EH": "e",    # bed, said    → 'e'
+    "ER": "er",   # bird, word   → 'er'
+    "EY": "ay",   # face, say    → 'ay'
+    "F":  "f",
+    "G":  "g",
     "HH": "h",
-    "IH": "i",
-    "IY": "ee",
+    "IH": "i",    # kit, bit     → 'i'
+    "IY": "ee",   # see, tea     → 'ee'
     "JH": "j",
-    "K": "k",
-    "L": "l",
-    "M": "m",
-    "N": "n",
+    "K":  "k",
+    "L":  "l",
+    "M":  "m",
+    "N":  "n",
     "NG": "ng",
-    "OW": "oh",
-    "OY": "oy",
-    "P": "p",
-    "R": "r",
-    "S": "s",
+    "OW": "oh",   # goat, show   → 'oh'
+    "OY": "oy",   # boy, coin    → 'oy'
+    "P":  "p",
+    "R":  "r",
+    "S":  "s",
     "SH": "sh",
-    "T": "t",
+    "T":  "t",
     "TH": "th",
-    "UH": "u",
-    "UW": "oo",
-    "V": "v",
-    "W": "w",
-    "Y": "y",
-    "Z": "z",
+    "UH": "u",    # book, put    → 'u'
+    "UW": "oo",   # food, blue   → 'oo'
+    "V":  "v",
+    "W":  "w",
+    "Y":  "y",
+    "Z":  "z",
     "ZH": "zh",
     "SIL": "",
 }
