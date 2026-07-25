@@ -15,6 +15,6 @@ async def root():
 async def health_check():
     return {
         "status": "healthy", 
-        "transcription_service": "deepgram"
+        "transcription_service": "wav2vec2"
     }
 

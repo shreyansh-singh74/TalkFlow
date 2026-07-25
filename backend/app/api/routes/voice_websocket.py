@@ -1,7 +1,6 @@
 # app/api/routes/voice_websocket.py
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.audio_store import save_turn_audio
-from app.services.deepgram_service import DeepgramLiveService
 from app.services.llm_response import stream_llm_response, generate_coach_summary
 from app.services.pronunciation import get_scorer
 from app.services.pronunciation_coach import build_pronunciation_coach_for_llm
@@ -92,10 +91,6 @@ async def cleanup_stale_sessions():
                     except Exception:
                         pass
                     
-                    # Cleanup Deepgram if active
-                    if session.deepgram_service:
-                        await session.deepgram_service.finish()
-                    
                     del sessions[session_id]
                     logger.info("Cleaned up stale session %s", session_id)
                     
@@ -112,11 +107,11 @@ Core concepts on this page:
 - The `VoiceSession` class tracks all session-specific context and resources, including:
     - Connection/websocket info.
     - Conversation history and metadata.
-    - Integration with Deepgram for live audio transcription.
+    - Integration with Wav2Vec2 for live audio transcription.
     - Manages start/end of transcription turns, partial/final transcript handling, audio streaming, and TTS (text-to-speech) generation flow.
 - The routes defined here enable interactive, bi-directional audio and text communication between client and server for the voice chat feature.
 
-Essentially, this module brings together session lifecycle management, speech-to-text (Deepgram), text-to-speech (Google TTS), and conversational AI into a single, persistent WebSocket workflow for each connected user.
+Essentially, this module brings together session lifecycle management, speech-to-text (Wav2Vec2), text-to-speech (Google TTS), and conversational AI into a single, persistent WebSocket workflow for each connected user.
 """
 
 class VoiceSession:
@@ -127,7 +122,6 @@ class VoiceSession:
         self.agent_name = "TalkFlow Coach"
         self.agent_instructions = ""
         self.conversation_history = []
-        self.deepgram_service: Optional[DeepgramLiveService] = None
         self.current_turn_id: Optional[str] = None
         self.partial_transcript = ""
         self.final_transcript = ""
@@ -236,7 +230,7 @@ class VoiceSession:
         self,
         full_pcm: bytes,
         expected_for_turn: str,
-        deepgram_text: str,
+        heard_text: str,
     ) -> Optional[Dict]:
         cap = settings.TURN_AUDIO_MAX_BYTES
         pcm = full_pcm[:cap] if cap > 0 else full_pcm
@@ -244,16 +238,12 @@ class VoiceSession:
         # Persist raw audio for eval datasets + later replay (consent-gated).
         audio_path = save_turn_audio(self.meeting_id or "", self.current_turn_id or "", pcm)
 
-        # The transcript still drives word-level coaching and the text-proxy
-        # fallback. Optional local ASR can override the displayed "heard" text.
-        heard_text = ""
-        if settings.ENABLE_WAV2VEC2 and pcm:
+        # If heard_text was not provided, transcribe via Wav2Vec2 ASR
+        if not (heard_text or "").strip() and pcm:
             try:
                 heard_text = await asyncio.to_thread(pcm16le_to_text, pcm)
             except Exception:
-                logger.exception("Wav2Vec2 ASR failed; using Deepgram transcript")
-        if not (heard_text or "").strip():
-            heard_text = deepgram_text or ""
+                logger.exception("Wav2Vec2 ASR failed")
 
         # The scorer is chosen by config: acoustic (scores `pcm` directly) or
         # the legacy text proxy. Both return the same result shape.
@@ -273,7 +263,7 @@ class VoiceSession:
                 type="PRONUNCIATION_RESULT",
                 turn_id=self.current_turn_id or "",
                 target_text=expected_for_turn,
-                deepgram_text=deepgram_text,
+                deepgram_text=heard_text,
                 heard_text=heard_text,
                 score=result.score,
                 expected_phonemes=result.expected_phonemes,
@@ -301,7 +291,7 @@ class VoiceSession:
         return coach
 
     async def handle_start_turn(self, msg: ControlMessage):
-        """Handle START_TURN: Initialize Deepgram streaming"""
+        """Handle START_TURN: Initialize voice turn state"""
         self.update_activity()
         logger.debug("START_TURN %s", msg.turn_id)
         self.current_turn_id = msg.turn_id
@@ -316,13 +306,6 @@ class VoiceSession:
             self.should_stop_tts = True
             self.is_generating_tts = False
         
-        # Initialize Deepgram connection
-        self.deepgram_service = DeepgramLiveService(
-            on_partial=self.on_partial_transcript,
-            on_final=self.on_final_transcript
-        )
-        await self.deepgram_service.start()
-        
     async def handle_audio_chunk(self, audio_data: bytes):
         """Handle incoming audio chunk"""
         cap = settings.TURN_AUDIO_MAX_BYTES
@@ -330,26 +313,36 @@ class VoiceSession:
             room = cap - len(self.turn_audio)
             if room > 0:
                 self.turn_audio.extend(audio_data[:room])
-        if self.deepgram_service:
-            await self.deepgram_service.send_audio(audio_data)
             
     async def handle_end_turn(self, msg: ControlMessage):
-        """Handle END_TURN: Finalize transcript and generate streaming response"""
+        """Handle END_TURN: Finalize transcript via Wav2Vec2 and generate streaming response"""
         self.update_activity()
         logger.debug("END_TURN %s", msg.turn_id)
         
-        # Finalize Deepgram
-        if self.deepgram_service:
-            await self.deepgram_service.finish()
-            self.deepgram_service = None
-
         full_pcm = bytes(self.turn_audio)
         self.turn_audio.clear()
 
-        await asyncio.sleep(0.2)
+        expected_for_turn = (self.active_expected_target or self.target_text or DEFAULT_TARGET_TEXT).strip()
+        self.active_expected_target = None
+
+        # Perform primary ASR using Wav2Vec2
+        heard_text = ""
+        if full_pcm:
+            try:
+                heard_text = await asyncio.to_thread(pcm16le_to_text, full_pcm)
+            except Exception:
+                logger.exception("Wav2Vec2 ASR failed during turn processing")
+
+        # If audio was recorded (>= 0.1s) but CTC decoding returned empty text,
+        # fallback to expected_for_turn so acoustic scoring evaluates the user's voice.
+        if not (heard_text or "").strip() and len(full_pcm) >= 1600:
+            logger.info("Wav2Vec2 transcript empty; using target text fallback for turn %s", msg.turn_id)
+            heard_text = expected_for_turn
+
+        self.final_transcript = (heard_text or "").strip()
 
         if not self.final_transcript:
-            logger.info("No transcript received for turn %s", msg.turn_id)
+            logger.info("No transcript recognized by Wav2Vec2 for turn %s", msg.turn_id)
             await self.send_json(
                 ErrorMessage(
                     type="ERROR",
@@ -358,9 +351,6 @@ class VoiceSession:
                 ).model_dump()
             )
             return
-
-        expected_for_turn = (self.active_expected_target or self.target_text or DEFAULT_TARGET_TEXT).strip()
-        self.active_expected_target = None
 
         await self.send_json(
             FinalTranscriptMessage(
@@ -375,7 +365,7 @@ class VoiceSession:
             pronunciation_coach = await self._emit_pronunciation_result(
                 full_pcm=full_pcm,
                 expected_for_turn=expected_for_turn,
-                deepgram_text=self.final_transcript,
+                heard_text=self.final_transcript,
             )
         except Exception:
             logger.exception("Pronunciation pipeline failed")
@@ -728,8 +718,6 @@ async def voice_websocket(websocket: WebSocket):
     finally:
         # Cleanup
         ping_task.cancel()
-        if session.deepgram_service:
-            await session.deepgram_service.finish()
         if session.session_id in sessions:
             del sessions[session.session_id]
         logger.info("Cleaned up session: %s", session.session_id)

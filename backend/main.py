@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
             await asyncio.to_thread(warm_wav2vec2)
         except Exception:
-            logger.exception("Wav2Vec2 warm failed; falling back to Deepgram transcripts")
+            logger.exception("Wav2Vec2 warm failed")
 
     if settings.ENABLE_ACOUSTIC_SCORING and settings.WARM_ACOUSTIC_ON_STARTUP:
         try:

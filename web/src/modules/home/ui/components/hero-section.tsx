@@ -36,7 +36,7 @@ const STATS = [
 ];
 
 const TECH_LOGOS = [
-  "Deepgram",
+  "Wav2Vec2 ASR",
   "Google Cloud TTS",
   "Next.js",
   "FastAPI",

@@ -4,7 +4,7 @@ FastAPI service for realtime voice practice and pronunciation analysis.
 
 ## Runtime
 
-- `/ws/voice`: WebSocket voice session. Receives PCM16 audio chunks, uses Deepgram for transcription, OpenRouter for LLM responses, Google Cloud TTS for audio replies, and emits pronunciation feedback.
+- `/ws/voice`: WebSocket voice session. Receives PCM16 audio chunks, uses Wav2Vec2 for transcription, OpenRouter for LLM responses, Google Cloud TTS for audio replies, and emits pronunciation feedback.
 - `/api/phonemes/*`: HTTP pronunciation utilities for sentence analysis, word analysis, IPA lookup, comparison, and reference syllables.
 - `/health`: service health check.
 
@@ -15,11 +15,10 @@ The old multipart `/transcribe` and `/clear-conversation` HTTP flow has been rem
 ```env
 FRONTEND_URL=http://localhost:3000
 OPENROUTER_API_KEY=
-DEEPGRAM_API_KEY=
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/google-credentials.json
 # or GOOGLE_CREDENTIALS_JSON=<base64-json>
-ENABLE_WAV2VEC2=0
-WARM_WAV2VEC2_ON_STARTUP=0
+ENABLE_WAV2VEC2=1
+WARM_WAV2VEC2_ON_STARTUP=1
 WAV2VEC2_MODEL_ID=facebook/wav2vec2-base-960h
 TURN_AUDIO_MAX_BYTES=160000
 ```

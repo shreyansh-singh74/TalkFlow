@@ -36,7 +36,6 @@ class Settings:
     ]
     
     # API Keys
-    DEEPGRAM_API_KEY: str = os.getenv("DEEPGRAM_API_KEY", "")
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
     
     # API URLs & Models
@@ -46,8 +45,6 @@ class Settings:
     OPENROUTER_MODEL: str = os.getenv(
         "OPENROUTER_MODEL", "google/gemini-2.5-flash"
     )
-    DEEPGRAM_MODEL: str = os.getenv("DEEPGRAM_MODEL", "nova-2")
-    DEEPGRAM_LANGUAGE: str = os.getenv("DEEPGRAM_LANGUAGE", "en-US")
     
     # Google Cloud Credentials - Support both file path and base64 encoded JSON
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
@@ -121,10 +118,9 @@ class Settings:
     # Paths
     TEMP_DIR: str = "/tmp"
     
-    ENABLE_WAV2VEC2: bool = os.getenv("ENABLE_WAV2VEC2", "0").lower() in ("1", "true", "yes")
+    ENABLE_WAV2VEC2: bool = os.getenv("ENABLE_WAV2VEC2", "1").lower() in ("1", "true", "yes")
     WARM_WAV2VEC2_ON_STARTUP: bool = os.getenv(
-        "WARM_WAV2VEC2_ON_STARTUP",
-        "1" if os.getenv("ENABLE_WAV2VEC2", "0").lower() in ("1", "true", "yes") else "0"
+        "WARM_WAV2VEC2_ON_STARTUP", "1"
     ).lower() in ("1", "true", "yes")
     WAV2VEC2_MODEL_ID: str = os.getenv("WAV2VEC2_MODEL_ID", "facebook/wav2vec2-base-960h")
     TURN_AUDIO_MAX_BYTES: int = int(os.getenv("TURN_AUDIO_MAX_BYTES", str(16_000 * 2 * 5)))
@@ -219,8 +215,6 @@ class Settings:
                 "Google credentials file not found at %s",
                 self.GOOGLE_APPLICATION_CREDENTIALS,
             )
-        if not self.DEEPGRAM_API_KEY:
-            logger.warning("DEEPGRAM_API_KEY is not set - speech transcription will not work")
 
 settings = Settings()
 settings.validate()

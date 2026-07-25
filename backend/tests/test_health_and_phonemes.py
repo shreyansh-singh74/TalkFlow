@@ -16,6 +16,7 @@ class HealthSmokeTests(unittest.IsolatedAsyncioTestCase):
         response = await get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "healthy")
+        self.assertEqual(response.json()["transcription_service"], "wav2vec2")
 
 
 if __name__ == "__main__":

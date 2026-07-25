@@ -16,7 +16,7 @@ const FEATURES = [
   {
     icon: Zap,
     title: "Real-time streaming",
-    desc: "Deepgram-powered live transcription with sub-150ms turnaround. No waiting, no interruptions.",
+    desc: "Wav2Vec2-powered live transcription with low-latency turnaround. No waiting, no interruptions.",
   },
   {
     icon: Volume2,

@@ -1,62 +1,42 @@
 # TalkFlow
 
-TalkFlow is a spoken-English practice app. Next.js owns auth, database CRUD, and UI; FastAPI owns realtime voice, LLM responses, text-to-speech, and pronunciation feedback.
+TalkFlow is a real-time, AI-powered spoken English practice application. It combines an interactive Next.js web interface with a FastAPI backend to provide real-time voice practice sessions, automated text-to-speech feedback, LLM conversational practice, and phoneme-level pronunciation analysis.
 
-## Stack
+## Tech Stack
 
-- Web: Next.js 15, React 19, TypeScript, Tailwind CSS, Better Auth, Drizzle ORM
-- Backend: FastAPI, Deepgram, OpenRouter, Google Cloud Text-to-Speech, optional wav2vec2 pronunciation comparison
-- Database: Postgres via `DATABASE_URL`
+### Web Frontend
+- **Framework:** Next.js 15 (App Router), React 19, TypeScript
+- **Styling:** Tailwind CSS v4, Radix UI components, Lucide React icons
+- **State & Data Fetching:** TanStack Query (React Query), TanStack Table
+- **Authentication:** Better Auth (GitHub OAuth, Google OAuth, Email & Password)
+- **Database & ORM:** PostgreSQL (Neon Serverless), Drizzle ORM, Drizzle Kit
 
-## Supported APIs
+### Backend API & ML Engine
+- **Framework:** FastAPI, Uvicorn (WebSockets & HTTP)
+- **Audio & ML Processing:** PyTorch, Hugging Face Transformers (Wav2Vec2 ASR)
+- **LLM Integration:** OpenRouter API
+- **Text-to-Speech:** Google Cloud Text-to-Speech API
+- **Phonetics & Scoring:** g2p-en, CMUDict, PyPhen, Acoustic Phoneme Alignment
 
-- Web: `/api/auth/*`, `/api/agents*`, `/api/meetings*`
-- Backend: `/health`, `/ws/voice`, `/api/phonemes/*`
+## Project Structure
 
-Removed prototype surfaces include `/test-recorder`, `/upgrade`, `/api/config`, `/api/meetings/generate-token`, `/api/webhook`, `/transcribe`, and `/clear-conversation`.
-
-## Environment
-
-Web:
-
-```env
-DATABASE_URL=
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
-BETTER_AUTH_SECRET=
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=
-SMTP_PASS=
+```
+TalkFlow/
+├── backend/            # FastAPI service (WebSockets, Speech-to-Text, LLM, TTS, Phoneme Scoring)
+├── web/                # Next.js web application (UI, Authentication, Database CRUD)
+└── docs/               # Technical documentation
 ```
 
-Backend:
+## Getting Started
 
-```env
-FRONTEND_URL=http://localhost:3000
-OPENROUTER_API_KEY=
-DEEPGRAM_API_KEY=
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/google-credentials.json
-# or GOOGLE_CREDENTIALS_JSON=<base64-json>
-ENABLE_WAV2VEC2=0
-WARM_WAV2VEC2_ON_STARTUP=0
-WAV2VEC2_MODEL_ID=facebook/wav2vec2-base-960h
-TURN_AUDIO_MAX_BYTES=160000
-# Acoustic pronunciation scoring: score the audio waveform (wav2vec2 phoneme
-# recognition + GOP alignment) instead of comparing transcript text. When 0,
-# the legacy text-proxy scorer is used.
-ENABLE_ACOUSTIC_SCORING=0
-WARM_ACOUSTIC_ON_STARTUP=0
-ACOUSTIC_PHONEME_MODEL_ID=facebook/wav2vec2-lv-60-espeak-cv-ft
-```
+### Prerequisites
+- Node.js 18+ and npm
+- Python 3.10+
+- PostgreSQL database (e.g., Neon)
 
-## Run Locally
+### 1. Backend Setup
 
-Backend:
+Navigate to the `backend` directory, create and activate a virtual environment, install dependencies, and start the service:
 
 ```bash
 cd backend
@@ -66,7 +46,9 @@ pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Web:
+### 2. Web Setup
+
+In a new terminal window, navigate to the `web` directory, install dependencies, and start the development server:
 
 ```bash
 cd web
@@ -74,14 +56,63 @@ npm install
 npm run dev
 ```
 
-## Checks
+The application will be available at `http://localhost:3000`.
 
+## Environment Variables
+
+### Web Configuration (`web/.env`)
+
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/talkflow
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+BETTER_AUTH_SECRET=your_better_auth_secret
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_email_password
+```
+
+### Backend Configuration (`backend/.env`)
+
+```env
+FRONTEND_URL=http://localhost:3000
+OPENROUTER_API_KEY=your_openrouter_api_key
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/google-credentials.json
+# Alternative: GOOGLE_CREDENTIALS_JSON=<base64-encoded-json>
+ENABLE_WAV2VEC2=1
+WARM_WAV2VEC2_ON_STARTUP=1
+WAV2VEC2_MODEL_ID=facebook/wav2vec2-base-960h
+TURN_AUDIO_MAX_BYTES=160000
+ENABLE_ACOUSTIC_SCORING=0
+WARM_ACOUSTIC_ON_STARTUP=0
+ACOUSTIC_PHONEME_MODEL_ID=facebook/wav2vec2-lv-60-espeak-cv-ft
+```
+
+## Database Management
+
+To apply schema migrations or launch Drizzle Studio:
+
+```bash
+cd web
+npm run db:push
+npm run db:studio
+```
+
+## Testing & Verification
+
+### Web Frontend
 ```bash
 cd web
 npm run lint
 npm run build
 ```
 
+### Backend API
 ```bash
 cd backend
 python -m unittest discover -s tests
