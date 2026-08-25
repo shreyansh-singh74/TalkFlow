@@ -1,78 +1,68 @@
-import Link from "next/link";
 import Image from "next/image";
-import { Github, Linkedin, Twitter } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
-const FOOTER_LINKS: Record<string, string[]> = {
-  Product: ["Practice Sessions", "Live Scoring", "Pricing", "Solutions"],
-  Developers: ["Documentation", "API Reference", "Changelog", "Support"],
-  Resources: ["About", "Blog", "Benchmarks", "Demo"],
-};
+const FOOTER_LINKS: { heading: string; links: { label: string; href: string }[] }[] = [
+  {
+    heading: "Product",
+    links: [
+      { label: "Features", href: "#features" },
+      { label: "How it works", href: "#how-it-works" },
+      { label: "See a session", href: "#demo" },
+      { label: "Pricing", href: "#pricing" },
+    ],
+  },
+  {
+    heading: "Get started",
+    links: [
+      { label: "Create an account", href: "/sign-up" },
+      { label: "Sign in", href: "/sign-in" },
+      { label: "Common questions", href: "#faq" },
+    ],
+  },
+];
 
 export function FooterSection() {
   return (
-    <footer
-      className="py-16 px-6"
-      style={{ borderTop: "1px solid rgba(239, 234, 225, 0.08)" }}
-    >
-      <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-14">
-          {/* Brand column */}
-          <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="flex items-center gap-2 mb-4">
+    <footer className="border-t border-tf-border bg-tf-bg px-6 py-16">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-14 grid grid-cols-2 gap-10 md:grid-cols-4">
+          {/* Brand */}
+          <div className="col-span-2 md:col-span-2">
+            <Link href="/" className="mb-4 flex items-center gap-2">
               <Image
-                src="/logo.svg"
-                alt="TalkFlow"
+                src="/logo-ink.svg"
+                alt=""
                 width={18}
                 height={18}
-                className="opacity-60"
+                aria-hidden="true"
               />
-              <span className="font-semibold text-sm" style={{ color: "var(--parchment)" }}>
-                TalkFlow
-              </span>
+              <span className="text-sm font-semibold text-tf-text">TalkFlow</span>
             </Link>
-            <p
-              className="text-xs leading-relaxed mb-6 max-w-[190px]"
-              style={{ color: "rgba(239, 234, 225, 0.4)" }}
-            >
-              Real-time pronunciation intelligence, built for real speech.
+            <p className="max-w-[240px] text-xs leading-relaxed text-tf-muted">
+              Real-time pronunciation intelligence, built for real speech. Coach to be
+              understood — keep your voice.
             </p>
-            <div className="flex items-center gap-3.5">
-              {[
-                { Icon: Github, label: "GitHub" },
-                { Icon: Linkedin, label: "LinkedIn" },
-                { Icon: Twitter, label: "X / Twitter" },
-              ].map(({ Icon, label }) => (
-                <Link
-                  key={label}
-                  href="#"
-                  className="transition-colors hover:text-white"
-                  style={{ color: "rgba(239, 234, 225, 0.4)" }}
-                  aria-label={label}
-                >
-                  <Icon className="w-4 h-4" />
-                </Link>
-              ))}
-            </div>
           </div>
 
-          {/* Link columns */}
-          {Object.entries(FOOTER_LINKS).map(([category, links]) => (
-            <div key={category}>
-              <h4
-                className="text-[10px] font-medium mb-4 uppercase tracking-widest font-mono"
-                style={{ color: "rgba(239, 234, 225, 0.4)" }}
-              >
-                {category}
+          {/* Link columns — only destinations that exist */}
+          {FOOTER_LINKS.map(({ heading, links }) => (
+            <div key={heading}>
+              <h4 className="mb-4 font-mono text-[10px] font-medium uppercase tracking-widest text-tf-muted">
+                {heading}
               </h4>
               <ul className="space-y-3">
-                {links.map((link) => (
-                  <li key={link}>
+                {links.map(({ label, href }) => (
+                  <li key={label}>
                     <Link
-                      href="#"
-                      className="text-xs transition-colors hover:text-white"
-                      style={{ color: "rgba(239, 234, 225, 0.5)" }}
+                      href={href}
+                      className="group inline-flex items-center gap-1 text-xs text-tf-muted transition-colors hover:text-tf-text"
                     >
-                      {link}
+                      {label}
+                      <ArrowRight
+                        className="tf-link-arrow size-3"
+                        aria-hidden="true"
+                      />
                     </Link>
                   </li>
                 ))}
@@ -81,26 +71,10 @@ export function FooterSection() {
           ))}
         </div>
 
-        {/* Bottom bar */}
-        <div
-          className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8"
-          style={{ borderTop: "1px solid rgba(239, 234, 225, 0.08)" }}
-        >
-          <p className="text-xs" style={{ color: "rgba(239, 234, 225, 0.4)" }}>
+        <div className="border-t border-tf-border pt-8">
+          <p className="text-xs text-tf-muted">
             © {new Date().getFullYear()} TalkFlow. All rights reserved.
           </p>
-          <div className="flex items-center gap-6">
-            {["Terms", "Privacy"].map((item) => (
-              <Link
-                key={item}
-                href="#"
-                className="text-xs transition-colors hover:text-white"
-                style={{ color: "rgba(239, 234, 225, 0.5)" }}
-              >
-                {item}
-              </Link>
-            ))}
-          </div>
         </div>
       </div>
     </footer>
