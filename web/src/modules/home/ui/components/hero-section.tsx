@@ -1,83 +1,117 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight, CheckCircle2, Play, Sparkles } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
 
-import CurvedLoop from "./curved-loop";
+import { HERO_LINE } from "./phoneme-data";
+import { PhonemeSlider } from "./phoneme-slider";
 
-const TRUST = ["No install", "Works in your browser", "Free to start"];
+const TRUST = ["Browser-based", "Free to start", "Accent-friendly"];
 
 export function HeroSection() {
   const { data: session } = authClient.useSession();
   const signedIn = Boolean(session?.user);
 
   return (
-    <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-tf-bg px-6 pb-20 pt-32">
-      {/* Decorative backdrop: the same sentence written, then respelled by sound.
-          Stacked rather than side-by-side so it never collides with the copy. */}
-      <div
-        className="pointer-events-none absolute inset-0 flex flex-col justify-between py-12 md:py-20"
-        aria-hidden="true"
-      >
-        <CurvedLoop
-          marqueeText="I'll check the data and update the schedule."
-          speed={0.7}
-          curveAmount={200}
-          direction="right"
-          interactive={false}
-          className="curved-loop-left"
-        />
-        <CurvedLoop
-          marqueeText="Ayl chek thuh day·tuh and up·dayt thuh skeh·jool."
-          speed={0.7}
-          curveAmount={-200}
-          direction="right"
-          interactive={false}
-          className="curved-loop-right"
-          showTrack
-        />
-      </div>
+    <section className="relative isolate flex min-h-screen flex-col justify-center overflow-hidden bg-tf-bg px-6 pb-24 pt-32 md:pt-40">
+      {/* Backdrop: green bloom behind the headline, dot grid fading downward. */}
+      <div className="pointer-events-none absolute inset-0 -z-20 bg-[radial-gradient(ellipse_60%_45%_at_50%_0%,rgba(24,164,75,0.13),transparent_70%)]" />
+      <div className="tf-dots pointer-events-none absolute inset-x-0 top-0 -z-20 h-[46rem] opacity-40 [mask-image:linear-gradient(180deg,#000_0%,transparent_78%)]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-20 h-40 bg-gradient-to-b from-transparent to-tf-bg" />
 
-      {/* Foreground copy */}
-      <div className="relative z-10 flex max-w-2xl flex-col items-center text-center">
-        <span className="tf-eyebrow mb-6 bg-tf-bg">Spoken English coach</span>
+      <div className="mx-auto flex w-full max-w-5xl flex-col items-center text-center">
+        <span className="tf-eyebrow mb-7 bg-tf-surface/70 backdrop-blur">
+          <span className="relative flex size-1.5" aria-hidden="true">
+            <span className="absolute inline-flex size-full rounded-full bg-tf-green opacity-70 motion-safe:animate-ping" />
+            <span className="relative inline-flex size-1.5 rounded-full bg-tf-green" />
+          </span>
+          Spoken English coach
+        </span>
 
-        <h1 className="text-balance text-[clamp(2.5rem,7vw,4.5rem)] font-semibold leading-[1.03] tracking-[-0.03em] text-tf-text">
-          Speak English.
-          <br />
-          <span className="h-accent">Be understood.</span>
+        <h1 className="text-balance text-[clamp(2.75rem,7.4vw,5.75rem)] font-semibold leading-[0.98] tracking-[-0.05em] text-tf-text">
+          Speak clearer.{" "}
+          <span className="h-accent tracking-[-0.03em] text-tf-green-strong">
+            Stay yourself.
+          </span>
         </h1>
 
-        <p className="mt-6 max-w-xl text-balance text-[15px] leading-relaxed text-tf-muted md:text-base">
-          An AI conversation partner that listens to how you actually say each sound,
-          then shows you exactly what to fix — and why. Intelligibility first: your
-          accent stays yours.
+        <p className="mt-7 max-w-2xl text-balance text-base leading-relaxed text-tf-muted md:text-[17px]">
+          TalkFlow listens to a sentence, aligns it against the sounds you
+          actually produced, and gives you one practical cue — so your speech gets
+          easier to understand without losing your accent.
         </p>
 
-        <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-9 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <Link
             href={signedIn ? "/dashboard" : "/sign-up"}
-            className="inline-flex items-center justify-center rounded-full bg-tf-green px-7 py-3 text-sm font-semibold text-white shadow-[0_0_24px_rgba(24,164,75,0.35)] transition-transform hover:scale-[1.03] active:scale-[0.98]"
+            className="group inline-flex items-center justify-center rounded-full bg-tf-green px-7 py-3.5 text-sm font-semibold text-white shadow-[0_14px_34px_-10px_rgba(24,164,75,0.65)] transition-all hover:bg-tf-green-strong hover:shadow-[0_18px_40px_-10px_rgba(24,164,75,0.7)] active:scale-[0.98]"
           >
             {signedIn ? "Go to dashboard" : "Start practicing free"}
+            <ArrowRight className="ml-2 size-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
           <Link
             href="#demo"
-            className="inline-flex items-center justify-center rounded-full border-[1.5px] border-tf-text bg-tf-bg px-7 py-3 text-sm font-semibold text-tf-text transition-colors hover:bg-tf-text hover:text-tf-bg"
+            className="inline-flex items-center justify-center rounded-full border border-tf-border bg-tf-surface px-7 py-3.5 text-sm font-semibold text-tf-text transition-colors hover:border-tf-text/25 hover:bg-tf-green-tint"
           >
-            See a session
+            <Play className="mr-2 size-3.5 fill-current text-tf-green-strong" />
+            See a scored session
           </Link>
         </div>
 
-        <ul className="mt-7 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[12px] text-tf-muted">
-          {TRUST.map((item, i) => (
-            <li key={item} className="flex items-center gap-2">
-              {i > 0 ? <span aria-hidden="true">·</span> : null}
+        <ul className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12.5px] text-tf-muted">
+          {TRUST.map((item) => (
+            <li key={item} className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="size-3.5 text-tf-green" aria-hidden="true" />
               {item}
             </li>
           ))}
         </ul>
+      </div>
+
+      {/* The product in one object: the same sentence rolling from spelling to
+          sounds to IPA, with the cue that follows from it. */}
+      <div className="relative z-10 mx-auto mt-16 w-full max-w-4xl md:mt-20">
+        <div className="overflow-hidden rounded-[1.75rem] border border-tf-border bg-tf-surface shadow-[0_30px_80px_-32px_rgba(8,32,26,0.28)]">
+          <div className="flex items-center justify-between gap-4 border-b border-tf-border bg-tf-green-tint/60 px-5 py-3.5">
+            <span className="flex items-center gap-2 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-tf-muted">
+              <Sparkles className="size-3.5 text-tf-green-strong" aria-hidden="true" />
+              Sound alignment
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-tf-subtle sm:inline">
+                intelligibility
+              </span>
+              <span className="rounded-full bg-tf-green px-2.5 py-1 font-mono text-[11px] font-semibold text-white">
+                79%
+              </span>
+            </span>
+          </div>
+
+          {/* No rules or grid in here on purpose — the sentence has to read as a
+              sentence, and anything vertical behind it chops it into cells. */}
+          <div className="relative px-5 py-10 md:px-10 md:py-12">
+            <div
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_65%_at_50%_50%,rgba(24,164,75,0.07),transparent_75%)]"
+              aria-hidden="true"
+            />
+            <div className="relative">
+              <PhonemeSlider tokens={HERO_LINE} />
+            </div>
+          </div>
+
+          <div className="border-t border-tf-border bg-tf-green-light/45 px-5 py-4 md:px-8">
+            <p className="text-left text-[13.5px] leading-relaxed text-tf-muted">
+              <span className="mr-2 inline-flex items-center rounded-md bg-tf-green px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
+                Cue
+              </span>
+              In <strong className="font-semibold text-tf-text">data</strong>, start
+              with <span className="font-mono text-tf-green-strong">/eɪ/</span> like
+              “day”, then relax into “tuh”. Fix the sound, not your accent.
+            </p>
+          </div>
+        </div>
       </div>
     </section>
   );

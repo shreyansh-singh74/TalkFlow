@@ -12,6 +12,8 @@ interface SectionHeadingProps {
   sub?: string;
   align?: "left" | "center";
   as?: "h1" | "h2";
+  /** `deep` inverts the type for the dark forest-green sections. */
+  tone?: "light" | "deep";
   className?: string;
 }
 
@@ -27,9 +29,11 @@ export function SectionHeading({
   sub,
   align = "center",
   as: Tag = "h2",
+  tone = "light",
   className,
 }: SectionHeadingProps) {
   const centered = align === "center";
+  const deep = tone === "deep";
 
   return (
     <div
@@ -39,21 +43,30 @@ export function SectionHeading({
         className,
       )}
     >
-      {eyebrow ? <span className="tf-eyebrow mb-5">{eyebrow}</span> : null}
+      {eyebrow ? (
+        <span className={cn("tf-eyebrow mb-5", deep && "tf-eyebrow-deep")}>
+          {eyebrow}
+        </span>
+      ) : null}
 
       <Tag
         className={cn(
-          "text-balance text-tf-text",
+          "text-balance",
+          deep ? "text-tf-deep-text" : "text-tf-text",
           Tag === "h1"
             ? "text-[clamp(2.5rem,6vw,4.5rem)] font-semibold leading-[1.03] tracking-[-0.03em]"
-            : "text-3xl font-semibold leading-[1.12] tracking-tight md:text-4xl",
+            : "text-[clamp(1.875rem,3.6vw,2.75rem)] font-semibold leading-[1.1] tracking-[-0.035em]",
         )}
       >
         {title}
         {accent ? (
           <>
             {accentOnNewLine ? <br /> : " "}
-            <span className="h-accent">{accent}</span>
+            <span
+              className={cn("h-accent", deep ? "text-tf-mint" : "text-tf-green-strong")}
+            >
+              {accent}
+            </span>
           </>
         ) : null}
       </Tag>
@@ -61,7 +74,8 @@ export function SectionHeading({
       {sub ? (
         <p
           className={cn(
-            "mt-5 text-balance text-[15px] leading-relaxed text-tf-muted",
+            "mt-5 text-balance text-[15px] leading-relaxed",
+            deep ? "text-tf-deep-muted" : "text-tf-muted",
             centered ? "max-w-xl" : "max-w-lg",
           )}
         >

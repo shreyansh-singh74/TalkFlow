@@ -23,20 +23,7 @@ session.on("phoneme", (result) => {
 session.on("complete", ({ accuracy, misses }) => {
   console.log(\`Score: \${accuracy}% — \${misses} misses\`);
 });`,
-    html: `<span class="t-comment">// Practice Session — live phoneme feedback</span>
-<span class="t-kw">const</span> session = <span class="t-dim">await</span> talkflow.<span class="t-white">startSession</span>({
-  targetText: <span class="t-str">"pronunciation accuracy"</span>,
-  streamAudio: <span class="t-amber">true</span>,
-});
-
-session.<span class="t-white">on</span>(<span class="t-str">"phoneme"</span>, (result) =&gt; {
-  console.<span class="t-white">log</span>(result);
-  <span class="t-comment">// { expected: "ə", actual: "ɛ", correct: false, latency_ms: 142 }</span>
-});
-
-session.<span class="t-white">on</span>(<span class="t-str">"complete"</span>, ({ accuracy, misses }) =&gt; {
-  console.<span class="t-white">log</span>(<span class="t-str">\`Score: \${accuracy}% — \${misses} misses\`</span>);
-});`,
+    html: `<span class="t-comment">// Practice Session — live phoneme feedback</span>\n<span class="t-kw">const</span> session = <span class="t-dim">await</span> talkflow.<span class="t-fn">startSession</span>({\n  targetText: <span class="t-str">"pronunciation accuracy"</span>,\n  streamAudio: <span class="t-bool">true</span>,\n});\n\nsession.<span class="t-fn">on</span>(<span class="t-str">"phoneme"</span>, (result) =&gt; {\n  console.<span class="t-fn">log</span>(result);\n  <span class="t-comment">// { expected: "ə", actual: "ɛ", correct: false, latency_ms: 142 }</span>\n});\n\nsession.<span class="t-fn">on</span>(<span class="t-str">"complete"</span>, ({ accuracy, misses }) =&gt; {\n  console.<span class="t-fn">log</span>(<span class="t-str">\`Score: \${accuracy}% — \${misses} misses\`</span>);\n});`,
   },
   "API / SDK": {
     lang: "python",
@@ -55,21 +42,7 @@ result = client.score_pronunciation(
 #     { "expected": "p", "actual": "p", "correct": True  },
 #     { "expected": "ə", "actual": "ɛ", "correct": False },
 #   ] }`,
-    html: `<span class="t-kw">import</span> talkflow
-
-client = talkflow.<span class="t-white">Client</span>(api_key=<span class="t-str">"tf_live_..."</span>)
-
-result = client.<span class="t-white">score_pronunciation</span>(
-    audio=<span class="t-str">"path/to/recording.wav"</span>,
-    target_text=<span class="t-str">"pronunciation accuracy"</span>,
-    return_phonemes=<span class="t-amber">True</span>,
-)
-
-<span class="t-comment"># { "accuracy": 0.83, "latency_ms": 142,</span>
-<span class="t-comment">#   "phonemes": [</span>
-<span class="t-comment">#     { "expected": "p", "actual": "p", "correct": True  },</span>
-<span class="t-miss">#     { "expected": "ə", "actual": "ɛ", "correct": False },</span>
-<span class="t-comment">#   ] }</span>`,
+    html: `<span class="t-kw">import</span> talkflow\n\nclient = talkflow.<span class="t-fn">Client</span>(api_key=<span class="t-str">"tf_live_..."</span>)\n\nresult = client.<span class="t-fn">score_pronunciation</span>(\n    audio=<span class="t-str">"path/to/recording.wav"</span>,\n    target_text=<span class="t-str">"pronunciation accuracy"</span>,\n    return_phonemes=<span class="t-bool">True</span>,\n)\n\n<span class="t-comment"># { "accuracy": 0.83, "latency_ms": 142,</span>\n<span class="t-comment">#   "phonemes": [</span>\n<span class="t-comment">#     { "expected": "p", "actual": "p", "correct": True  },</span>\n<span class="t-miss">#     { "expected": "ə", "actual": "ɛ", "correct": False },</span>\n<span class="t-comment">#   ] }</span>`,
   },
   "Diff Engine": {
     lang: "python",
@@ -88,21 +61,7 @@ for op in diff.operations:
 # { "op": "replace", "from": "ə", "to": "ɛ" }  ← mismatch
 # { "op": "keep",    "phoneme": "n" }
 # { "op": "replace", "from": "ʃ", "to": "s" }  ← mismatch`,
-    html: `<span class="t-kw">from</span> talkflow.diff <span class="t-kw">import</span> phoneme_diff
-
-diff = <span class="t-white">phoneme_diff</span>(
-    expected=<span class="t-str">"p r ə n ʌ n . s i . eɪ . ʃ ə n"</span>,
-    actual  =<span class="t-str">"p r ɛ n ʌ n . s i . eɪ . s ə n"</span>,
-)
-
-<span class="t-dim">for</span> op <span class="t-dim">in</span> diff.operations:
-    <span class="t-white">print</span>(op)
-
-<span class="t-comment"># { "op": "keep",    "phoneme": "p" }</span>
-<span class="t-comment"># { "op": "keep",    "phoneme": "r" }</span>
-<span class="t-miss"># { "op": "replace", "from": "ə", "to": "ɛ" }  ← mismatch</span>
-<span class="t-comment"># { "op": "keep",    "phoneme": "n" }</span>
-<span class="t-miss"># { "op": "replace", "from": "ʃ", "to": "s" }  ← mismatch</span>`,
+    html: `<span class="t-kw">from</span> talkflow.diff <span class="t-kw">import</span> phoneme_diff\n\ndiff = <span class="t-fn">phoneme_diff</span>(\n    expected=<span class="t-str">"p r ə n ʌ n . s i . eɪ . ʃ ə n"</span>,\n    actual  =<span class="t-str">"p r ɛ n ʌ n . s i . eɪ . s ə n"</span>,\n)\n\n<span class="t-dim">for</span> op <span class="t-dim">in</span> diff.operations:\n    <span class="t-fn">print</span>(op)\n\n<span class="t-comment"># { "op": "keep",    "phoneme": "p" }</span>\n<span class="t-comment"># { "op": "keep",    "phoneme": "r" }</span>\n<span class="t-miss"># { "op": "replace", "from": "ə", "to": "ɛ" }  ← mismatch</span>\n<span class="t-comment"># { "op": "keep",    "phoneme": "n" }</span>\n<span class="t-miss"># { "op": "replace", "from": "ʃ", "to": "s" }  ← mismatch</span>`,
   },
 };
 
@@ -119,49 +78,29 @@ export function CodeSection() {
   };
 
   return (
-    <section
-      className="py-24 px-6"
-      style={{ borderTop: "1px solid rgba(239, 234, 225, 0.08)" }}
-    >
-      <div className="max-w-5xl mx-auto">
+    <section className="border-t border-tf-border bg-tf-bg px-6 py-24">
+      <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-10 text-center md:text-left">
-          <p
-            className="text-[10px] uppercase tracking-widest mb-3 font-mono"
-            style={{ color: "rgba(239, 234, 225, 0.4)" }}
-          >
-            Integration
-          </p>
-          <h2
-            className="text-3xl md:text-4xl font-semibold tracking-tight"
-            style={{ color: "var(--parchment)" }}
-          >
+          <span className="tf-eyebrow mb-3">Integration</span>
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-tf-text md:text-4xl">
             From raw speech to structured feedback — one call.
           </h2>
         </div>
 
         {/* Code panel */}
-        <div
-          className="rounded-xl overflow-hidden"
-          style={{
-            backgroundColor: "#1C1E22",
-            border: "1px solid rgba(239, 234, 225, 0.08)",
-          }}
-        >
+        <div className="overflow-hidden rounded-2xl border border-tf-border bg-tf-surface shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           {/* Tab bar */}
-          <div
-            className="flex items-center px-2 overflow-x-auto"
-            style={{ borderBottom: "1px solid rgba(239, 234, 225, 0.08)" }}
-          >
+          <div className="flex items-center overflow-x-auto border-b border-tf-border px-2">
             {TABS.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className="flex-shrink-0 px-4 py-3.5 text-[13px] font-medium border-b-2 transition-colors -mb-px whitespace-nowrap"
-                style={{
-                  borderColor: activeTab === tab ? "var(--emerald)" : "transparent",
-                  color: activeTab === tab ? "#00d196" : "rgba(239, 234, 225, 0.4)",
-                }}
+                className={`flex-shrink-0 px-4 py-3.5 text-[13px] font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
+                  activeTab === tab
+                    ? "border-tf-green text-tf-green-strong"
+                    : "border-transparent text-tf-muted hover:text-tf-text"
+                }`}
               >
                 {tab}
               </button>
@@ -170,50 +109,40 @@ export function CodeSection() {
             {/* Copy button */}
             <button
               onClick={handleCopy}
-              className="ml-auto flex-shrink-0 flex items-center gap-1.5 text-xs transition-colors px-3 py-2 mr-1 rounded"
-              style={{ color: "rgba(239, 234, 225, 0.4)" }}
+              className="ml-auto flex shrink-0 items-center gap-1.5 rounded px-3 py-2 text-xs text-tf-muted transition-colors hover:text-tf-text"
             >
               {copied ? (
-                <Check className="w-3.5 h-3.5" style={{ color: "#22C55E" }} />
+                <Check className="size-3.5 text-tf-green" />
               ) : (
-                <Copy className="w-3.5 h-3.5" />
+                <Copy className="size-3.5" />
               )}
               <span>{copied ? "Copied" : "Copy"}</span>
             </button>
           </div>
 
           {/* Code body */}
-          <div className="p-6 overflow-x-auto">
-            <div className="flex items-center gap-2 mb-4">
-              <span
-                className="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded"
-                style={{
-                  color: "rgba(239, 234, 225, 0.4)",
-                  border: "1px solid rgba(239, 234, 225, 0.08)",
-                }}
-              >
+          <div className="overflow-x-auto bg-[#F8F8F0] p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <span className="rounded border border-tf-border bg-tf-bg px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-tf-muted">
                 {snippet.lang}
               </span>
             </div>
-            <pre
-              className="text-[13px] leading-[1.8] font-mono"
-              style={{ color: "rgba(239, 234, 225, 0.7)" }}
-            >
+            <pre className="font-mono text-[13px] leading-[1.8] text-tf-muted">
               <code dangerouslySetInnerHTML={{ __html: snippet.html }} />
             </pre>
           </div>
         </div>
       </div>
 
-      {/* Syntax token colors */}
+      {/* Syntax token colors — warm cream-compatible palette */}
       <style>{`
-        .t-kw      { color: #6C8BFF; }
-        .t-dim     { color: rgba(239, 234, 225, 0.4); }
-        .t-str     { color: #86EFAC; }
-        .t-amber   { color: #FF8F5B; }
-        .t-white   { color: var(--parchment); }
-        .t-comment { color: rgba(239, 234, 225, 0.25); }
-        .t-miss    { color: var(--amber-warm); }
+        .t-kw      { color: #5B6FD4; }
+        .t-dim     { color: rgba(26, 26, 26, 0.35); }
+        .t-fn      { color: #1A1A1A; font-weight: 500; }
+        .t-str     { color: #18A44B; }
+        .t-bool    { color: #C25E2F; }
+        .t-comment { color: rgba(26, 26, 26, 0.30); }
+        .t-miss    { color: var(--amber-warm); font-weight: 500; }
       `}</style>
     </section>
   );
