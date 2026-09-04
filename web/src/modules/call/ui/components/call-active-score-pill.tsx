@@ -71,7 +71,9 @@ export function CallActiveScorePill({
 
   return (
     <div className={cn(PILL_BOX, band)}>
-      <span className="text-base font-bold tabular-nums leading-none">{score}%</span>
+      <span className="text-base font-bold tabular-nums leading-none">
+        {Math.round(score)}%
+      </span>
       <span className="text-[10px] font-semibold text-neutral-500">
         {passed ? "passed" : `need ${passThreshold}%`}
       </span>

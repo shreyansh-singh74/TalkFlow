@@ -67,112 +67,109 @@ export function CallActiveSentence({
     >
       <TranscriptViewerAudio />
 
-      {/* Level target badge */}
-      <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 text-xs">
+      {/* Level target badge. The recording / evaluating state is deliberately
+          not repeated here — the score pill straddling the panel's top edge is
+          the one authoritative readout for it, and it sits directly above. */}
+      <div className="flex shrink-0 items-center justify-center gap-2 text-xs">
         <span className="rounded-full px-3 py-1 font-semibold bg-neutral-100 text-neutral-600 border border-neutral-200/80">
           Level target
         </span>
-        {isTalking && (
-          <span className="rounded-full px-3 py-1 font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
-            🎙️ Listening... (Hold SPACE)
-          </span>
-        )}
-        {isEvaluating && (
-          <span className="rounded-full px-3 py-1 font-bold bg-blue-100 text-blue-800 border border-blue-300 animate-pulse">
-            ⚡ Evaluating...
-          </span>
-        )}
       </div>
 
-      {/* Preceding line of a pasted text */}
-      <CallActiveContext text={contextBefore} position="before" note={stepNote} />
+      {/* The line being read, its neighbouring lines and the model audio travel
+          as one block, centred in the panel's spare height — so the player sits
+          directly under the sentence instead of being pushed to the panel floor
+          with a void in between. Only the words scroll: the player must not
+          scroll away when the sentence is long. */}
+      <div className="flex w-full min-w-0 flex-col justify-center gap-2 lg:min-h-0 lg:flex-1">
+        {/* Preceding line of a pasted text */}
+        <CallActiveContext text={contextBefore} position="before" note={stepNote} />
 
-      {/* Interactive target words with word-by-word active audio sync
-          highlighting. The pane scrolls internally on desktop; below `lg` it
-          grows with the words and the page scrolls. `my-auto` is the safe way
-          to centre short content — unlike `content-center` it cannot push the
-          first line past the scroll origin when the words overflow. */}
-      <div
-        data-call-pane="target"
-        className="flex min-h-0 w-full min-w-0 flex-col lg:flex-1 lg:overflow-y-auto"
-      >
-        <TranscriptViewerWords
-          className="my-auto px-2"
-          renderWord={({ word, status }) => {
-            const part = word.word;
-            const norm = normalizeWord(part);
-            const wrong = norm ? misExpectedNormSet.has(norm) : false;
-            const active = norm === activeWordKey;
+        {/* Interactive target words with word-by-word active audio sync
+            highlighting. The pane shrinks and scrolls internally on desktop;
+            below `lg` it grows with the words and the page scrolls. */}
+        <div
+          data-call-pane="target"
+          className="w-full min-w-0 lg:min-h-0 lg:overflow-y-auto"
+        >
+          <TranscriptViewerWords
+            className="px-2"
+            renderWord={({ word, status }) => {
+              const part = word.word;
+              const norm = normalizeWord(part);
+              const wrong = norm ? misExpectedNormSet.has(norm) : false;
+              const active = norm === activeWordKey;
 
-            return (
-              <button
-                type="button"
-                onClick={() => {
-                  if (norm) onWordClick(norm);
-                }}
-                className={cn(
-                  "group flex flex-col items-center focus:outline-none transition-all duration-200 cursor-pointer px-1",
-                  wrong && "animate-word-shake"
-                )}
-              >
-                <span
-                  className={cn(
-                    "call-target-word font-bold leading-tight tracking-tight transition-all duration-200",
-                    status === "current" && "bg-emerald-100/90 text-emerald-950 scale-105 rounded-lg px-2 py-0.5 shadow-2xs border-b-3 border-emerald-600",
-                    status === "spoken" && !wrong && "text-neutral-900",
-                    status === "unspoken" && !wrong && !active && "text-neutral-600",
-                    active && isTalking && "animate-word-glow"
-                  )}
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    color: wrong
-                      ? "#dc2626"
-                      : active && status !== "current"
-                        ? "#14161A"
-                        : undefined,
-                    borderBottom: wrong
-                      ? "3px solid #dc2626"
-                      : active && status !== "current"
-                        ? "3px solid #059669"
-                        : undefined,
-                    paddingBottom: status === "current" ? "2px" : "4px",
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (norm) onWordClick(norm);
                   }}
+                  className={cn(
+                    "group flex flex-col items-center focus:outline-none transition-all duration-200 cursor-pointer px-1",
+                    wrong && "animate-word-shake"
+                  )}
                 >
-                  {part}
-                </span>
-              </button>
-            );
-          }}
-        />
-      </div>
-
-      {/* Following line of a pasted text */}
-      <CallActiveContext text={contextAfter} position="after" />
-
-      {/* Audio controls row: Play/Pause button + ScrubBar */}
-      <div className="mx-auto mt-auto flex w-full max-w-sm shrink-0 items-center gap-3 rounded-full border border-neutral-200/80 bg-neutral-50/80 px-4 py-2 shadow-2xs backdrop-blur-xs">
-        <TranscriptViewerPlayPauseButton />
-        <TranscriptViewerScrubBar />
-      </div>
-
-      {/* Dynamic Canvas Live Waveform Display when recording or evaluating */}
-      {(isTalking || isEvaluating) && (
-        <div className="mx-auto mt-2 w-full max-w-sm shrink-0 px-4">
-          <LiveWaveform
-            active={isTalking}
-            processing={isEvaluating}
-            stream={micStream}
-            mode="static"
-            height={36}
-            barWidth={3}
-            barGap={2}
-            barRadius={1.5}
-            barColor={isTalking ? "#059669" : "#3b82f6"}
-            fadeEdges={true}
-            fadeWidth={20}
+                  <span
+                    className={cn(
+                      "call-target-word font-bold leading-tight tracking-tight transition-all duration-200",
+                      status === "current" && "bg-emerald-100/90 text-emerald-950 scale-105 rounded-lg px-2 py-0.5 shadow-2xs border-b-3 border-emerald-600",
+                      status === "spoken" && !wrong && "text-neutral-900",
+                      status === "unspoken" && !wrong && !active && "text-neutral-600",
+                      active && isTalking && "animate-word-glow"
+                    )}
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      color: wrong
+                        ? "#dc2626"
+                        : active && status !== "current"
+                          ? "#14161A"
+                          : undefined,
+                      borderBottom: wrong
+                        ? "3px solid #dc2626"
+                        : active && status !== "current"
+                          ? "3px solid #059669"
+                          : undefined,
+                      paddingBottom: status === "current" ? "2px" : "4px",
+                    }}
+                  >
+                    {part}
+                  </span>
+                </button>
+              );
+            }}
           />
         </div>
-      )}
+
+        {/* Following line of a pasted text */}
+        <CallActiveContext text={contextAfter} position="after" />
+
+        {/* Audio controls row: Play/Pause button + ScrubBar */}
+        <div className="mx-auto flex w-full max-w-sm shrink-0 items-center gap-3 rounded-full border border-neutral-200/80 bg-neutral-50/80 px-4 py-2 shadow-2xs backdrop-blur-xs">
+          <TranscriptViewerPlayPauseButton />
+          <TranscriptViewerScrubBar />
+        </div>
+
+        {/* Dynamic Canvas Live Waveform Display when recording or evaluating */}
+        {(isTalking || isEvaluating) && (
+          <div className="mx-auto w-full max-w-sm shrink-0 px-4">
+            <LiveWaveform
+              active={isTalking}
+              processing={isEvaluating}
+              stream={micStream}
+              mode="static"
+              height={36}
+              barWidth={3}
+              barGap={2}
+              barRadius={1.5}
+              barColor={isTalking ? "#059669" : "#3b82f6"}
+              fadeEdges={true}
+              fadeWidth={20}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Word mode sentence context */}
       {practiceMode === "word" && practiceSentence !== targetText && (

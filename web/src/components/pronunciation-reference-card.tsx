@@ -188,9 +188,11 @@ export function PronunciationReferenceCard({
             </div>
           )}
 
-          {/* Mismatch coaching note */}
+          {/* Mismatch coaching note. Sized to its text rather than stretched
+              across the cell — a one-line sentence in a full-width band read as
+              a banner and pushed the phone strip down. */}
           {activePair && (
-            <p className="rounded-lg px-3.5 py-2 text-xs leading-relaxed bg-blue-50 border border-blue-200 text-blue-800 font-medium">
+            <p className="w-fit max-w-full rounded-lg px-3 py-1.5 text-xs leading-relaxed bg-blue-50 border border-blue-200 text-blue-800 font-medium">
               Expected <strong className="text-blue-950">&ldquo;{activePair.expected}&rdquo;</strong>, heard{" "}
               <span className="font-bold text-red-600">&ldquo;{activePair.heard}&rdquo;</span>.
             </p>
@@ -240,10 +242,10 @@ export function PronunciationReferenceCard({
             dimmed={status === "loading"}
             className="call-mouth"
           />
-          <p className="min-h-8 max-w-36 text-center text-[10px] font-semibold leading-tight text-emerald-900/80">
+          <p className="min-h-7 max-w-32 text-center text-[10px] font-semibold leading-tight text-emerald-900/80">
             {status === "loading" ? "Loading audio…" : hintFor(frame.pose)}
           </p>
-          <span className="text-[8px] font-bold uppercase tracking-widest text-emerald-800/70">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-800/70">
             {isBusy
               ? silent
                 ? "Silent demo"

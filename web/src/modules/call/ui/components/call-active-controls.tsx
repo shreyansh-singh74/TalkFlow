@@ -13,6 +13,14 @@ export type UIState =
   | "Transitioning"
   | "Practice Complete";
 
+/**
+ * `conversationStatus` (see `use-push-to-talk`) idles at "Hold SPACE to talk"
+ * and reads "Recording..." while the mic is open — both of which the hint row
+ * already says on its own, so printing them again produced a visibly duplicated
+ * line. Only the coach-activity values add anything.
+ */
+const REDUNDANT_STATUS = new Set(["Hold SPACE to talk", "Recording..."]);
+
 interface CallActiveControlsProps {
   uiState: UIState;
   isConnected?: boolean;
@@ -57,6 +65,11 @@ export function CallActiveControls({
   onCancelEvaluating,
 }: CallActiveControlsProps) {
   const micDisabled = isTransitioning || isEvaluating || uiState === "Level Complete";
+  const coachStatus =
+    conversationStatus && !REDUNDANT_STATUS.has(conversationStatus)
+      ? conversationStatus
+      : null;
+  const waveActive = isTalking || isEvaluating || isTransitioning;
 
   return (
     <div className="control-bar relative z-20 shrink-0 px-4 pb-2.5 pt-2 sm:px-6">
@@ -111,9 +124,16 @@ export function CallActiveControls({
 
         {/* Center: Live Audio Waveform + Mic */}
         <div className="flex items-center gap-2 sm:gap-4 justify-center">
-          {/* Left Live Waveform canvas */}
+          {/* Left Live Waveform canvas. Kept mounted at rest — the fixed-width
+              wrapper reserves its space either way, and remounting it would
+              re-attach the analyser on every mic press — but faded out, because
+              its idle baseline otherwise reads as a broken dotted line. */}
           <div className="w-20 sm:w-28 h-10 flex items-center justify-end">
             <LiveWaveform
+              className={cn(
+                "transition-opacity duration-300",
+                waveActive ? "opacity-100" : "opacity-0"
+              )}
               active={isTalking}
               processing={isEvaluating || isTransitioning}
               stream={micStream}
@@ -208,6 +228,10 @@ export function CallActiveControls({
           {/* Right Live Waveform canvas */}
           <div className="w-20 sm:w-28 h-10 flex items-center justify-start">
             <LiveWaveform
+              className={cn(
+                "transition-opacity duration-300",
+                waveActive ? "opacity-100" : "opacity-0"
+              )}
               active={isTalking}
               processing={isEvaluating || isTransitioning}
               stream={micStream}
@@ -273,11 +297,13 @@ export function CallActiveControls({
             {" "}to talk
           </span>
         )}
-        <span className="text-neutral-300">·</span>
         <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold", isConnected ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200")}>
           <span className={cn("h-1.5 w-1.5 rounded-full", isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />
           {isConnected ? "Voice Ready" : "Connecting..."}
         </span>
+        <span className="text-neutral-300">·</span>
+        <span className="text-neutral-300">·</span>
+        <span className="text-neutral-300">·</span>
         <span className="text-neutral-300">·</span>
         <button
           type="button"
@@ -287,10 +313,10 @@ export function CallActiveControls({
         >
           {isMicEnabled ? "Mic on" : "Mic off"}
         </button>
-        {conversationStatus && !isTalking && (
+        {coachStatus && (
           <>
             <span className="text-neutral-300">·</span>
-            <span className="text-neutral-500">{conversationStatus}</span>
+            <span className="text-neutral-500">{coachStatus}</span>
           </>
         )}
       </div>

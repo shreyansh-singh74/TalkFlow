@@ -194,11 +194,9 @@ export function CallActiveHeader({
         )}
       </div>
 
-      {/* Right: Progress % + Leave */}
+      {/* Right: Leave. The percentage that used to sit here said the same thing
+          as the step badge two elements to its left. */}
       <div className="flex items-center gap-3 shrink-0">
-        <span className="hidden sm:block text-xs tabular-nums font-bold text-neutral-600">
-          {Math.round(progressPct)}%
-        </span>
         <button
           type="button"
           onClick={onLeave}
