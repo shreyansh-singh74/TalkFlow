@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { pgTable, text, timestamp, boolean, pgEnum, jsonb } from "drizzle-orm/pg-core";
-import type { MeetingPhonemeDataPersisted } from "@/types/pronunciation";
+import type { SessionPhonemeDataPersisted } from "@/types/pronunciation";
+import type { PracticeScript } from "@/types/practice";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -62,7 +63,21 @@ export const verification = pgTable("verification", {
   ),
 });
 
-export const agents = pgTable("agents", {
+// Difficulty is an enforced band (word count + syllable profile + pass
+// threshold), defined once in `backend/app/services/practice_content.py` and
+// exposed via GET /api/practice/difficulty. Keep these three values in sync
+// with DIFFICULTY_BANDS there.
+export const difficultyLevel = pgEnum("difficulty_level", [
+  "easy",
+  "medium",
+  "hard",
+]);
+
+// "coach" = steps generated from the coach's topic; "custom" = steps segmented
+// from text the user pasted (speech prep).
+export const sessionSource = pgEnum("session_source", ["coach", "custom"]);
+
+export const coaches = pgTable("coaches", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => nanoid()),
@@ -70,12 +85,19 @@ export const agents = pgTable("agents", {
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  instructions: text("instructions").notNull(),
+  // What to practise, e.g. "Job interviews in tech". Drives script generation.
+  topic: text("topic").notNull().default(""),
+  difficulty: difficultyLevel("difficulty").notNull().default("medium"),
+  accent: text("accent").notNull().default("en-US"),
+  // Optional ARPAbet/IPA hints, e.g. ["θ", "r"], biasing generated sentences.
+  focusSounds: jsonb("focus_sounds").$type<string[]>().default([]),
+  // Coach personality. Optional now that topic/difficulty carry the intent.
+  instructions: text("instructions").notNull().default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow()
 });
 
-export const meetingStatus = pgEnum("meeting_status",[
+export const practiceSessionStatus = pgEnum("practice_session_status",[
   "upcoming",
   "active",
   "processing",
@@ -83,7 +105,10 @@ export const meetingStatus = pgEnum("meeting_status",[
   "cancelled"
 ])
 
-export const meetings = pgTable("meetings", {
+// Named `practiceSessions`/`practice_sessions` rather than `sessions` so it can
+// never be confused with Better Auth's `session` table above, nor with the
+// `const session = await auth.api.getSession(...)` local in every route handler.
+export const practiceSessions = pgTable("practice_sessions", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => nanoid()),
@@ -91,16 +116,24 @@ export const meetings = pgTable("meetings", {
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  agentId: text("agent_id")
-    .notNull()
-    .references(() => agents.id, { onDelete: "cascade" }),
-  status: meetingStatus("status").notNull().default("upcoming"),
+  // Null for custom (pasted-text) sessions, which have no coach behind them.
+  coachId: text("coach_id").references(() => coaches.id, { onDelete: "cascade" }),
+  status: practiceSessionStatus("status").notNull().default("upcoming"),
+  source: sessionSource("source").notNull().default("coach"),
+  // The user's pasted content, verbatim. Kept so the script can be re-segmented
+  // at a different difficulty without making them paste it again.
+  sourceText: text("source_text"),
+  // The practice steps, resolved at creation time and possibly hand-edited in
+  // the preview. This is what the WebSocket engine executes -- the backend
+  // chooses no content of its own.
+  script: jsonb("script").$type<PracticeScript>(),
+  difficulty: difficultyLevel("difficulty").notNull().default("medium"),
   startedAt: timestamp("started_at"),
   endedAt: timestamp("ended_at"),
   transcriptUrl: text("transcript_url"),
   recordingUrl: text("recording_url"),
   summary: text("summary"),
-  phonemeData: jsonb("phoneme_data").$type<MeetingPhonemeDataPersisted>(),
+  phonemeData: jsonb("phoneme_data").$type<SessionPhonemeDataPersisted>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow()
 });

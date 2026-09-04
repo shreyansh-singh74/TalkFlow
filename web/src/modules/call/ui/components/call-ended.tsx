@@ -20,7 +20,7 @@ export const CallEnded = () => {
           className="gap-2 rounded-full px-3 text-sm"
           style={{ color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}
         >
-          <Link href="/dashboard/meetings">
+          <Link href="/dashboard/sessions">
             <X className="h-4 w-4" />
             Close
           </Link>
@@ -59,7 +59,7 @@ export const CallEnded = () => {
 
           {/* CTA */}
           <Link
-            href="/dashboard/meetings"
+            href="/dashboard/sessions"
             className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold transition-all duration-200 active:scale-95 text-white"
             style={{
               background: "linear-gradient(135deg, #10b981, #14b8a6)",

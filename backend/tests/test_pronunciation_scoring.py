@@ -1,7 +1,7 @@
 """Unit tests for the Phase-1 acoustic scoring core.
 
 These cover the model-independent logic: articulatory distance, Needleman-Wunsch
-alignment, GOP-style score aggregation, and graceful fallback. The wav2vec2
+alignment, GOP-style score aggregation, and graceful fallback. The phoneme
 recognizer itself needs a downloaded model and is validated separately.
 """
 
@@ -38,6 +38,50 @@ class PhoneSetTests(unittest.TestCase):
 
     def test_ipa_to_arpabet_roundtrip(self):
         self.assertEqual(ipa_to_arpabet("θɪŋk"), ["TH", "IH", "NG", "K"])
+
+    def test_affricates_in_every_notation(self):
+        """Recognizer vocabs spell CH/JH three different ways; all must map.
+
+        The default checkpoint emits the precomposed U+02A7/U+02A4 forms. Before
+        these were mapped, ipa_to_arpabet dropped them as unknown symbols, so
+        every CH/JH in the reference silently read as a deletion.
+        """
+        for ch_form in ("tʃ", "ʧ", "t͡ʃ"):
+            with self.subTest(form=ch_form):
+                self.assertEqual(ipa_to_arpabet(ch_form), ["CH"])
+        for jh_form in ("dʒ", "ʤ", "d͡ʒ"):
+            with self.subTest(form=jh_form):
+                self.assertEqual(ipa_to_arpabet(jh_form), ["JH"])
+
+    def test_diacritics_carry_no_phone(self):
+        """Stress, length, and a bare tie bar must not produce phones."""
+        self.assertEqual(ipa_to_arpabet("ˈˌː.͡ "), [])
+        # Stress/length around a real phone leave the phone intact.
+        self.assertEqual(ipa_to_arpabet("ˈtiː"), ["T", "IY"])
+
+    def test_default_phoneme_vocab_maps_completely(self):
+        """Every phone token in the configured checkpoint's vocab must resolve.
+
+        A token that fails to map is silently dropped by ipa_to_arpabet, which
+        shows up as a phantom deletion in the user's score rather than as an
+        error. This pins the vocab of the default model
+        (vitouphy/wav2vec2-xls-r-300m-timit-phoneme) so a bad env-var swap or a
+        mapping regression fails loudly here instead.
+        """
+        vocab = [
+            "ɑ", "æ", "ə", "aʊ", "aɪ", "b", "ʧ",
+            "d", "ð", "ɾ", "ɛ", "ɝ", "eɪ", "f", "g",
+            "h", "ɪ", "i", "ʤ", "k", "l", "m", "n", "ŋ",
+            "oʊ", "ɔɪ", "p", "ɹ", "s", "ʃ", "t",
+            "θ", "ʊ", "u", "v", "w", "j", "z",
+        ]
+        for token in vocab:
+            with self.subTest(token=token):
+                mapped = ipa_to_arpabet(token)
+                self.assertEqual(
+                    len(mapped), 1,
+                    f"{token!r} -> {mapped} (expected exactly one ARPAbet phone)",
+                )
 
 
 class AlignmentTests(unittest.TestCase):
@@ -107,14 +151,31 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.method, "text_proxy")
         self.assertIsInstance(result.score, float)
 
-    def test_registry_default_is_text_proxy(self):
-        # With acoustic scoring disabled (default), registry returns text proxy.
-        from app.core.config import settings
+    def test_registry_honours_acoustic_flag(self):
+        """Registry must pick the scorer the flag asks for -- both directions.
+
+        Asserted unconditionally: an `if settings.ENABLE_ACOUSTIC_SCORING`
+        guard here would make the test pass vacuously whenever the default
+        flips, which is exactly the regression this guards against.
+        """
+        from unittest import mock
+
         from app.services.pronunciation import registry
 
-        if not settings.ENABLE_ACOUSTIC_SCORING:
-            registry._scorer = None  # reset cache for a clean read
-            self.assertEqual(registry.get_scorer().name, "text_proxy")
+        for enabled, expected in ((True, "acoustic"), (False, "text_proxy")):
+            with self.subTest(enabled=enabled):
+                with mock.patch.object(
+                    registry.settings, "ENABLE_ACOUSTIC_SCORING", enabled
+                ):
+                    registry._scorer = None  # reset cached singleton
+                    self.assertEqual(registry.get_scorer().name, expected)
+        registry._scorer = None  # don't leak a mocked-config scorer to other tests
+
+    def test_acoustic_is_the_configured_default(self):
+        """The shipped default must be acoustic; text proxy is the fallback only."""
+        from app.core.config import settings
+
+        self.assertTrue(settings.ENABLE_ACOUSTIC_SCORING)
 
 
 if __name__ == "__main__":

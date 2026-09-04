@@ -172,9 +172,18 @@ class PronunciationService:
         """Build a PronunciationEntry from a list of raw ARPABET tokens."""
         from app.schemas.pronunciation import PronunciationEntry
         from app.utils.arpabet_tables import arpabet_to_ipa
+        from app.utils.syllabify import syllabify
 
-        phonemes = self._extract_phonemes(raw_tokens)
-        syllables = self._extract_syllables(word, raw_tokens)
+        # Filter once and partition once, then build both the phoneme list and
+        # the syllable list from that single partition. Previously
+        # _extract_phonemes and _extract_syllables each re-filtered the same raw
+        # tokens independently, so the two lists stayed index-aligned only by
+        # coincidence — and neither could say which syllable a phoneme was in.
+        tokens = [t.strip() for t in raw_tokens if t and t.strip() and t.strip()[0].isalnum()]
+        groups = syllabify(tokens)
+
+        phonemes = self._extract_phonemes(tokens, groups)
+        syllables = self._extract_syllables(word, tokens, groups)
         ipa = arpabet_to_ipa(phonemes)
 
         return PronunciationEntry(
@@ -184,51 +193,60 @@ class PronunciationService:
             syllables=syllables,
         )
 
-    def _extract_phonemes(self, raw_tokens: List[str]) -> "List[PhonemeEntry]":
-        """Convert raw ARPABET token strings into PhonemeEntry objects."""
+    def _extract_phonemes(
+        self, tokens: List[str], groups: List[List[int]]
+    ) -> "List[PhonemeEntry]":
+        """Convert filtered ARPABET tokens into PhonemeEntry objects."""
         from app.schemas.pronunciation import PhonemeEntry
         from app.utils.arpabet_tables import VISEME_ID_MAP, VISEME_DEFAULT
 
+        syllable_of = {i: s for s, group in enumerate(groups) for i in group}
+
         result = []
-        for token in raw_tokens:
-            t = token.strip()
-            if not t or not t[0].isalnum():
-                continue
-            symbol, stress = _strip_stress(t)
+        for index, token in enumerate(tokens):
+            symbol, stress = _strip_stress(token)
             viseme_id = VISEME_ID_MAP.get(symbol, VISEME_DEFAULT)
             result.append(
                 PhonemeEntry(
                     symbol=symbol,
                     stress=stress,
                     viseme_id=viseme_id,
+                    syllable_index=syllable_of.get(index, 0),
                     confidence=None,
+                    # Reserved for Phase 5 forced alignment. Deliberately left
+                    # None: the mouth animation derives its frame timing on the
+                    # client from the measured audio duration, and must never
+                    # write nominal constants into a field that rhythm scoring
+                    # will read as a reference measurement.
                     expected_duration_ms=None,
                 )
             )
         return result
 
-    def _extract_syllables(self, word: str, raw_tokens: List[str]) -> "List[SyllableEntry]":
-        """Build syllable objects by reusing the existing pronunciation_reference helpers."""
+    def _extract_syllables(
+        self, word: str, tokens: List[str], groups: List[List[int]]
+    ) -> "List[SyllableEntry]":
+        """Build syllable objects from the shared phone partition."""
         from app.schemas.pronunciation import SyllableEntry
-        from app.utils.pronunciation_reference import (
-            _allocate_phonemes,
-            _phone_bits,
-            _stressed_vowel,
-        )
+        from app.utils.pronunciation_reference import _phone_bits
+        from app.utils.syllabify import syllable_stress
 
-        # Filter tokens to valid phonemes only
-        tks = [t.strip() for t in raw_tokens if t and t.strip() and t.strip()[0].isalnum()]
-        if not tks:
+        if not tokens:
             return [SyllableEntry(text=word, stress=0)]
 
-        chunks = _allocate_phonemes(word, tks)
         result = []
-        for chunk in chunks:
-            if not chunk:
+        for group in groups:
+            if not group:
                 continue
-            stressed = 1 if any(_stressed_vowel(p) for p in chunk) else 0
-            text = _phone_bits(chunk)
-            result.append(SyllableEntry(text=text, stress=stressed))
+            result.append(
+                SyllableEntry(
+                    text=_phone_bits([tokens[i] for i in group]),
+                    # Real level: 1 primary, 2 secondary, 0 none. Previously
+                    # collapsed to 1 for either, so a word with both marked two
+                    # syllables as stressed.
+                    stress=syllable_stress(tokens, group),
+                )
+            )
         return result
 
     @staticmethod

@@ -22,7 +22,7 @@ const FEATURES = [
   {
     icon: MessagesSquare,
     title: "Practice inside conversation",
-    desc: "Talk with an AI tutor about daily life, interviews or meetings. Feedback comes from sentences you would actually say.",
+    desc: "Talk with an AI tutor about daily life, interviews or sessions. Feedback comes from sentences you would actually say.",
     span: "lg:col-span-2",
   },
   {

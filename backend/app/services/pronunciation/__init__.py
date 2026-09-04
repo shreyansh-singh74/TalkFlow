@@ -4,7 +4,7 @@ Phase 1 of the audio-based scoring roadmap. Exposes a swappable
 ``PronunciationScorer`` interface with two implementations:
 
 - ``TextProxyScorer``  – the legacy text-vs-text comparison (transcript based).
-- ``AcousticScorer``   – wav2vec2 phoneme recognition on the raw audio + GOP-style
+- ``AcousticScorer``   – phoneme-CTC recognition on the raw audio + GOP-style
                           alignment scoring against the G2P reference.
 
 The active scorer is chosen by configuration so the engine can be swapped or

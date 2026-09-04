@@ -6,9 +6,14 @@ import { StreamingAudioPlayer } from "@/lib/streaming-audio-player";
 import { getWebSocketUrl } from "@/lib/backend-config";
 import { SentencePhonemeAnalysis } from "@/types/pronunciation";
 import type { PracticeTargetPayload, PronunciationResultPayload, SessionAnalysisReport } from "@/types/pronunciation";
+import type { Difficulty, PracticeStep, SessionSource } from "@/types/practice";
 import { v4 as uuidv4 } from "uuid";
 
-const DEFAULT_TARGET_TEXT = "I want to speak English more naturally";
+/**
+ * Shown only until the first PRACTICE_TARGET lands. The script decides the real
+ * content — this is a placeholder for the connecting frame, not a fallback.
+ */
+const PLACEHOLDER_TARGET_TEXT = "Connecting…";
 
 export interface TranscriptEntry {
   id: string;
@@ -33,6 +38,15 @@ export interface UsePushToTalkReturn {
   practiceMode: "word" | "sentence";
   practiceSentence: string;
   practiceProgress: { current: number; total: number };
+  /** Score the current step must reach to advance. Comes from the script. */
+  passThreshold: number;
+  /** Zero-based cursor into the script's steps. */
+  stepIndex: number;
+  /** Surrounding lines of a pasted text. Null for coach-backed sessions. */
+  contextBefore: string | null;
+  contextAfter: string | null;
+  /** Segmenter hint for the current step, e.g. "continues in the next step". */
+  stepNote: string | null;
   connect: () => Promise<void>;
   disconnect: () => void;
   startTalking: () => void;
@@ -47,15 +61,32 @@ export interface UsePushToTalkReturn {
 }
 
 interface UsePushToTalkOptions {
-  meetingId: string;
-  agentName: string;
-  agentInstructions: string;
+  sessionId: string;
+  coachName: string;
+  coachInstructions: string;
+  /**
+   * The full script, resolved at session-creation time and persisted. The
+   * backend engine executes this list verbatim — it picks no content of its
+   * own, so an empty array means the session degrades to a generic bank.
+   */
+  steps: PracticeStep[];
+  difficulty: Difficulty;
+  source: SessionSource;
+  passThreshold: number;
+  accent?: string;
+  topic?: string;
 }
 
 export function usePushToTalk({
-  meetingId,
-  agentName,
-  agentInstructions,
+  sessionId,
+  coachName,
+  coachInstructions,
+  steps,
+  difficulty,
+  source,
+  passThreshold: configuredThreshold,
+  accent = "en-US",
+  topic = "",
 }: UsePushToTalkOptions): UsePushToTalkReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [isTalking, setIsTalking] = useState(false);
@@ -67,10 +98,18 @@ export function usePushToTalk({
   const [phonemeAnalysis, setPhonemeAnalysis] = useState<SentencePhonemeAnalysis | null>(null);
   const [lastPronunciation, setLastPronunciation] =
     useState<PronunciationResultPayload | null>(null);
-  const [targetText, setTargetText] = useState(DEFAULT_TARGET_TEXT);
+  const [targetText, setTargetText] = useState(PLACEHOLDER_TARGET_TEXT);
   const [practiceMode, setPracticeMode] = useState<"word" | "sentence">("sentence");
-  const [practiceSentence, setPracticeSentence] = useState(DEFAULT_TARGET_TEXT);
-  const [practiceProgress, setPracticeProgress] = useState({ current: 1, total: 1 });
+  const [practiceSentence, setPracticeSentence] = useState(PLACEHOLDER_TARGET_TEXT);
+  const [practiceProgress, setPracticeProgress] = useState({
+    current: 1,
+    total: Math.max(1, steps.length),
+  });
+  const [passThreshold, setPassThreshold] = useState(configuredThreshold);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [contextBefore, setContextBefore] = useState<string | null>(null);
+  const [contextAfter, setContextAfter] = useState<string | null>(null);
+  const [stepNote, setStepNote] = useState<string | null>(null);
   const [sessionReport, setSessionReport] = useState<SessionAnalysisReport | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -78,7 +117,54 @@ export function usePushToTalk({
   useEffect(() => {
     targetTextRef.current = targetText;
   }, [targetText]);
-  
+
+  /**
+   * The config is rebuilt on every send rather than memoised, so a script that
+   * loads after the socket opens is still picked up by `restartSession`.
+   */
+  const configRef = useRef({
+    sessionId,
+    coachName,
+    coachInstructions,
+    steps,
+    difficulty,
+    source,
+    passThreshold: configuredThreshold,
+    accent,
+    topic,
+  });
+  configRef.current = {
+    sessionId,
+    coachName,
+    coachInstructions,
+    steps,
+    difficulty,
+    source,
+    passThreshold: configuredThreshold,
+    accent,
+    topic,
+  };
+
+  const buildSessionConfig = useCallback(() => {
+    const config = configRef.current;
+    return {
+      type: "SESSION_CONFIG",
+      session_id: config.sessionId,
+      coach_name: config.coachName,
+      coach_instructions: config.coachInstructions,
+      topic: config.topic,
+      difficulty: config.difficulty,
+      accent: config.accent,
+      pass_threshold: config.passThreshold,
+      source: config.source,
+      steps: config.steps.map((step) => ({
+        index: step.index,
+        text: step.text,
+        note: step.note ?? null,
+      })),
+    };
+  }, []);
+
   const wsRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunkerRef = useRef<AudioChunker | null>(null);
@@ -133,7 +219,9 @@ export function usePushToTalk({
         if (message.analysis) {
           const analysis = message.analysis as SentencePhonemeAnalysis;
           setPhonemeAnalysis(analysis);
-          setTargetText(message.target_text || analysis.sentence || DEFAULT_TARGET_TEXT);
+          if (message.target_text || analysis.sentence) {
+            setTargetText(message.target_text || analysis.sentence);
+          }
         }
         break;
 
@@ -150,17 +238,28 @@ export function usePushToTalk({
         }
         setLastPronunciation(p);
         setPhonemeAnalysis(null);
-        setTargetText(p.target_text || DEFAULT_TARGET_TEXT);
+        if (p.target_text) {
+          setTargetText(p.target_text);
+        }
         break;
       }
 
       case "PRACTICE_TARGET": {
         const target = message as PracticeTargetPayload;
         setLastPronunciation(null);
-        setTargetText(target.target_text || DEFAULT_TARGET_TEXT);
+        setTargetText(target.target_text);
         setPracticeMode(target.mode);
-        setPracticeSentence(target.sentence || target.target_text || DEFAULT_TARGET_TEXT);
+        setPracticeSentence(target.sentence || target.target_text);
         setPracticeProgress(target.progress || { current: 1, total: 1 });
+        setStepIndex(target.step_index ?? 0);
+        // The server is authoritative: it resolves the tier default when the
+        // client sends no threshold, so trust its value over the prop.
+        if (typeof target.pass_threshold === "number") {
+          setPassThreshold(target.pass_threshold);
+        }
+        setContextBefore(target.context_before ?? null);
+        setContextAfter(target.context_after ?? null);
+        setStepNote(target.note ?? null);
         setIsTransitioning(false);
         break;
       }
@@ -211,12 +310,7 @@ export function usePushToTalk({
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
-        ws.send(JSON.stringify({
-          type: "SESSION_CONFIG",
-          meeting_id: meetingId,
-          agent_name: agentName,
-          agent_instructions: agentInstructions,
-        }));
+        ws.send(JSON.stringify(buildSessionConfig()));
         // Pre-warm the mic stream so that getUserMedia permission is handled
         // before the user presses the button. This ensures startTalking on the
         // first press has no async gap before creating AudioContext.
@@ -284,7 +378,7 @@ export function usePushToTalk({
       void err;
       setError("Failed to connect");
     }
-  }, [agentInstructions, agentName, handleMessage, meetingId]);
+  }, [buildSessionConfig, handleMessage]);
   
   /**
    * Start talking (spacebar down)
@@ -460,15 +554,11 @@ export function usePushToTalk({
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       clearTranscripts();
       setSessionReport(null);
+      setStepIndex(0);
       setIsTransitioning(true);
-      wsRef.current.send(JSON.stringify({
-        type: "SESSION_CONFIG",
-        meeting_id: meetingId,
-        agent_name: agentName,
-        agent_instructions: agentInstructions,
-      }));
+      wsRef.current.send(JSON.stringify(buildSessionConfig()));
     }
-  }, [meetingId, agentName, agentInstructions, clearTranscripts]);
+  }, [buildSessionConfig, clearTranscripts]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -492,6 +582,11 @@ export function usePushToTalk({
     practiceMode,
     practiceSentence,
     practiceProgress,
+    passThreshold,
+    stepIndex,
+    contextBefore,
+    contextAfter,
+    stepNote,
     connect,
     disconnect,
     startTalking,

@@ -36,11 +36,20 @@ BASE_SYSTEM_PROMPT = (
 async def _call_openrouter(
     prompt: str,
     pronunciation_coach: Optional[Dict[str, Any]] = None,
-    agent_name: Optional[str] = None,
-    agent_instructions: Optional[str] = None,
+    coach_name: Optional[str] = None,
+    coach_instructions: Optional[str] = None,
     practice_state: Optional[Dict[str, Any]] = None,
+    system_override: Optional[str] = None,
+    max_tokens_override: Optional[int] = None,
+    temperature: float = 0.7,
 ) -> str:
-    """Call OpenRouter chat completions and return the full response text."""
+    """Call OpenRouter chat completions and return the full response text.
+
+    ``system_override``/``max_tokens_override`` exist so non-conversational
+    callers (script generation) can reuse this client's headers, model choice,
+    and 402 -> free-model fallback chain without inheriting the live-coaching
+    system prompt, which caps replies at three sentences.
+    """
     if not settings.OPENROUTER_API_KEY:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
 
@@ -51,12 +60,12 @@ async def _call_openrouter(
         "X-Title": os.getenv("OPENROUTER_APP_NAME", "TalkFlow"),
     }
 
-    system_parts = [BASE_SYSTEM_PROMPT]
-    if agent_name or agent_instructions:
+    system_parts = [system_override or BASE_SYSTEM_PROMPT]
+    if not system_override and (coach_name or coach_instructions):
         system_parts.append(
-            "Selected agent:\n"
-            f"Name: {agent_name or 'TalkFlow Coach'}\n"
-            f"Instructions: {agent_instructions or 'General spoken English practice.'}"
+            "Selected coach:\n"
+            f"Name: {coach_name or 'TalkFlow Coach'}\n"
+            f"Instructions: {coach_instructions or 'General spoken English practice.'}"
         )
     if pronunciation_coach:
         system_parts.append(PRONUNCIATION_COACH_SYSTEM_SUFFIX)
@@ -83,6 +92,9 @@ async def _call_openrouter(
         user_content = prompt
         max_tokens = MAX_TOKENS_DEFAULT
 
+    if max_tokens_override:
+        max_tokens = max_tokens_override
+
     payload = {
         "model": OPENROUTER_MODEL,
         "messages": [
@@ -92,7 +104,7 @@ async def _call_openrouter(
             },
             {"role": "user", "content": user_content},
         ],
-        "temperature": 0.7,
+        "temperature": temperature,
         "max_tokens": max_tokens,
     }
 
@@ -165,8 +177,8 @@ async def stream_llm_response(
     conversation_history: Optional[List[Dict]] = None,
     is_first_turn: bool = False,
     pronunciation_coach: Optional[Dict[str, Any]] = None,
-    agent_name: Optional[str] = None,
-    agent_instructions: Optional[str] = None,
+    coach_name: Optional[str] = None,
+    coach_instructions: Optional[str] = None,
     practice_state: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream an LLM response as batched text chunks."""
@@ -181,8 +193,8 @@ async def stream_llm_response(
         reply_text = await _call_openrouter(
             full_prompt,
             pronunciation_coach,
-            agent_name=agent_name,
-            agent_instructions=agent_instructions,
+            coach_name=coach_name,
+            coach_instructions=coach_instructions,
             practice_state=practice_state,
         )
 
@@ -241,35 +253,62 @@ async def stream_llm_response(
             yield "Sorry, I couldn't generate a response. Please try again."
 
 
+def _fmt_metric(label: str, value: Optional[float], suffix: str = "/100") -> str:
+    """One metric line, or an explicit 'not measured' -- never a made-up number."""
+    if value is None:
+        return f"- {label}: not measured this session"
+    return f"- {label}: {value:.0f}{suffix}"
+
+
 async def generate_coach_summary(
-    agent_name: str,
-    agent_instructions: str,
-    accuracy: float,
-    fluency: float,
-    clarity: float,
-    confidence: float,
+    coach_name: str,
+    coach_instructions: str,
+    overall: Optional[float],
+    accuracy: Optional[float],
+    fluency: Optional[float],
+    wpm: Optional[float],
     mispronounced_words: list,
     difficult_sounds: list,
 ) -> str:
-    """Generate a personalized AI coach feedback paragraph at the end of a session."""
+    """Generate a personalized AI coach feedback paragraph at the end of a session.
+
+    Metrics that were not measured are passed through as ``None`` and described
+    as such, so the model cannot narrate a fabricated pause length or fluency
+    figure back to the learner.
+    """
     prompt = (
-        f"The user has completed a spoken English practice session with you ({agent_name}).\n"
-        f"Instructions you follow: {agent_instructions}\n\n"
-        "Here are their final scores:\n"
-        f"- Pronunciation Accuracy: {accuracy:.0f}/100\n"
-        f"- Fluency: {fluency:.0f}/100\n"
-        f"- Clarity: {clarity:.0f}/100\n"
-        f"- Confidence: {confidence:.0f}/100\n\n"
-        f"Mispronounced words: {', '.join(mispronounced_words) if mispronounced_words else 'None'}\n"
-        f"Difficult sounds identified: {', '.join(difficult_sounds) if difficult_sounds else 'None'}\n\n"
+        f"The user has completed a spoken English practice session with you ({coach_name}).\n"
+        f"Instructions you follow: {coach_instructions}\n\n"
+        "Here is what was measured:\n"
+        + _fmt_metric("Overall score", overall)
+        + "\n"
+        + _fmt_metric("Pronunciation accuracy", accuracy)
+        + "\n"
+        + _fmt_metric("Consistency (fluency)", fluency)
+        + "\n"
+        + _fmt_metric("Speaking rate", wpm, " words per minute")
+        + "\n\n"
+        f"Mispronounced words: {', '.join(mispronounced_words) if mispronounced_words else 'None detected'}\n"
+        f"Sounds they struggled with: {', '.join(difficult_sounds) if difficult_sounds else 'None stood out'}\n\n"
         "Please write a personalized, encouraging, and constructive coaching feedback paragraph (4-5 sentences) summarizing their performance. "
         "Address them as a supportive spoken English coach. Highlight what they did well, where they should focus next, and how they can improve. "
+        "Only reference metrics listed above; never invent a number, and say nothing about anything marked 'not measured'. "
         "Keep it under 150 words. Do not output headings, bullet points, or generic introductions. Write it as a single cohesive paragraph."
+    )
+
+    fallback = (
+        "Nice work getting through this session. "
+        + (
+            f"You struggled most with {', '.join(difficult_sounds[:2])} — drill those next. "
+            if difficult_sounds
+            else "Keep practising to build up enough data for sound-level feedback. "
+        )
+        + "Keep sessions short and regular; consistency matters more than any single score."
     )
 
     try:
         if not settings.OPENROUTER_API_KEY:
-            return "Excellent work today! You showed solid pronunciation accuracy and spoke clearly. For the next session, focus on your word pacing and practice vowel sounds."
+            return fallback
 
         headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
@@ -301,6 +340,6 @@ async def generate_coach_summary(
             resp.raise_for_status()
             data = resp.json()
             return data["choices"][0]["message"]["content"].strip()
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to generate coach summary via OpenRouter")
-        return f"Fantastic job completing your practice session! Your accuracy reached {accuracy:.0f}%. Focus on practicing the tricky sounds like {', '.join(difficult_sounds) if difficult_sounds else 'TH and R'} in your next session, and keep speaking with confidence!"
+        return fallback

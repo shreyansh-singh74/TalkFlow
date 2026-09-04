@@ -6,7 +6,7 @@ import { SectionHeading } from "./section-heading";
 const USE_CASES = [
   {
     icon: BriefcaseBusiness,
-    title: "Meetings and standups",
+    title: "Sessions and standups",
     desc: "Practise the sentences you actually say at work: updates, questions, blockers, timelines and handoffs.",
     example: "I’ll check the data and update the schedule.",
     focus: { word: "schedule", ipa: "ˈskɛ.dʒuːl" },
@@ -36,7 +36,7 @@ export function TestimonialsSection() {
             eyebrow="Where it helps"
             title="Practise English for"
             accent="the moments that matter."
-            sub="Use TalkFlow before the call, meeting, class or interview where being understood changes the outcome."
+            sub="Use TalkFlow before the call, session, class or interview where being understood changes the outcome."
           />
         </Reveal>
 

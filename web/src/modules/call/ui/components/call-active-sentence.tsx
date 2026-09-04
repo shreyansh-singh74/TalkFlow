@@ -12,6 +12,7 @@ import {
   TranscriptViewerPlayPauseButton,
   TranscriptViewerScrubBar,
 } from "@/components/ui/transcript-viewer";
+import { CallActiveContext } from "./call-active-context";
 
 interface CallActiveSentenceProps {
   targetText: string;
@@ -24,8 +25,19 @@ interface CallActiveSentenceProps {
   isEvaluating?: boolean;
   micStream?: MediaStream | null;
   speechLang?: string;
+  /** Surrounding lines of a pasted text. Null for coach-backed sessions. */
+  contextBefore?: string | null;
+  contextAfter?: string | null;
+  /** Segmenter hint for the current step, e.g. "continues in the next step". */
+  stepNote?: string | null;
 }
 
+/**
+ * Row-1 "Level target" panel. On desktop it is a fixed-height grid cell: the
+ * word pane owns the flex space and scrolls internally, while the context
+ * lines, badges and audio row stay pinned as shrink-0 zones. Below `lg` the
+ * panel grows with its content and the page scrolls instead.
+ */
 export function CallActiveSentence({
   targetText,
   practiceMode,
@@ -37,41 +49,55 @@ export function CallActiveSentence({
   isEvaluating = false,
   micStream,
   speechLang = "en-US",
+  contextBefore = null,
+  contextAfter = null,
+  stepNote = null,
 }: CallActiveSentenceProps) {
   const audioSrc = useMemo(() => {
     return `${getBackendUrl()}/api/phonemes/tts?text=${encodeURIComponent(targetText)}&lang=${encodeURIComponent(speechLang)}`;
   }, [targetText, speechLang]);
 
   return (
-    <div className="w-full max-w-3xl flex flex-col items-center gap-4 animate-fade-in-up">
-      {/* Target sentence container with TranscriptViewer */}
-      <TranscriptViewerContainer
-        audioSrc={audioSrc}
-        text={targetText}
-        className="w-full rounded-2xl px-6 sm:px-8 py-6 sm:py-8 glass-panel flex flex-col items-center justify-center text-center shadow-xs relative overflow-hidden"
-      >
-        <TranscriptViewerAudio />
+    /* Target sentence panel — the container's baked-in `gap-3` is overridden by
+       `cn` (tailwind-merge) with `gap-2`. */
+    <TranscriptViewerContainer
+      audioSrc={audioSrc}
+      text={targetText}
+      className="call-panel call-panel-t glass-panel relative flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden rounded-2xl text-center shadow-xs"
+    >
+      <TranscriptViewerAudio />
 
-        {/* Level target badge */}
-        <div className="mb-3 flex flex-wrap items-center justify-center gap-2 text-xs">
-          <span className="rounded-full px-3 py-1 font-semibold bg-neutral-100 text-neutral-600 border border-neutral-200/80">
-            Level target
+      {/* Level target badge */}
+      <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 text-xs">
+        <span className="rounded-full px-3 py-1 font-semibold bg-neutral-100 text-neutral-600 border border-neutral-200/80">
+          Level target
+        </span>
+        {isTalking && (
+          <span className="rounded-full px-3 py-1 font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
+            🎙️ Listening... (Hold SPACE)
           </span>
-          {isTalking && (
-            <span className="rounded-full px-3 py-1 font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse">
-              🎙️ Listening... (Hold SPACE)
-            </span>
-          )}
-          {isEvaluating && (
-            <span className="rounded-full px-3 py-1 font-bold bg-blue-100 text-blue-800 border border-blue-300 animate-pulse">
-              ⚡ Evaluating...
-            </span>
-          )}
-        </div>
+        )}
+        {isEvaluating && (
+          <span className="rounded-full px-3 py-1 font-bold bg-blue-100 text-blue-800 border border-blue-300 animate-pulse">
+            ⚡ Evaluating...
+          </span>
+        )}
+      </div>
 
-        {/* Interactive target words with word-by-word active audio sync highlighting */}
+      {/* Preceding line of a pasted text */}
+      <CallActiveContext text={contextBefore} position="before" note={stepNote} />
+
+      {/* Interactive target words with word-by-word active audio sync
+          highlighting. The pane scrolls internally on desktop; below `lg` it
+          grows with the words and the page scrolls. `my-auto` is the safe way
+          to centre short content — unlike `content-center` it cannot push the
+          first line past the scroll origin when the words overflow. */}
+      <div
+        data-call-pane="target"
+        className="flex min-h-0 w-full min-w-0 flex-col lg:flex-1 lg:overflow-y-auto"
+      >
         <TranscriptViewerWords
-          className="px-2 max-w-2xl gap-x-2 gap-y-3"
+          className="my-auto px-2"
           renderWord={({ word, status }) => {
             const part = word.word;
             const norm = normalizeWord(part);
@@ -91,7 +117,7 @@ export function CallActiveSentence({
               >
                 <span
                   className={cn(
-                    "text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight tracking-tight transition-all duration-200",
+                    "call-target-word font-bold leading-tight tracking-tight transition-all duration-200",
                     status === "current" && "bg-emerald-100/90 text-emerald-950 scale-105 rounded-lg px-2 py-0.5 shadow-2xs border-b-3 border-emerald-600",
                     status === "spoken" && !wrong && "text-neutral-900",
                     status === "unspoken" && !wrong && !active && "text-neutral-600",
@@ -102,13 +128,13 @@ export function CallActiveSentence({
                     color: wrong
                       ? "#dc2626"
                       : active && status !== "current"
-                      ? "#14161A"
-                      : undefined,
+                        ? "#14161A"
+                        : undefined,
                     borderBottom: wrong
                       ? "3px solid #dc2626"
                       : active && status !== "current"
-                      ? "3px solid #059669"
-                      : undefined,
+                        ? "3px solid #059669"
+                        : undefined,
                     paddingBottom: status === "current" ? "2px" : "4px",
                   }}
                 >
@@ -118,39 +144,42 @@ export function CallActiveSentence({
             );
           }}
         />
+      </div>
 
-        {/* Audio controls row: Play/Pause button + ScrubBar */}
-        <div className="mt-4 flex items-center gap-3 w-full max-w-md bg-neutral-50/80 backdrop-blur-xs px-4 py-2 rounded-full border border-neutral-200/80 shadow-2xs">
-          <TranscriptViewerPlayPauseButton />
-          <TranscriptViewerScrubBar />
+      {/* Following line of a pasted text */}
+      <CallActiveContext text={contextAfter} position="after" />
+
+      {/* Audio controls row: Play/Pause button + ScrubBar */}
+      <div className="mx-auto mt-auto flex w-full max-w-sm shrink-0 items-center gap-3 rounded-full border border-neutral-200/80 bg-neutral-50/80 px-4 py-2 shadow-2xs backdrop-blur-xs">
+        <TranscriptViewerPlayPauseButton />
+        <TranscriptViewerScrubBar />
+      </div>
+
+      {/* Dynamic Canvas Live Waveform Display when recording or evaluating */}
+      {(isTalking || isEvaluating) && (
+        <div className="mx-auto mt-2 w-full max-w-sm shrink-0 px-4">
+          <LiveWaveform
+            active={isTalking}
+            processing={isEvaluating}
+            stream={micStream}
+            mode="static"
+            height={36}
+            barWidth={3}
+            barGap={2}
+            barRadius={1.5}
+            barColor={isTalking ? "#059669" : "#3b82f6"}
+            fadeEdges={true}
+            fadeWidth={20}
+          />
         </div>
+      )}
 
-        {/* Dynamic Canvas Live Waveform Display when recording or evaluating */}
-        {(isTalking || isEvaluating) && (
-          <div className="w-full max-w-md mt-4 px-4">
-            <LiveWaveform
-              active={isTalking}
-              processing={isEvaluating}
-              stream={micStream}
-              mode="static"
-              height={36}
-              barWidth={3}
-              barGap={2}
-              barRadius={1.5}
-              barColor={isTalking ? "#059669" : "#3b82f6"}
-              fadeEdges={true}
-              fadeWidth={20}
-            />
-          </div>
-        )}
-
-        {/* Word mode sentence context */}
-        {practiceMode === "word" && practiceSentence !== targetText && (
-          <p className="mt-4 text-center text-xs text-neutral-500 italic">
-            Sentence: &ldquo;{practiceSentence}&rdquo;
-          </p>
-        )}
-      </TranscriptViewerContainer>
-    </div>
+      {/* Word mode sentence context */}
+      {practiceMode === "word" && practiceSentence !== targetText && (
+        <p className="mt-1 shrink-0 text-center text-xs italic text-neutral-500">
+          Sentence: &ldquo;{practiceSentence}&rdquo;
+        </p>
+      )}
+    </TranscriptViewerContainer>
   );
 }

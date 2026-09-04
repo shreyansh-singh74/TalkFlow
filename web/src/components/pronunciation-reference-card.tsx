@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
-import { Label } from "@/components/ui/label";
+import { useEffect, useId, useMemo, useState } from "react";
+import { Pause, Volume2 } from "lucide-react";
+
 import { Switch } from "@/components/ui/switch";
-import { Volume2 } from "lucide-react";
+import { VisemeMouth, hintFor } from "@/components/viseme-mouth";
 import { usePronunciationReference } from "@/hooks/use-pronunciation-reference";
+import { useVisemeTimeline } from "@/hooks/use-viseme-timeline";
 import { DIALECTS, requestSpeechVoices } from "@/lib/speak-word";
-import { getBackendUrl } from "@/lib/backend-config";
-import type { PronunciationReferenceResponse } from "@/types/pronunciation";
-import type { MisalignedWordPair } from "@/types/pronunciation";
+import { cn } from "@/lib/utils";
+import type {
+  ArpabetSyllableItem,
+  MisalignedWordPair,
+} from "@/types/pronunciation";
 
 type Props = {
   displayWord: string;
@@ -19,6 +23,13 @@ type Props = {
   misalignedPairs?: MisalignedWordPair[];
 };
 
+/**
+ * The pronunciation reference content, row-2 of the call page.
+ *
+ * The surrounding chrome (border, radius, shadow, padding) belongs to the
+ * row-2 group that mounts this card — call-active's row-2 <section> — so this
+ * root is plain: the two-column text + mouth grid only.
+ */
 export function PronunciationReferenceCard({
   displayWord,
   activeWordKey,
@@ -29,51 +40,67 @@ export function PronunciationReferenceCard({
   const idSlow = useId();
   const [isSlow, setIsSlow] = useState(false);
   const [showIPA, setShowIPA] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [mouthFrame, setMouthFrame] = useState(0);
   const { data, loading, error } = usePronunciationReference(activeWordKey, lang);
+
+  const spoken = (data?.word || displayWord || activeWordKey || "").trim();
+
+  const {
+    status,
+    frame,
+    slots,
+    reducedMotion,
+    silent,
+    play,
+    stop,
+    step,
+  } = useVisemeTimeline({
+    text: spoken,
+    phonemes: data?.phonemes,
+    lang,
+    rate: isSlow ? 0.65 : 1,
+  });
+
+  const isBusy = status === "playing" || status === "loading";
 
   useEffect(() => {
     requestSpeechVoices();
     if (typeof window !== "undefined") window.speechSynthesis?.getVoices();
   }, []);
 
-  useEffect(() => {
-    if (!isPlaying) {
-      setMouthFrame(0);
-      return;
-    }
-    const interval = setInterval(() => {
-      setMouthFrame((f) => (f + 1) % 3);
-    }, 120);
-    return () => clearInterval(interval);
-  }, [isPlaying]);
-
-  const play = () => {
-    const text = (data?.word || displayWord || activeWordKey || "").trim();
-    if (text) {
-      setIsPlaying(true);
-      // Use backend speech synthesis to guarantee audio output across all OS systems (including Linux/Chrome synthesis blocks)
-      const url = `${getBackendUrl()}/api/phonemes/tts?text=${encodeURIComponent(text)}&lang=${lang}&rate=${isSlow ? 0.65 : 1.0}`;
-      const audio = new Audio(url);
-      audio.onended = () => setIsPlaying(false);
-      audio.onerror = () => setIsPlaying(false);
-      audio.play().catch((err) => {
-        console.error("Error playing word TTS:", err);
-        setIsPlaying(false);
-      });
-    }
-  };
-
   // Find the misaligned pair for the active word to show heard IPA
   const activePair = misalignedPairs?.find(
     (p) => p.expected?.toLowerCase() === displayWord?.toLowerCase()
   );
 
+  const syllables = data?.arpabet_syllables ?? [];
+  const activeSyllable = frame.isRest ? -1 : frame.syllableIndex;
+
+  /**
+   * The step affordance is what makes this usable without audio at all — on a
+   * machine with no TTS credentials, in a silent room, or with motion reduced.
+   * Arrow keys walk the word one phone at a time.
+   */
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      step(1);
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      step(-1);
+    } else if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      if (isBusy) {
+        stop();
+      } else {
+        play();
+      }
+    }
+  };
+
   return (
-    <div className="w-full max-w-3xl rounded-2xl p-6 glass-panel shadow-xs">
+    <div className="flex w-full flex-col gap-2">
       {/* Header row */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3 border-neutral-200/80">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">
           Phonetic Breakdown
         </span>
@@ -97,46 +124,63 @@ export function PronunciationReferenceCard({
       </div>
 
       {/* Main Pronunciation Section */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-        <div className="flex-1 space-y-3 w-full">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-w-0 space-y-2.5">
           <div>
             <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Sounds like</p>
-            <div className="flex items-center gap-3 mt-1">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
               {loading ? (
                 <p className="text-xl font-medium text-neutral-400">Loading phonetic breakdown…</p>
               ) : error ? (
                 <p className="text-sm font-semibold text-amber-600">{error}</p>
               ) : data ? (
                 <div className="flex items-center gap-2">
-                  <div className="text-3xl font-bold tracking-tight text-neutral-900">
-                    <SyllableLine syllables={data.arpabet_syllables} />
+                  <div className="text-2xl font-bold tracking-tight text-neutral-900">
+                    <SyllableLine syllables={syllables} activeIndex={activeSyllable} />
                   </div>
                 </div>
               ) : (
-                <p className="text-3xl font-bold capitalize text-neutral-900">{displayWord}</p>
+                <p className="text-2xl font-bold capitalize text-neutral-900">{displayWord}</p>
               )}
-              
+
               {/* Play icon button directly next to sounds-like spelling */}
               <button
                 type="button"
-                onClick={play}
+                onClick={() => (isBusy ? stop() : play())}
                 className="flex h-9 w-9 items-center justify-center rounded-full transition-all hover:scale-105 active:scale-95 cursor-pointer bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 shadow-2xs"
-                title={isSlow ? "Play slow" : "Play"}
+                title={isBusy ? "Stop" : isSlow ? "Play slow" : "Play"}
+                aria-label={isBusy ? "Stop pronunciation" : "Play pronunciation"}
               >
-                <Volume2 className="h-4.5 w-4.5" />
+                {isBusy ? (
+                  <Pause className="h-4 w-4" />
+                ) : (
+                  <Volume2 className="h-4.5 w-4.5" />
+                )}
               </button>
+
+              {/* Slow toggle on the same row as the spelling */}
+              <label
+                htmlFor={idSlow}
+                className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-neutral-600"
+              >
+                <Switch id={idSlow} checked={isSlow} onCheckedChange={setIsSlow} className="scale-75" />
+                Slow speed
+              </label>
             </div>
           </div>
 
-          {/* Slow toggle below the spelling */}
-          <div className="flex items-center gap-2 mt-2">
-            <Switch id={idSlow} checked={isSlow} onCheckedChange={setIsSlow} className="scale-75" />
-            <Label htmlFor={idSlow} className="cursor-pointer text-xs font-semibold text-neutral-600">Slow speed</Label>
-          </div>
+          {showIPA && data?.ipa && (
+            <p
+              className="text-sm font-semibold text-neutral-600"
+              style={{ fontFamily: "var(--font-phonetic)" }}
+            >
+              /{data.ipa}/
+            </p>
+          )}
 
           {/* Show expected vs heard comparison row if IPA toggle is on */}
           {showIPA && activePair && (
-            <div className="pt-2 border-t border-dashed border-neutral-200">
+            <div className="border-t border-dashed border-neutral-200 pt-2">
               <HeardVsExpectedRow
                 expected={activePair.expected}
                 heard={activePair.heard}
@@ -146,73 +190,67 @@ export function PronunciationReferenceCard({
 
           {/* Mismatch coaching note */}
           {activePair && (
-            <p className="mt-3 rounded-lg px-3.5 py-2 text-xs leading-relaxed bg-blue-50 border border-blue-200 text-blue-800 font-medium">
+            <p className="rounded-lg px-3.5 py-2 text-xs leading-relaxed bg-blue-50 border border-blue-200 text-blue-800 font-medium">
               Expected <strong className="text-blue-950">&ldquo;{activePair.expected}&rdquo;</strong>, heard{" "}
               <span className="font-bold text-red-600">&ldquo;{activePair.heard}&rdquo;</span>.
             </p>
           )}
+
+          {/* Phone filmstrip — every mouth position in the word, at a glance,
+              with no audio and no motion required. Click any phone to hold that
+              shape. Sits inside the text cell so the mouth stays beside the
+              whole block rather than above a full-width strip. */}
+          {slots.length > 0 && (
+            <div className="border-t border-dashed border-neutral-200 pt-2.5">
+              <PhoneStrip
+                slots={slots}
+                activeIndex={frame.isRest ? -1 : frame.index}
+                onPick={(i) => step(i - (frame.isRest ? -1 : frame.index))}
+              />
+            </div>
+          )}
         </div>
 
-        {/* Dynamic Mouth articulation animation SVG on the right */}
+        {/* The reference face: shape follows the phoneme currently being said.
+            Clickable, because a diagram that only responds to a button 200px
+            away reads as static decoration — which is exactly how the previous
+            one read. */}
         <div
-          className="flex flex-col items-center justify-center rounded-xl p-4 shrink-0 relative overflow-hidden h-28 w-28 bg-emerald-50/60 border border-emerald-200/80 shadow-2xs"
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            if (isBusy) {
+              stop();
+            } else {
+              play();
+            }
+          }}
+          onKeyDown={onKeyDown}
+          aria-label="Reference mouth position. Press space to play, arrow keys to step through each sound."
+          className={cn(
+            "flex shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 self-center justify-self-center",
+            "bg-emerald-50/60 border border-emerald-200/80 shadow-2xs transition-colors",
+            "hover:bg-emerald-50 hover:border-emerald-300",
+            "outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+          )}
         >
-          <svg className="w-full h-full" viewBox="0 0 100 100" fill="none" style={{ color: "rgba(5,150,105,0.7)" }}>
-            {/* Outline Face Profile */}
-            <path
-              d="M15,20 C15,80 85,80 85,20"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeDasharray="3 3"
-              className="opacity-40"
-            />
-            {/* Lips / Mouth outline */}
-            <path
-              d={
-                mouthFrame === 0
-                  ? "M25,50 Q50,42 75,50 Q50,58 25,50"
-                  : mouthFrame === 1
-                  ? "M25,50 Q50,32 75,50 Q50,68 25,50"
-                  : "M25,50 Q50,22 75,50 Q50,78 25,50"
-              }
-              fill="rgba(5,150,105,0.1)"
-              stroke="#059669"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="transition-all duration-100 ease-in-out"
-            />
-            {/* Upper Teeth */}
-            <path
-              d={
-                mouthFrame === 0
-                  ? "M32,48 Q50,45 68,48"
-                  : mouthFrame === 1
-                  ? "M32,44 Q50,41 68,44"
-                  : "M32,40 Q50,37 68,40"
-              }
-              stroke="rgba(0,0,0,0.3)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              className="transition-all duration-100 ease-in-out"
-            />
-            {/* Tongue */}
-            <path
-              d={
-                mouthFrame === 0
-                  ? "M38,52 Q50,49 62,52 Q50,55 38,52"
-                  : mouthFrame === 1
-                  ? "M38,54 Q50,49 62,54 Q50,59 38,54"
-                  : "M38,57 Q50,49 62,57 Q50,65 38,57"
-              }
-              fill="rgba(239,68,68,0.2)"
-              stroke="rgba(220,38,38,0.7)"
-              strokeWidth="1.2"
-              className="transition-all duration-100 ease-in-out"
-            />
-          </svg>
-          <span className="absolute bottom-2 text-[8px] font-bold text-emerald-800 uppercase tracking-widest">
-            {isPlaying ? "Speaking..." : "Mouth Shape"}
+          <VisemeMouth
+            pose={frame.pose}
+            snap={reducedMotion}
+            dimmed={status === "loading"}
+            className="call-mouth"
+          />
+          <p className="min-h-8 max-w-36 text-center text-[10px] font-semibold leading-tight text-emerald-900/80">
+            {status === "loading" ? "Loading audio…" : hintFor(frame.pose)}
+          </p>
+          <span className="text-[8px] font-bold uppercase tracking-widest text-emerald-800/70">
+            {isBusy
+              ? silent
+                ? "Silent demo"
+                : "Reference mouth"
+              : slots.length > 0
+                ? "Tap to play"
+                : "Reference mouth"}
           </span>
         </div>
       </div>
@@ -222,13 +260,15 @@ export function PronunciationReferenceCard({
 
 function SyllableLine({
   syllables,
+  activeIndex,
 }: {
-  syllables: PronunciationReferenceResponse["arpabet_syllables"];
+  syllables: ArpabetSyllableItem[];
+  activeIndex: number;
 }) {
   if (!syllables.length) return null;
   return (
     <span
-      className="text-3xl font-bold leading-snug text-neutral-900"
+      className="text-2xl font-bold leading-snug text-neutral-900"
       style={{ fontFamily: "var(--font-phonetic)" }}
     >
       {syllables.map((s, i) => (
@@ -236,10 +276,57 @@ function SyllableLine({
           {i > 0 && (
             <span className="text-neutral-400"> · </span>
           )}
-          <span style={{ fontWeight: s.stressed ? 800 : 500 }}>{s.display}</span>
+          <span
+            className={cn(
+              "rounded px-0.5 transition-colors duration-150",
+              i === activeIndex && "bg-emerald-100 text-emerald-900"
+            )}
+            // Only primary stress is bold. `stressed` is already primary-only,
+            // but fall back to `stress_level` for payloads cached before the
+            // field existed.
+            style={{ fontWeight: (s.stress_level ?? (s.stressed ? 1 : 0)) === 1 ? 800 : 500 }}
+          >
+            {s.display}
+          </span>
         </span>
       ))}
     </span>
+  );
+}
+
+function PhoneStrip({
+  slots,
+  activeIndex,
+  onPick,
+}: {
+  slots: ReturnType<typeof useVisemeTimeline>["slots"];
+  activeIndex: number;
+  onPick: (index: number) => void;
+}) {
+  const labels = useMemo(
+    () => slots.map((s) => ({ index: s.index, symbol: s.symbol, pose: s.pose })),
+    [slots]
+  );
+  return (
+    <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+      {labels.map((s) => (
+        <button
+          key={s.index}
+          type="button"
+          onClick={() => onPick(s.index)}
+          title={hintFor(s.pose)}
+          className={cn(
+            "rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide transition-colors cursor-pointer",
+            s.index === activeIndex
+              ? "border-emerald-400 bg-emerald-100 text-emerald-900"
+              : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:border-emerald-200 hover:text-emerald-800"
+          )}
+          style={{ fontFamily: "var(--font-phonetic)" }}
+        >
+          {s.symbol}
+        </button>
+      ))}
+    </div>
   );
 }
 

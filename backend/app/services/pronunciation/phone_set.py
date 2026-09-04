@@ -33,8 +33,18 @@ _IPA_TO_ARPABET_RAW.update({
     "ɹ": "R", "r": "R", "ɾ": "T", "g": "G", "a": "AA", "ə": "AH",
     "ɐ": "AH", "ɜ": "ER", "ɚ": "ER", "ɡ": "G", "e": "EY", "o": "OW",
     "ʔ": "T", "x": "K", "ç": "HH", "ɫ": "L",
+    # Affricates. ARPABET_TO_IPA spells these as two chars (tʃ/dʒ), but
+    # recognizer vocabs also ship them precomposed or with a tie bar. Without
+    # these, ipa_to_arpabet drops them silently as unknown symbols and every
+    # CH/JH in the reference reads as a deletion.
+    "ʧ": "CH", "ʤ": "JH",        # U+02A7 / U+02A4 precomposed
+    "t͡ʃ": "CH", "d͡ʒ": "JH",      # explicit U+0361 tie bar
 })
 _IPA_KEYS_BY_LEN: List[str] = sorted(_IPA_TO_ARPABET_RAW, key=len, reverse=True)
+
+# Diacritics carrying no phone identity: stress, length, syllable break, and a
+# bare tie bar (emitted as a standalone token by some phoneme checkpoints).
+_IPA_SKIP = (" ", "\t", "ˈ", "ˌ", "ː", ".", "͡")
 
 VOWELS = {
     "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY",
@@ -89,7 +99,7 @@ def ipa_to_arpabet(ipa: str) -> List[str]:
     s = (ipa or "").strip()
     while i < len(s):
         ch = s[i]
-        if ch in (" ", "\t", "ˈ", "ˌ", "ː", "."):
+        if ch in _IPA_SKIP:
             i += 1
             continue
         matched = False

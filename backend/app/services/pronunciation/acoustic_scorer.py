@@ -1,6 +1,6 @@
 """Acoustic pronunciation scorer: scores the actual audio waveform.
 
-Pipeline:  audio --(wav2vec2 CTC)--> recognized phones (+confidence)
+Pipeline:  audio --(phoneme CTC)--> recognized phones (+confidence)
            target text --(g2p_en)--> canonical ARPAbet reference
            Needleman-Wunsch align --> GOP-style scoring
 
@@ -19,7 +19,7 @@ from app.services.pronunciation.base import PronunciationResult
 from app.services.pronunciation.phone_set import ARPABET_TO_IPA, normalize_arpabet
 from app.services.pronunciation.scoring import score_alignment
 from app.services.pronunciation.text_proxy_scorer import TextProxyScorer
-from app.services.pronunciation.wav2vec2_phonemes import recognize_phones
+from app.services.pronunciation.phoneme_recognizer import recognize_phones
 
 logger = logging.getLogger(__name__)
 

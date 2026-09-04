@@ -4,7 +4,7 @@ Consent-gated by ``settings.PERSIST_TURN_AUDIO``: never writes unless the flag
 is on. A background sweep deletes files older than ``TURN_AUDIO_RETENTION_HOURS``
 so disk does not grow unbounded.
 
-Layout:  ``<TURN_AUDIO_DIR>/<meeting_id>/<turn_id>.wav``
+Layout:  ``<TURN_AUDIO_DIR>/<session_id>/<turn_id>.wav``
 
 We store WAV (not raw PCM) so the files are directly usable by the eval harness
 and external tools (Praat, audacity, MFA) without a conversion step.
@@ -35,7 +35,7 @@ def _ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
 
 
-def save_turn_audio(meeting_id: str, turn_id: str, pcm16: bytes) -> Optional[str]:
+def save_turn_audio(session_id: str, turn_id: str, pcm16: bytes) -> Optional[str]:
     """Persist a turn's PCM16 audio as a WAV. Returns the file path or None.
 
     Returns None silently when persistence is disabled or the audio is empty,
@@ -45,9 +45,9 @@ def save_turn_audio(meeting_id: str, turn_id: str, pcm16: bytes) -> Optional[str
         return None
     if not pcm16:
         return None
-    safe_meeting = (meeting_id or "unknown").replace("/", "_") or "unknown"
+    safe_session = (session_id or "unknown").replace("/", "_") or "unknown"
     safe_turn = (turn_id or "turn").replace("/", "_") or "turn"
-    folder = os.path.join(settings.TURN_AUDIO_DIR, safe_meeting)
+    folder = os.path.join(settings.TURN_AUDIO_DIR, safe_session)
     try:
         _ensure_dir(folder)
         path = os.path.join(folder, f"{safe_turn}.wav")
@@ -58,7 +58,7 @@ def save_turn_audio(meeting_id: str, turn_id: str, pcm16: bytes) -> Optional[str
             wf.writeframes(pcm16)
         return path
     except Exception:
-        logger.exception("Failed to persist turn audio for %s/%s", safe_meeting, safe_turn)
+        logger.exception("Failed to persist turn audio for %s/%s", safe_session, safe_turn)
         return None
 
 
@@ -90,7 +90,7 @@ def _sweep_sync() -> int:
                     removed += 1
             except OSError:
                 pass
-        # Drop now-empty meeting dirs.
+        # Drop now-empty session dirs.
         try:
             if not os.listdir(root) and root != settings.TURN_AUDIO_DIR:
                 os.rmdir(root)

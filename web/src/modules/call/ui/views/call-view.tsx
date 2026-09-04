@@ -1,14 +1,14 @@
 "use client";
 import { ErrorState } from "@/components/error-state";
-import { useMeeting } from "@/hooks/use-api";
+import { usePracticeSession } from "@/hooks/use-api";
 import { CallUI } from "../components/call-ui";
 
 interface Props {
-  meetingId: string;
+  sessionId: string;
 }
 
-export const CallView = ({ meetingId }: Props) => {
-  const { data, isLoading, error } = useMeeting(meetingId);
+export const CallView = ({ sessionId }: Props) => {
+  const { data, isLoading, error } = usePracticeSession(sessionId);
 
   if (isLoading) {
     return (
@@ -46,10 +46,15 @@ export const CallView = ({ meetingId }: Props) => {
   return (
     <div className="flex h-screen max-h-screen flex-1 flex-col overflow-hidden">
       <CallUI
-        meetingId={meetingId}
-        meetingName={data.name}
-        agentName={data.agent?.name ?? "TalkFlow Coach"}
-        agentInstructions={data.agent?.instructions ?? ""}
+        sessionId={sessionId}
+        sessionName={data.name}
+        coachName={data.coach?.name ?? "TalkFlow Coach"}
+        coachInstructions={data.coach?.instructions ?? ""}
+        script={data.script ?? null}
+        source={data.source ?? "coach"}
+        difficulty={data.difficulty ?? "medium"}
+        topic={data.coach?.topic ?? ""}
+        accent={data.coach?.accent ?? "en-US"}
       />
     </div>
   )

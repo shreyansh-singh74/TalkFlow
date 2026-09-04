@@ -35,6 +35,10 @@ class PhonemeEntry(BaseModel):
         Integer ID (0–9) mapping to a mouth-shape group.  System-agnostic —
         the animation layer maps this integer to SVG / Rive / Lottie / 3D.
         See ``app/utils/arpabet_tables.VISEME_ID_MAP`` for the full table.
+    syllable_index : int
+        Index into the sibling ``syllables`` list identifying which syllable
+        this phoneme belongs to.  Lets a consumer highlight the syllable
+        currently being articulated without re-deriving the grouping.
     confidence : float | None
         Acoustic confidence that the learner produced this phoneme correctly.
         ``None`` in Phase 1; filled by the acoustic scorer in Phase 3.
@@ -42,11 +46,19 @@ class PhonemeEntry(BaseModel):
         Expected duration in milliseconds from a reference speaker.
         ``None`` in Phase 1; filled by forced alignment in Phase 5 and used
         for rhythm / fluency scoring.
+
+        Because rhythm scoring is learner-facing, this field must only ever
+        hold a real measurement.  The mouth-shape animation needs per-phone
+        timing too, but derives it on the client from the measured duration of
+        the synthesised reference clip (``web/src/lib/viseme-timing.ts``);
+        those nominal constants must not be written here.  Enforced by
+        ``backend/tests/test_viseme_contract.py``.
     """
 
     symbol: str
     stress: int
     viseme_id: int
+    syllable_index: int = 0
     confidence: Optional[float] = None
     expected_duration_ms: Optional[float] = None
 
@@ -59,6 +71,10 @@ class SyllableEntry(BaseModel):
     ``pronunciation_reference.py``.  The frontend or a server-side helper
     renders the full display string (e.g. ``"nat • chur • uh • lee"``) from
     these objects at render time — it is never stored inside the model.
+
+    ``stress`` is the real ARPABET level — ``1`` primary, ``2`` secondary,
+    ``0`` unstressed — so a word carrying both (``particularly``) identifies
+    exactly one primary-stressed syllable.
     """
 
     text: str

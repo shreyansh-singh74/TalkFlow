@@ -12,7 +12,7 @@ export const HomeView = () => {
   const userName = session?.user?.name || session?.user?.email?.split('@')[0] || 'User';
 
   const handleStartConversation = () => {
-    router.push('/dashboard/meetings');
+    router.push('/dashboard/sessions');
   };
 
   return (

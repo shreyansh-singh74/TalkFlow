@@ -4,7 +4,7 @@ import { Mic, MicOff, SkipForward, ArrowRight, ArrowLeft, RotateCcw, Sparkles, X
 import { cn } from "@/lib/utils";
 import { LiveWaveform } from "@/components/ui/live-waveform";
 
-type UIState =
+export type UIState =
   | "Level Ready"
   | "Recording"
   | "Evaluating"
@@ -21,7 +21,6 @@ interface CallActiveControlsProps {
   micStream?: MediaStream | null;
   isTransitioning: boolean;
   isEvaluating: boolean;
-  scoreDisplay: number | null;
   transcriptionError: string | null;
   conversationStatus: string;
   onMicPress: (e: React.PointerEvent) => void;
@@ -44,7 +43,6 @@ export function CallActiveControls({
   micStream,
   isTransitioning,
   isEvaluating,
-  scoreDisplay,
   transcriptionError,
   conversationStatus,
   onMicPress,
@@ -61,11 +59,11 @@ export function CallActiveControls({
   const micDisabled = isTransitioning || isEvaluating || uiState === "Level Complete";
 
   return (
-    <div className="control-bar relative z-20 shrink-0 px-4 pb-4 pt-3 sm:px-6">
+    <div className="control-bar relative z-20 shrink-0 px-4 pb-2.5 pt-2 sm:px-6">
       {/* Error banner */}
       {transcriptionError && (
         <div
-          className="mb-3 mx-auto max-w-md rounded-lg px-3.5 py-2 text-center text-sm font-semibold bg-red-50 text-red-700 border border-red-200"
+          className="mb-2 mx-auto max-w-md rounded-lg px-3.5 py-2 text-center text-sm font-semibold bg-red-50 text-red-700 border border-red-200"
           role="alert"
         >
           {transcriptionError}
@@ -75,54 +73,12 @@ export function CallActiveControls({
       {/* Connection warning banner if offline */}
       {!isConnected && !transcriptionError && (
         <div
-          className="mb-3 mx-auto max-w-md rounded-lg px-3.5 py-2 text-center text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center gap-2"
+          className="mb-2 mx-auto max-w-md rounded-lg px-3.5 py-2 text-center text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center gap-2"
         >
           <div className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
           <span>Connecting to voice server... (Make sure FastAPI backend is running on port 8000)</span>
         </div>
       )}
-
-      {/* State banner */}
-      <div className="mb-3 flex justify-center">
-        {uiState === "Transitioning" && (
-          <div className="flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold text-neutral-600 bg-neutral-100 border border-neutral-200">
-            <RotateCcw className="h-3.5 w-3.5 animate-spin text-neutral-500" />
-            Loading next level...
-          </div>
-        )}
-
-        {uiState === "Evaluating" && (
-          <div className="flex items-center gap-3 rounded-full px-4 py-1.5 text-xs font-semibold text-blue-800 bg-blue-50 border border-blue-200 shadow-2xs">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 animate-spin text-blue-600" />
-              <span>Evaluating pronunciation...</span>
-            </div>
-            {onCancelEvaluating && (
-              <button
-                type="button"
-                onClick={onCancelEvaluating}
-                className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 hover:bg-amber-200 transition-all cursor-pointer"
-                title="Cancel evaluation"
-              >
-                <X className="h-3 w-3" />
-                Cancel
-              </button>
-            )}
-          </div>
-        )}
-
-        {uiState === "Level Complete" && (
-          <div className="flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 shadow-2xs">
-            🎉 Level Complete! (Score: {scoreDisplay}%)
-          </div>
-        )}
-
-        {uiState === "Level Failed" && (
-          <div className="flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 shadow-2xs">
-            Score: {scoreDisplay}% — Goal: 95%
-          </div>
-        )}
-      </div>
 
       {/* Main control row */}
       <div className="flex items-center justify-between gap-4 max-w-4xl mx-auto">
@@ -197,20 +153,20 @@ export function CallActiveControls({
               }}
               disabled={micDisabled || !isConnected}
               className={cn(
-                "relative flex h-16 w-16 items-center justify-center rounded-full transition-all duration-200 active:scale-90 disabled:opacity-40 disabled:pointer-events-none cursor-pointer shadow-md",
+                "call-mic relative flex items-center justify-center rounded-full transition-all duration-200 active:scale-90 disabled:opacity-40 disabled:pointer-events-none cursor-pointer shadow-md",
                 isTalking ? "ring-4 ring-red-400" : isMicEnabled ? "shadow-[0_0_24px_rgba(5,150,105,0.3)]" : ""
               )}
               style={{
                 background: isTalking
                   ? "#dc2626"
                   : isMicEnabled
-                  ? "linear-gradient(135deg, #059669, #0d9488)"
-                  : "#f5f5f5",
+                    ? "linear-gradient(135deg, #059669, #0d9488)"
+                    : "#f5f5f5",
                 border: isTalking
                   ? "2px solid #ef4444"
                   : isMicEnabled
-                  ? "2px solid rgba(5,150,105,0.5)"
-                  : "2px solid oklch(0.85 0 0)",
+                    ? "2px solid rgba(5,150,105,0.5)"
+                    : "2px solid oklch(0.85 0 0)",
                 color: isMicEnabled ? "#fff" : "oklch(0.4 0 0)",
               }}
               title={isTalking ? "Click to stop recording" : !isMicEnabled ? "Enable mic" : "Click mic or Hold SPACE to talk"}
@@ -282,15 +238,41 @@ export function CallActiveControls({
         </div>
       </div>
 
-      {/* Bottom hint row */}
-      <div className="mt-2 flex items-center justify-center gap-3 text-[11px] font-medium text-neutral-500">
-        <span className="hidden lg:inline">
-          Click mic or Hold{" "}
-          <kbd className="rounded px-1.5 py-0.5 font-mono text-[10px] bg-neutral-100 border border-neutral-300 text-neutral-700 font-semibold shadow-2xs">
-            SPACE
-          </kbd>
-          {" "}to talk
-        </span>
+      {/* Bottom hint row — carries the Transitioning / Evaluating states that
+          used to occupy their own banner above the controls. */}
+      <div className="mt-1.5 flex items-center justify-center gap-3 text-[10px] font-medium text-neutral-500">
+        {uiState === "Transitioning" ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-neutral-600 bg-neutral-100 border border-neutral-200">
+            <RotateCcw className="h-3 w-3 animate-spin text-neutral-500" />
+            Loading next level...
+          </span>
+        ) : uiState === "Evaluating" ? (
+          <span className="inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-blue-800 bg-blue-50 border border-blue-200 shadow-2xs">
+            <span className="inline-flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3 animate-spin text-blue-600" />
+              Evaluating pronunciation...
+            </span>
+            {onCancelEvaluating && (
+              <button
+                type="button"
+                onClick={onCancelEvaluating}
+                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 hover:bg-amber-200 transition-all cursor-pointer"
+                title="Cancel evaluation"
+              >
+                <X className="h-3 w-3" />
+                Cancel
+              </button>
+            )}
+          </span>
+        ) : (
+          <span className="hidden lg:inline">
+            Click mic or Hold{" "}
+            <kbd className="rounded px-1.5 py-0.5 font-mono text-[10px] bg-neutral-100 border border-neutral-300 text-neutral-700 font-semibold shadow-2xs">
+              SPACE
+            </kbd>
+            {" "}to talk
+          </span>
+        )}
         <span className="text-neutral-300">·</span>
         <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold", isConnected ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200")}>
           <span className={cn("h-1.5 w-1.5 rounded-full", isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />

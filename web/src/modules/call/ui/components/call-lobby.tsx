@@ -3,12 +3,35 @@
 import { Button } from "@/components/ui/button";
 import { LogIn, Mic, X } from "lucide-react";
 import Link from "next/link";
+import {
+  DIFFICULTY_LABELS,
+  DIFFICULTY_PASS_THRESHOLDS,
+  type Difficulty,
+  type PracticeScript,
+  type SessionSource,
+} from "@/types/practice";
 
 interface Props {
   onJoin: () => void;
+  sessionName: string;
+  coachName: string;
+  script: PracticeScript | null;
+  source: SessionSource;
+  difficulty: Difficulty;
 }
 
-export const CallLobby = ({ onJoin }: Props) => {
+export const CallLobby = ({
+  onJoin,
+  sessionName,
+  coachName,
+  script,
+  source,
+  difficulty,
+}: Props) => {
+  const steps = script?.steps ?? [];
+  const passThreshold =
+    script?.pass_threshold ?? DIFFICULTY_PASS_THRESHOLDS[difficulty];
+
   return (
     <div
       className="flex h-full min-h-screen flex-col"
@@ -24,7 +47,7 @@ export const CallLobby = ({ onJoin }: Props) => {
           className="gap-2 rounded-full px-3 text-sm"
           style={{ color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}
         >
-          <Link href="/dashboard/meetings">
+          <Link href="/dashboard/sessions">
             <X className="h-4 w-4" />
             Close
           </Link>
@@ -58,33 +81,73 @@ export const CallLobby = ({ onJoin }: Props) => {
               className="text-3xl font-semibold tracking-tight"
               style={{ fontFamily: "var(--font-display)", color: "var(--foreground)" }}
             >
-              Ready to practise?
+              {sessionName || "Ready to practise?"}
             </h1>
             <p className="text-sm leading-relaxed text-neutral-400">
-              Microphone access is requested when you start speaking.
               Hold{" "}
               <kbd className="rounded px-1.5 py-0.5 text-xs font-mono bg-neutral-800 border border-neutral-700 text-neutral-300">
                 SPACE
               </kbd>{" "}
-              to talk; release to submit.
+              to talk; release to submit. Microphone access is requested when you
+              start speaking.
             </p>
           </div>
 
-          {/* Info card */}
-          <div className="w-full rounded-xl p-5 text-left space-y-3 glass-panel">
-            {[
-              { icon: "🎯", label: "Target sentence", desc: "Listen, then repeat it back." },
-              { icon: "📊", label: "Arc score", desc: "Your pronunciation score on a dial after each attempt." },
-              { icon: "🔬", label: "Phoneme diff", desc: "Expected vs heard — word by word, sound by sound." },
-            ].map(({ icon, label, desc }) => (
-              <div key={label} className="flex items-start gap-3">
-                <span className="text-lg leading-none pt-0.5">{icon}</span>
-                <div>
-                  <p className="text-sm font-medium" style={{ color: "var(--foreground)" }}>{label}</p>
-                  <p className="text-xs text-neutral-500">{desc}</p>
-                </div>
+          {/* What this session actually contains */}
+          <div className="w-full rounded-xl p-5 text-left space-y-4 glass-panel">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className="rounded-full px-2.5 py-1 text-[11px] font-medium"
+                style={{
+                  background: "rgba(16,185,129,0.12)",
+                  border: "1px solid rgba(16,185,129,0.25)",
+                  color: "#34d399",
+                }}
+              >
+                {script?.source_label ??
+                  (source === "custom" ? "Your text" : coachName)}
+              </span>
+              <span className="rounded-full border border-neutral-700 px-2.5 py-1 text-[11px] text-neutral-400">
+                {DIFFICULTY_LABELS[difficulty]}
+              </span>
+              <span className="rounded-full border border-neutral-700 px-2.5 py-1 text-[11px] text-neutral-400">
+                Pass at {passThreshold}%
+              </span>
+            </div>
+
+            {steps.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-neutral-400">
+                  {steps.length} {steps.length === 1 ? "step" : "steps"} — first
+                  up:
+                </p>
+                <ol className="space-y-1.5">
+                  {steps.slice(0, 3).map((step) => (
+                    <li
+                      key={step.index}
+                      className="flex items-start gap-2 text-sm"
+                      style={{ color: "var(--foreground)" }}
+                    >
+                      <span className="w-4 shrink-0 pt-0.5 text-xs tabular-nums text-neutral-500">
+                        {step.index + 1}
+                      </span>
+                      <span className="leading-snug">{step.text}</span>
+                    </li>
+                  ))}
+                </ol>
+                {steps.length > 3 && (
+                  <p className="text-xs text-neutral-500">
+                    + {steps.length - 3} more
+                  </p>
+                )}
               </div>
-            ))}
+            ) : (
+              <p className="text-xs leading-relaxed text-amber-400/90">
+                This session has no saved steps, so you&apos;ll practise generic{" "}
+                {DIFFICULTY_LABELS[difficulty].toLowerCase()} sentences. Edit the
+                session to build a real script.
+              </p>
+            )}
           </div>
 
           {/* Actions */}

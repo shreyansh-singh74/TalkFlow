@@ -8,7 +8,7 @@ export interface DashboardData {
   continuePractice: {
     id: string;
     name: string;
-    agentName: string;
+    coachName: string;
     status: string;
     accuracy: number | null;
     duration: number | null;
@@ -24,7 +24,7 @@ export interface DashboardData {
   recentSessions: Array<{
     id: string;
     name: string;
-    agentName: string;
+    coachName: string;
     endedAt: string;
     duration: number | null;
     accuracy: number | null;
@@ -34,11 +34,11 @@ export interface DashboardData {
     context: string;
   };
   focusAreas: string[];
-  agents: Array<{
+  coaches: Array<{
     id: string;
     name: string;
     description: string;
-    meetingCount: number;
+    sessionCount: number;
   }>;
 }
 

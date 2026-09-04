@@ -23,11 +23,67 @@ export function CallActiveComplete({
   onLeave,
 }: CallActiveCompleteProps) {
   const bestScore = useMemo(
-    () => (scoreHistory.length > 0 ? Math.max(...scoreHistory) : 0),
+    () => (scoreHistory.length > 0 ? Math.max(...scoreHistory) : null),
     [scoreHistory]
   );
 
   const skippedWords = sessionReport.words_skipped || [];
+
+  /**
+   * Only measured values get a tile. A null on the report means the scorer that
+   * would have produced it was off or had nothing to work with — printing a
+   * placeholder there would be inventing a result.
+   */
+  const stats = useMemo(() => {
+    const tiles: Array<{
+      label: string;
+      value: string;
+      title?: string;
+      highlightAmber?: boolean;
+    }> = [];
+
+    if (sessionReport.accuracy_score !== null) {
+      tiles.push({
+        label: "Accuracy",
+        value: `${Math.round(sessionReport.accuracy_score)}%`,
+        title: "Mean per-sound accuracy across every attempt",
+      });
+    }
+    if (sessionReport.fluency_score !== null) {
+      tiles.push({
+        label: "Consistency",
+        value: `${Math.round(sessionReport.fluency_score)}%`,
+        title: "How steady your scores were from step to step",
+      });
+    }
+    if (sessionReport.wpm !== null) {
+      tiles.push({
+        label: "Pace",
+        value: `${Math.round(sessionReport.wpm)} wpm`,
+        title: "Words per minute of actual speech",
+      });
+    }
+    if (bestScore !== null) {
+      tiles.push({ label: "Best Step", value: `${Math.round(bestScore)}%` });
+    }
+    tiles.push({
+      label: "Steps",
+      value: `${sessionReport.sentences_completed}/${
+        sessionReport.sentences_total ?? sessionReport.sentences_completed
+      }`,
+    });
+    if (skippedLevelsCount > 0) {
+      tiles.push({
+        label: "Skipped",
+        value: String(skippedLevelsCount),
+        highlightAmber: true,
+      });
+    }
+
+    return tiles.slice(0, 4);
+  }, [sessionReport, bestScore, skippedLevelsCount]);
+
+  const phoneBreakdown = (sessionReport.phone_breakdown ?? []).slice(0, 3);
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col items-center justify-center p-6 overflow-y-auto">
@@ -86,17 +142,25 @@ export function CallActiveComplete({
 
         {/* Score ring + stats */}
         <div className="flex flex-col sm:flex-row items-center gap-6 w-full my-2">
-          <ScoreRing score={Math.round(sessionReport.overall_score)} size={130} strokeWidth={10} />
+          {sessionReport.overall_score !== null ? (
+            <ScoreRing
+              score={Math.round(sessionReport.overall_score)}
+              size={130}
+              strokeWidth={10}
+            />
+          ) : (
+            <div className="flex h-[130px] w-[130px] shrink-0 flex-col items-center justify-center rounded-full border border-dashed border-neutral-700 px-4 text-center">
+              <span className="text-xs font-medium text-neutral-500">
+                No scored attempts
+              </span>
+            </div>
+          )}
 
           <div className="flex-1 grid grid-cols-2 gap-3 w-full">
-            {[
-              { label: "Fluency", value: Math.round(sessionReport.fluency_score) },
-              { label: "Clarity", value: Math.round(sessionReport.clarity_score) },
-              { label: "Best Score", value: bestScore },
-              { label: "Skipped", value: `${skippedLevelsCount} levels`, highlightAmber: skippedLevelsCount > 0 },
-            ].map(({ label, value, highlightAmber }) => (
+            {stats.map(({ label, value, title, highlightAmber }) => (
               <div
                 key={label}
+                title={title}
                 className="rounded-xl p-3 flex flex-col items-center glass-panel"
               >
                 <span className="text-[9px] text-neutral-500 font-bold tracking-wider uppercase">
@@ -107,19 +171,54 @@ export function CallActiveComplete({
                     highlightAmber ? "text-amber-400" : "text-neutral-200"
                   }`}
                 >
-                  {typeof value === "number" && label !== "Words" ? `${value}%` : value}
+                  {value}
                 </span>
               </div>
             ))}
           </div>
         </div>
 
+        {/* Sounds that actually gave trouble, from the acoustic scorer */}
+        {phoneBreakdown.length > 0 && (
+          <div className="w-full rounded-xl p-4 text-left glass-panel">
+            <p className="mb-2.5 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+              Sounds to work on
+            </p>
+            <div className="space-y-2">
+              {phoneBreakdown.map((entry) => (
+                <div key={entry.phone} className="flex items-center gap-3">
+                  <span className="w-10 shrink-0 font-mono text-sm text-neutral-200">
+                    {entry.phone}
+                  </span>
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-amber-400"
+                      style={{
+                        width: `${Math.min(100, Math.max(2, entry.avg_accuracy))}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="shrink-0 text-xs tabular-nums text-neutral-400">
+                    {Math.round(entry.avg_accuracy)}%
+                  </span>
+                  <span className="shrink-0 text-[10px] tabular-nums text-neutral-600">
+                    ×{entry.observations}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Skipped sentences / words badge section in Yellow (Amber) */}
         {(skippedLevelsCount > 0 || skippedWords.length > 0) && (
           <div className="w-full rounded-xl p-4 text-left bg-amber-500/10 border border-amber-500/20 text-amber-300">
             <div className="flex items-center gap-2 mb-1.5 text-xs font-bold uppercase tracking-wider text-amber-400">
               <SkipForward className="h-4 w-4" />
-              <span>Skipped in this Session ({skippedLevelsCount} levels)</span>
+              <span>
+                Skipped in this session
+                {skippedLevelsCount > 0 && ` (${skippedLevelsCount} steps)`}
+              </span>
             </div>
             {skippedWords.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">

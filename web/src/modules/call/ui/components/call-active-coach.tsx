@@ -52,7 +52,7 @@ export function CallActiveCoach({
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+      <ScrollArea data-call-pane="coach" className="flex-1 min-h-0" ref={scrollRef}>
         <div className="flex flex-col gap-3.5 p-5">
           {isConnected && !isTalking && !isAISpeaking && !streamingAIText && isMicEnabled && (
             <div className="mx-auto rounded-full px-4 py-1.5 text-xs font-semibold text-center bg-neutral-100 text-neutral-600 border border-neutral-200/80">

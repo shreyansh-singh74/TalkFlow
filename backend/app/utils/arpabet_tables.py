@@ -15,16 +15,25 @@ Design notes
 
 Viseme groups (0–9)
 -------------------
- 0  closed_lips      — B P M SIL
+ 0  closed_lips      — B P M SIL SP
  1  teeth_lip        — F V
  2  tongue_tip       — D T L N
  3  tongue_back      — K G NG
  4  teeth_gap        — S Z SH ZH CH JH TH DH
- 5  open             — AE EH AY AW
+ 5  open             — AE EH AY AW AA AO
  6  neutral_schwa    — AH UH HH
  7  spread_lips      — IY IH EY W Y
- 8  rounded_lips     — UW OW OY AO
+ 8  rounded_lips     — UW OW OY
  9  r_colored        — ER R
+
+These ten groups are a coarse *coding* target, kept stable because
+``pronunciation_comparison_service``, ``pronunciation_service`` and the
+WhisperX provider all emit them.  They are deliberately lossier than what a
+teaching diagram needs: group 4 merges interdental /θ ð/ with sibilant /s z/,
+and group 7 merges spread /iː/ with rounded /w/.  The mouth-shape renderer
+therefore refines these ids using the ARPABET symbol, which is returned
+alongside ``viseme_id`` — see ``web/src/lib/viseme-poses.ts``.  Do not
+"fix" the merges here; downstream consumers depend on these exact integers.
 """
 
 from __future__ import annotations

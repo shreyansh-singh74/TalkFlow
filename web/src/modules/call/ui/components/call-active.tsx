@@ -17,10 +17,16 @@ import { speakWord } from "@/lib/speak-word";
 import { splitTargetToWords } from "@/lib/split-target-words";
 import { usePushToTalk } from "@/hooks/use-push-to-talk";
 import { useSpacebarControl } from "@/hooks/use-spacebar-control";
-import { useUpdateMeeting } from "@/hooks/use-api";
-import { MeetingStatus } from "@/modules/meetings/types";
+import { useUpdatePracticeSession } from "@/hooks/use-api";
+import { SessionStatus } from "@/modules/sessions/types";
+import {
+  DIFFICULTY_PASS_THRESHOLDS,
+  type Difficulty,
+  type PracticeScript,
+  type SessionSource,
+} from "@/types/practice";
 import type {
-  MeetingPhonemeDataPersisted,
+  SessionPhonemeDataPersisted,
   PronunciationResultPayload,
 } from "@/types/pronunciation";
 
@@ -30,46 +36,70 @@ import { CallActiveCoach } from "./call-active-coach";
 import { CallActiveComplete } from "./call-active-complete";
 import { CallActiveSentence } from "./call-active-sentence";
 import { CallActiveFeedback } from "./call-active-feedback";
+import { CallActiveScorePill } from "./call-active-score-pill";
 
 interface Props {
   onLeave: () => void;
-  meetingName: string;
-  meetingId: string;
-  agentName: string;
-  agentInstructions: string;
-  initialPhonemeData?: MeetingPhonemeDataPersisted | null;
+  sessionName: string;
+  sessionId: string;
+  coachName: string;
+  coachInstructions: string;
+  script: PracticeScript | null;
+  source: SessionSource;
+  difficulty: Difficulty;
+  topic: string;
+  accent: string;
+  initialPhonemeData?: SessionPhonemeDataPersisted | null;
 }
 
 export const CallActive = ({
   onLeave,
-  meetingName,
-  meetingId,
-  agentName,
-  agentInstructions,
+  sessionName,
+  sessionId,
+  coachName,
+  coachInstructions,
+  script,
+  source,
+  difficulty,
+  topic,
+  accent,
   initialPhonemeData,
 }: Props) => {
-  const updateMeeting = useUpdateMeeting();
+  const updateSession = useUpdatePracticeSession();
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+
+  const scriptSteps = useMemo(() => script?.steps ?? [], [script]);
 
   const {
     isConnected, isTalking, isAISpeaking, transcripts, partialTranscript,
     streamingAIText, conversationStatus, error: transcriptionError,
     lastPronunciation, targetText,
     practiceMode, practiceSentence, practiceProgress,
+    passThreshold, stepIndex, contextBefore, contextAfter, stepNote,
     connect, disconnect, startTalking, stopTalking,
     sessionReport, sendNextSentence, sendPrevSentence, isTransitioning, restartSession,
     micStream,
-  } = usePushToTalk({ meetingId, agentName, agentInstructions });
+  } = usePushToTalk({
+    sessionId,
+    coachName,
+    coachInstructions,
+    steps: scriptSteps,
+    difficulty,
+    source,
+    passThreshold:
+      script?.pass_threshold ?? DIFFICULTY_PASS_THRESHOLDS[difficulty],
+    accent,
+    topic,
+  });
 
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [skippedLevels, setSkippedLevels] = useState<Set<number>>(new Set());
+  const [skippedSteps, setSkippedSteps] = useState<Set<number>>(new Set());
+  // Best score per step index, so the header can mark a step passed or failed
+  // rather than merely "behind the cursor".
+  const [scoreByStep, setScoreByStep] = useState<Record<number, number>>({});
 
   const handleSkipSentence = () => {
-    setSkippedLevels((prev) => {
-      const next = new Set(prev);
-      next.add(practiceProgress.current);
-      return next;
-    });
+    setSkippedSteps((prev) => new Set(prev).add(stepIndex));
     sendNextSentence();
   };
 
@@ -79,9 +109,16 @@ export const CallActive = ({
 
   const [scoreHistory, setScoreHistory] = useState<number[]>([]);
   useEffect(() => {
-    if (lastPronunciation?.score != null) {
-      setScoreHistory((prev) => [...prev, lastPronunciation.score]);
-    }
+    if (lastPronunciation?.score == null) return;
+    const score = lastPronunciation.score;
+    setScoreHistory((prev) => [...prev, score]);
+    setScoreByStep((prev) =>
+      score > (prev[stepIndex] ?? -1) ? { ...prev, [stepIndex]: score } : prev
+    );
+    // `stepIndex` is deliberately excluded: a result always belongs to the step
+    // that was current when it arrived, and re-running on a step change would
+    // re-attribute the previous score to the new step.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastPronunciation]);
 
   const scoreDisplay = useMemo(() => {
@@ -100,20 +137,23 @@ export const CallActive = ({
     if (isEvaluating) return "Evaluating";
     if (isTalking) return "Recording";
     if (scoreDisplay !== null) {
-      return scoreDisplay >= 95 ? "Level Complete" : "Level Failed";
+      return scoreDisplay >= passThreshold ? "Level Complete" : "Level Failed";
     }
     return "Level Ready";
-  }, [sessionReport, isTransitioning, isEvaluating, isTalking, scoreDisplay]);
+  }, [sessionReport, isTransitioning, isEvaluating, isTalking, scoreDisplay, passThreshold]);
 
   const [selectedLang, setSelectedLang] = useState<string | null>(null);
 
+  // The coach's configured accent wins; the instruction sniffing below only
+  // survives for coaches created before `accent` existed as a field.
   const defaultSpeechLang = useMemo(() => {
-    const i = (agentInstructions || "").toLowerCase();
+    if (accent) return accent;
+    const i = (coachInstructions || "").toLowerCase();
     if (i.includes("uk") || i.includes("british")) return "en-GB";
     if (i.includes("australia")) return "en-AU";
     if (i.includes("india")) return "en-IN";
     return "en-US";
-  }, [agentInstructions]);
+  }, [accent, coachInstructions]);
 
   const speechLang = selectedLang || defaultSpeechLang;
 
@@ -196,10 +236,10 @@ export const CallActive = ({
     if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current);
     persistDebounceRef.current = setTimeout(() => {
       appendPronunciationEntry(lastPronunciation);
-      updateMeeting.mutate({ id: meetingId, phonemeData: { entries: phonemeEntriesRef.current } });
+      updateSession.mutate({ id: sessionId, phonemeData: { entries: phonemeEntriesRef.current } });
     }, 2000);
     return () => { if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current); };
-  }, [lastPronunciation, meetingId, updateMeeting, appendPronunciationEntry]);
+  }, [lastPronunciation, sessionId, updateSession, appendPronunciationEntry]);
 
   useSpacebarControl({ onSpaceDown: handleStartTalking, onSpaceUp: handleStopTalking, enabled: isConnected && isMicEnabled });
 
@@ -231,9 +271,9 @@ export const CallActive = ({
         appendPronunciationEntry(lastPronunciation);
       }
 
-      updateMeeting.mutate({
-        id: meetingId,
-        status: MeetingStatus.Completed,
+      updateSession.mutate({
+        id: sessionId,
+        status: SessionStatus.Completed,
         endedAt: new Date().toISOString(),
         phonemeData: {
           entries: phonemeEntriesRef.current,
@@ -241,13 +281,13 @@ export const CallActive = ({
         }
       });
     }
-  }, [sessionReport, meetingId, lastPronunciation, appendPronunciationEntry, updateMeeting]);
+  }, [sessionReport, sessionId, lastPronunciation, appendPronunciationEntry, updateSession]);
 
   const handleLeaveWithPersist = () => {
     if (persistDebounceRef.current) { clearTimeout(persistDebounceRef.current); persistDebounceRef.current = null; }
     if (lastPronunciation) appendPronunciationEntry(lastPronunciation);
     if (phonemeEntriesRef.current.length > 0) {
-      updateMeeting.mutate({ id: meetingId, phonemeData: { entries: phonemeEntriesRef.current } });
+      updateSession.mutate({ id: sessionId, phonemeData: { entries: phonemeEntriesRef.current } });
     }
     onLeave();
   };
@@ -268,14 +308,18 @@ export const CallActive = ({
   };
 
   return (
-    <div className="relative flex h-dvh min-h-0 flex-col overflow-hidden" style={{ background: "var(--background)", color: "var(--foreground)" }}>
+    <div className="call-shell relative flex h-dvh min-h-0 flex-col overflow-hidden" style={{ background: "var(--background)", color: "var(--foreground)" }}>
       {/* Header */}
       <CallActiveHeader
-        meetingName={meetingName}
-        agentName={agentName}
+        sessionName={sessionName}
+        coachName={coachName}
         practiceProgress={practiceProgress}
-        skippedLevels={skippedLevels}
-        lastScore={scoreDisplay}
+        steps={scriptSteps}
+        skippedSteps={skippedSteps}
+        scoreByStep={scoreByStep}
+        passThreshold={passThreshold}
+        difficulty={difficulty}
+        sourceLabel={script?.source_label ?? null}
         onLeave={() => setShowLeaveConfirm(true)}
       />
 
@@ -284,20 +328,36 @@ export const CallActive = ({
         <CallActiveComplete
           sessionReport={sessionReport}
           scoreHistory={scoreHistory}
-          skippedLevelsCount={skippedLevels.size}
+          skippedLevelsCount={skippedSteps.size}
           onRestart={() => {
             setScoreHistory([]);
-            setSkippedLevels(new Set());
+            setSkippedSteps(new Set());
+            setScoreByStep({});
             restartSession();
           }}
           onLeave={() => setShowLeaveConfirm(true)}
         />
       ) : (
-        /* Main Practice Area — two columns */
-        <div className="flex flex-1 min-h-0 overflow-hidden">
-          {/* Left column: Target + Feedback + Pronunciation Reference */}
-          <div className="flex flex-1 flex-col min-h-0 overflow-y-auto px-6 py-6 gap-6 items-center">
-            <div className="w-full max-w-3xl flex flex-col items-center gap-6">
+        /* Main Practice Area — practice grid + full-height chat rail */
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+          {/* Practice column: row 1 (target + heard) above row 2 (word work).
+              Below lg the whole column scrolls like an ordinary page; on lg+ it
+              is a fixed grid where only the panes scroll, so the sentence the
+              learner is reading never leaves the screen. */}
+          <div className="call-practice flex min-w-0 flex-1 flex-col max-lg:overflow-y-auto">
+            {/* Row 1: the sentence and its live feedback side by side. Below lg
+                the row keeps its natural (content) height so the column
+                scrolls instead of squeezing the panels; on lg+ it takes the
+                leftover space and the panes inside it scroll. */}
+            <div className="call-row1 relative grid shrink-0 grid-cols-1 lg:min-h-0 lg:flex-1 lg:shrink lg:grid-cols-[1.1fr_1fr]">
+              {/* The one authoritative score readout — straddles the row's top
+                  edge, coloured against the session's own threshold. */}
+              <CallActiveScorePill
+                score={scoreDisplay}
+                passThreshold={passThreshold}
+                uiState={uiState}
+              />
+
               {/* Target sentence (Read - Huge typography) */}
               <CallActiveSentence
                 targetText={targetText}
@@ -310,15 +370,18 @@ export const CallActive = ({
                 isEvaluating={isEvaluating}
                 micStream={micStream}
                 speechLang={speechLang}
+                contextBefore={contextBefore}
+                contextAfter={contextAfter}
+                stepNote={stepNote}
               />
 
-              {/* Feedback directly below sentence (Review) */}
-              <CallActiveFeedback
-                lastPronunciation={lastPronunciation}
-                scoreDisplay={scoreDisplay}
-              />
+              {/* Feedback beside the sentence (Review) */}
+              <CallActiveFeedback lastPronunciation={lastPronunciation} />
+            </div>
 
-              {/* Wrong words bar */}
+            {/* Row 2: one bordered group — words to practise + the phonetic
+                breakdown with the mouth diagram. */}
+            <section className="glass-panel call-panel flex shrink-0 flex-col gap-2 rounded-2xl">
               <WrongWordsBar
                 pairs={lastPronunciation?.misaligned_words}
                 activeKey={activeWordKey}
@@ -327,8 +390,6 @@ export const CallActive = ({
                   if (fromWrongBar) speakWord(expected, { rate: 0.7, lang: speechLang });
                 }}
               />
-
-              {/* Pronunciation reference card */}
               <PronunciationReferenceCard
                 displayWord={displayWord}
                 activeWordKey={activeWordKey}
@@ -336,11 +397,11 @@ export const CallActive = ({
                 onLangChange={setSelectedLang}
                 misalignedPairs={lastPronunciation?.misaligned_words}
               />
-            </div>
+            </section>
           </div>
 
-          {/* Right column: Coach panel — flush 420px sidebar */}
-          <div className="hidden lg:flex w-[420px] xl:w-[450px] shrink-0 h-full">
+          {/* Chat rail — full height, coach chat only */}
+          <div className="hidden lg:flex w-[360px] xl:w-[400px] shrink-0 flex-col min-h-0 py-3 pr-3">
             <CallActiveCoach
               isConnected={isConnected}
               isTalking={isTalking}
@@ -352,7 +413,7 @@ export const CallActive = ({
               practiceMode={practiceMode}
             />
           </div>
-        </div>
+        </main>
       )}
 
       {/* Fixed bottom controls */}
@@ -365,7 +426,6 @@ export const CallActive = ({
           micStream={micStream}
           isTransitioning={isTransitioning}
           isEvaluating={isEvaluating}
-          scoreDisplay={scoreDisplay}
           transcriptionError={transcriptionError}
           conversationStatus={conversationStatus}
           onMicPress={mainMicPress}

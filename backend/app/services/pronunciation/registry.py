@@ -24,7 +24,7 @@ def get_scorer() -> PronunciationScorer:
             if settings.ENABLE_ACOUSTIC_SCORING:
                 from app.services.pronunciation.acoustic_scorer import AcousticScorer
 
-                logger.info("Pronunciation scorer: acoustic (wav2vec2 + GOP)")
+                logger.info("Pronunciation scorer: acoustic (phoneme CTC + GOP)")
                 _scorer = AcousticScorer()
             else:
                 logger.info("Pronunciation scorer: text_proxy")

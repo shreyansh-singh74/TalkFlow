@@ -13,7 +13,7 @@ TalkFlow is a real-time, AI-powered spoken English practice application. It comb
 
 ### Backend API & ML Engine
 - **Framework:** FastAPI, Uvicorn (WebSockets & HTTP)
-- **Audio & ML Processing:** PyTorch, Hugging Face Transformers (Wav2Vec2 ASR)
+- **Audio & ML Processing:** PyTorch, Hugging Face Transformers (WavLM ASR + phoneme-CTC scoring)
 - **LLM Integration:** OpenRouter API
 - **Text-to-Speech:** Google Cloud Text-to-Speech API
 - **Phonetics & Scoring:** g2p-en, CMUDict, PyPhen, Acoustic Phoneme Alignment
@@ -84,14 +84,29 @@ FRONTEND_URL=http://localhost:3000
 OPENROUTER_API_KEY=your_openrouter_api_key
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/google-credentials.json
 # Alternative: GOOGLE_CREDENTIALS_JSON=<base64-encoded-json>
-ENABLE_WAV2VEC2=1
-WARM_WAV2VEC2_ON_STARTUP=1
-WAV2VEC2_MODEL_ID=facebook/wav2vec2-base-960h
-TURN_AUDIO_MAX_BYTES=160000
-ENABLE_ACOUSTIC_SCORING=0
-WARM_ACOUSTIC_ON_STARTUP=0
-ACOUSTIC_PHONEME_MODEL_ID=facebook/wav2vec2-lv-60-espeak-cv-ft
+ENABLE_ASR=1
+WARM_ASR_ON_STARTUP=1
+ASR_MODEL_ID=patrickvonplaten/wavlm-libri-clean-100h-large
+# 15s of 16kHz mono PCM16. Practice sentences take 6-10s at learner pace.
+TURN_AUDIO_MAX_BYTES=480000
+ENABLE_ACOUSTIC_SCORING=1
+WARM_ACOUSTIC_ON_STARTUP=1
+ACOUSTIC_PHONEME_MODEL_ID=vitouphy/wav2vec2-xls-r-300m-timit-phoneme
 ```
+
+> **Renamed variables.** `ENABLE_WAV2VEC2` and `WARM_WAV2VEC2_ON_STARTUP` are
+> still accepted as deprecated aliases. `WAV2VEC2_MODEL_ID` is **not** — it is
+> ignored with a startup warning, because honouring it would silently pin the
+> old wav2vec2 checkpoint and WavLM would never load. Rename it to
+> `ASR_MODEL_ID` in your `.env` and in the Railway dashboard.
+
+> **Memory.** WavLM-Large (1.26 GB) and the phoneme model (1.26 GB) are both fp32 and
+> resident at once: **3.6 GB peak RSS, measured on the running server**. A 512 MB–1 GB
+> container will OOM, and a 4 GB host is too tight. On a memory-capped host set
+> `WARM_ACOUSTIC_ON_STARTUP=0` to defer the phoneme load, then fall back to
+> `ASR_MODEL_ID=patrickvonplaten/wavlm-libri-clean-100h-base-plus` (2.8 GB peak, 2.9× faster
+> ASR). base-plus does **not** reduce pronunciation-scoring accuracy — only the displayed
+> transcript. See [backend/README.md](backend/README.md#deploying-on-a-small-vps).
 
 ## Database Management
 

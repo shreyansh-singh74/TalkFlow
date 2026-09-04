@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { agents, meetings } from "@/db/schema";
+import { coaches, practiceSessions } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { and, desc, eq, sql, count } from "drizzle-orm";
-import type { MeetingPhonemeDataPersisted } from "@/types/pronunciation";
+import type { SessionPhonemeDataPersisted } from "@/types/pronunciation";
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,86 +17,86 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id;
 
-    // 1. Fetch all completed meetings with agent info and phoneme data
-    const completedMeetings = await db
+    // 1. Fetch all completed sessions with coach info and phoneme data
+    const completedSessions = await db
       .select({
-        id: meetings.id,
-        name: meetings.name,
-        status: meetings.status,
-        startedAt: meetings.startedAt,
-        endedAt: meetings.endedAt,
-        phonemeData: meetings.phonemeData,
-        agentId: meetings.agentId,
-        agentName: agents.name,
-        createdAt: meetings.createdAt,
+        id: practiceSessions.id,
+        name: practiceSessions.name,
+        status: practiceSessions.status,
+        startedAt: practiceSessions.startedAt,
+        endedAt: practiceSessions.endedAt,
+        phonemeData: practiceSessions.phonemeData,
+        coachId: practiceSessions.coachId,
+        coachName: coaches.name,
+        createdAt: practiceSessions.createdAt,
         duration:
-          sql<number>`EXTRACT(EPOCH FROM (${meetings.endedAt} - ${meetings.startedAt}))`.as(
+          sql<number>`EXTRACT(EPOCH FROM (${practiceSessions.endedAt} - ${practiceSessions.startedAt}))`.as(
             "duration"
           ),
       })
-      .from(meetings)
-      .innerJoin(agents, eq(meetings.agentId, agents.id))
+      .from(practiceSessions)
+      .innerJoin(coaches, eq(practiceSessions.coachId, coaches.id))
       .where(
         and(
-          eq(meetings.userId, userId),
-          eq(meetings.status, "completed")
+          eq(practiceSessions.userId, userId),
+          eq(practiceSessions.status, "completed")
         )
       )
-      .orderBy(desc(meetings.endedAt), desc(meetings.createdAt))
+      .orderBy(desc(practiceSessions.endedAt), desc(practiceSessions.createdAt))
       .limit(50);
 
-    // 2. Fetch the most recent meeting of any status (for "Continue practice")
-    const [lastMeeting] = await db
+    // 2. Fetch the most recent session of any status (for "Continue practice")
+    const [lastSession] = await db
       .select({
-        id: meetings.id,
-        name: meetings.name,
-        status: meetings.status,
-        startedAt: meetings.startedAt,
-        endedAt: meetings.endedAt,
-        phonemeData: meetings.phonemeData,
-        agentId: meetings.agentId,
-        agentName: agents.name,
-        createdAt: meetings.createdAt,
+        id: practiceSessions.id,
+        name: practiceSessions.name,
+        status: practiceSessions.status,
+        startedAt: practiceSessions.startedAt,
+        endedAt: practiceSessions.endedAt,
+        phonemeData: practiceSessions.phonemeData,
+        coachId: practiceSessions.coachId,
+        coachName: coaches.name,
+        createdAt: practiceSessions.createdAt,
         duration:
-          sql<number>`EXTRACT(EPOCH FROM (${meetings.endedAt} - ${meetings.startedAt}))`.as(
+          sql<number>`EXTRACT(EPOCH FROM (${practiceSessions.endedAt} - ${practiceSessions.startedAt}))`.as(
             "duration"
           ),
       })
-      .from(meetings)
-      .innerJoin(agents, eq(meetings.agentId, agents.id))
-      .where(eq(meetings.userId, userId))
-      .orderBy(desc(meetings.createdAt))
+      .from(practiceSessions)
+      .innerJoin(coaches, eq(practiceSessions.coachId, coaches.id))
+      .where(eq(practiceSessions.userId, userId))
+      .orderBy(desc(practiceSessions.createdAt))
       .limit(1);
 
-    // 3. Fetch all agents
+    // 3. Fetch all coaches
     const userAgents = await db
       .select({
-        id: agents.id,
-        name: agents.name,
-        instructions: agents.instructions,
-        meetingCount: sql<number>`(
+        id: coaches.id,
+        name: coaches.name,
+        instructions: coaches.instructions,
+        sessionCount: sql<number>`(
           select count(*)::int
-          from ${meetings}
-          where ${meetings.agentId} = ${agents.id}
-        )`.as("meetingCount"),
+          from ${practiceSessions}
+          where ${practiceSessions.coachId} = ${coaches.id}
+        )`.as("sessionCount"),
       })
-      .from(agents)
-      .where(eq(agents.userId, userId))
-      .orderBy(desc(agents.createdAt));
+      .from(coaches)
+      .where(eq(coaches.userId, userId))
+      .orderBy(desc(coaches.createdAt));
 
     // 4. Total completed sessions count
     const [totalResult] = await db
       .select({ count: count() })
-      .from(meetings)
+      .from(practiceSessions)
       .where(
         and(
-          eq(meetings.userId, userId),
-          eq(meetings.status, "completed")
+          eq(practiceSessions.userId, userId),
+          eq(practiceSessions.status, "completed")
         )
       );
     const totalSessions = totalResult?.count ?? 0;
 
-    // 5. Compute stats from completed meetings
+    // 5. Compute stats from completed sessions
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -112,9 +112,9 @@ export async function GET(request: NextRequest) {
     // Track unique practice days for streak
     const practiceDays = new Set<string>();
 
-    for (const meeting of completedMeetings) {
-      const endDate = meeting.endedAt ? new Date(meeting.endedAt) : null;
-      const duration = meeting.duration ?? 0;
+    for (const session of completedSessions) {
+      const endDate = session.endedAt ? new Date(session.endedAt) : null;
+      const duration = session.duration ?? 0;
 
       // Add to practice days set
       if (endDate) {
@@ -123,9 +123,9 @@ export async function GET(request: NextRequest) {
       }
 
       // Parse phoneme data
-      const pd = meeting.phonemeData as MeetingPhonemeDataPersisted | null;
+      const pd = session.phonemeData as SessionPhonemeDataPersisted | null;
       if (pd && pd.entries && pd.entries.length > 0) {
-        // Average accuracy for this meeting
+        // Average accuracy for this session
         const avgScore =
           pd.entries.reduce((sum, e) => sum + e.score, 0) / pd.entries.length;
 
@@ -206,8 +206,8 @@ export async function GET(request: NextRequest) {
       .map(([phoneme]) => phoneme);
 
     // Recent sessions (top 4)
-    const recentSessions = completedMeetings.slice(0, 4).map((m) => {
-      const pd = m.phonemeData as MeetingPhonemeDataPersisted | null;
+    const recentSessions = completedSessions.slice(0, 4).map((m) => {
+      const pd = m.phonemeData as SessionPhonemeDataPersisted | null;
       const avgScore =
         pd && pd.entries && pd.entries.length > 0
           ? Math.round(
@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
       return {
         id: m.id,
         name: m.name,
-        agentName: m.agentName,
+        coachName: m.coachName,
         endedAt: m.endedAt?.toISOString() ?? m.createdAt.toISOString(),
         duration: m.duration,
         accuracy: avgScore,
@@ -228,8 +228,8 @@ export async function GET(request: NextRequest) {
 
     // Continue practice card data
     let continuePractice = null;
-    if (lastMeeting) {
-      const pd = lastMeeting.phonemeData as MeetingPhonemeDataPersisted | null;
+    if (lastSession) {
+      const pd = lastSession.phonemeData as SessionPhonemeDataPersisted | null;
       const avgScore =
         pd && pd.entries && pd.entries.length > 0
           ? Math.round(
@@ -239,14 +239,14 @@ export async function GET(request: NextRequest) {
           : null;
 
       continuePractice = {
-        id: lastMeeting.id,
-        name: lastMeeting.name,
-        agentName: lastMeeting.agentName,
-        status: lastMeeting.status,
+        id: lastSession.id,
+        name: lastSession.name,
+        coachName: lastSession.coachName,
+        status: lastSession.status,
         accuracy: avgScore,
-        duration: lastMeeting.duration,
-        endedAt: lastMeeting.endedAt?.toISOString() ?? null,
-        createdAt: lastMeeting.createdAt.toISOString(),
+        duration: lastSession.duration,
+        endedAt: lastSession.endedAt?.toISOString() ?? null,
+        createdAt: lastSession.createdAt.toISOString(),
       };
     }
 
@@ -271,11 +271,11 @@ export async function GET(request: NextRequest) {
         context: bestAccuracyContext,
       },
       focusAreas: focusPhonemes,
-      agents: userAgents.map((a) => ({
+      coaches: userAgents.map((a) => ({
         id: a.id,
         name: a.name,
         description: a.instructions.slice(0, 60),
-        meetingCount: a.meetingCount,
+        sessionCount: a.sessionCount,
       })),
     });
   } catch (error) {

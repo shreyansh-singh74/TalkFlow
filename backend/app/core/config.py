@@ -11,6 +11,30 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+_TRUTHY = ("1", "true", "yes")
+
+
+def _env_flag(name: str, default: str, *legacy_names: str) -> bool:
+    """Read a boolean env var, honouring deprecated names as aliases.
+
+    Only used for on/off switches. Value-carrying vars (model IDs) deliberately
+    do NOT get legacy aliases -- a stale alias there would silently pin the old
+    model. See ASR_MODEL_ID below.
+    """
+    raw = os.getenv(name)
+    if raw is None:
+        for legacy in legacy_names:
+            raw = os.getenv(legacy)
+            if raw is not None:
+                logger.warning(
+                    "%s is deprecated; use %s instead (still honoured for now)",
+                    legacy,
+                    name,
+                )
+                break
+    return (raw if raw is not None else default).lower() in _TRUTHY
+
+
 class Settings:
     """Application settings and configuration"""
     
@@ -118,28 +142,39 @@ class Settings:
     # Paths
     TEMP_DIR: str = "/tmp"
     
-    ENABLE_WAV2VEC2: bool = os.getenv("ENABLE_WAV2VEC2", "1").lower() in ("1", "true", "yes")
-    WARM_WAV2VEC2_ON_STARTUP: bool = os.getenv(
-        "WARM_WAV2VEC2_ON_STARTUP", "1"
-    ).lower() in ("1", "true", "yes")
-    WAV2VEC2_MODEL_ID: str = os.getenv("WAV2VEC2_MODEL_ID", "facebook/wav2vec2-base-960h")
-    TURN_AUDIO_MAX_BYTES: int = int(os.getenv("TURN_AUDIO_MAX_BYTES", str(16_000 * 2 * 5)))
+    # --- Speech-to-text (ASR) -------------------------------------------------
+    # Model-agnostic: loaded via AutoProcessor/AutoModelForCTC, so switching
+    # checkpoints is an env-var change, not a code change.
+    ENABLE_ASR: bool = _env_flag("ENABLE_ASR", "1", "ENABLE_WAV2VEC2")
+    WARM_ASR_ON_STARTUP: bool = _env_flag(
+        "WARM_ASR_ON_STARTUP", "1", "WARM_WAV2VEC2_ON_STARTUP"
+    )
+    # WavLM-Large: 94k hours of SSL pretraining (Libri-Light + GigaSpeech +
+    # VoxPopuli) with utterance mixing, so it holds up on accented, noisy,
+    # real-microphone audio far better than an audiobook-only wav2vec2.
+    # NOTE: no legacy WAV2VEC2_MODEL_ID alias on purpose -- see validate().
+    ASR_MODEL_ID: str = os.getenv(
+        "ASR_MODEL_ID", "patrickvonplaten/wavlm-libri-clean-100h-large"
+    )
+    # 15s at 16kHz mono PCM16. Practice sentences run 5-9 words, which is 6-10s
+    # at learner pace; the previous 5s cap silently truncated most of them.
+    TURN_AUDIO_MAX_BYTES: int = int(os.getenv("TURN_AUDIO_MAX_BYTES", str(16_000 * 2 * 15)))
 
-    # Acoustic pronunciation scoring (Phase 1): score the raw audio waveform with
-    # a wav2vec2 phoneme recognizer + GOP-style alignment instead of comparing
-    # transcript text. When disabled, the legacy text-proxy scorer is used.
-    ENABLE_ACOUSTIC_SCORING: bool = os.getenv("ENABLE_ACOUSTIC_SCORING", "0").lower() in (
-        "1",
-        "true",
-        "yes",
-    )
-    WARM_ACOUSTIC_ON_STARTUP: bool = os.getenv("WARM_ACOUSTIC_ON_STARTUP", "0").lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    # Acoustic pronunciation scoring: score the raw audio waveform with a
+    # phoneme-CTC recognizer + GOP-style alignment instead of comparing
+    # transcript text. When disabled, the legacy text-proxy scorer is used --
+    # that proxy is structurally blind to any error the ASR normalizes away.
+    ENABLE_ACOUSTIC_SCORING: bool = _env_flag("ENABLE_ACOUSTIC_SCORING", "1")
+    WARM_ACOUSTIC_ON_STARTUP: bool = _env_flag("WARM_ACOUSTIC_ON_STARTUP", "1")
+    # XLS-R-300m fine-tuned on TIMIT phonemes (8.0% CER). Its 42-token vocab
+    # maps ~1:1 onto the ARPAbet reference from g2p_en: diphthongs and
+    # affricates are single tokens, and its TIMIT foldings (AO->AA, ZH->SH)
+    # land under CORRECT_DISTANCE_THRESHOLD, so they cost nothing.
+    # Alternatives (env-swappable): mrrubino/wav2vec2-large-xlsr-53-l2-arctic-phoneme
+    # (trained on non-native speech, but no diphthong tokens),
+    # facebook/wav2vec2-lv-60-espeak-cv-ft (multilingual eSpeak IPA).
     ACOUSTIC_PHONEME_MODEL_ID: str = os.getenv(
-        "ACOUSTIC_PHONEME_MODEL_ID", "facebook/wav2vec2-lv-60-espeak-cv-ft"
+        "ACOUSTIC_PHONEME_MODEL_ID", "vitouphy/wav2vec2-xls-r-300m-timit-phoneme"
     )
 
     # Scoring thresholds (env-overridable so they can be tuned without redeploy).
@@ -214,6 +249,17 @@ class Settings:
             logger.warning(
                 "Google credentials file not found at %s",
                 self.GOOGLE_APPLICATION_CREDENTIALS,
+            )
+        # WAV2VEC2_MODEL_ID is intentionally NOT read as an alias for
+        # ASR_MODEL_ID: honouring it would let a stale wav2vec2 checkpoint win
+        # and WavLM would never load. Fail loudly instead of silently.
+        legacy_model_id = os.getenv("WAV2VEC2_MODEL_ID")
+        if legacy_model_id:
+            logger.warning(
+                "WAV2VEC2_MODEL_ID=%r is IGNORED. Rename it to ASR_MODEL_ID "
+                "(currently using %s).",
+                legacy_model_id,
+                self.ASR_MODEL_ID,
             )
 
 settings = Settings()

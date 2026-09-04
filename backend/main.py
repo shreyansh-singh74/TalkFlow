@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.routes import health, voice_websocket, phonemes, pronunciation, pronunciation_analysis
+from app.api.routes import health, voice_websocket, phonemes, practice, pronunciation, pronunciation_analysis
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,17 +19,17 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    if settings.ENABLE_WAV2VEC2 and settings.WARM_WAV2VEC2_ON_STARTUP:
+    if settings.ENABLE_ASR and settings.WARM_ASR_ON_STARTUP:
         try:
-            from app.services.wav2vec2_asr import warm_wav2vec2
+            from app.services.asr import warm_asr
 
-            await asyncio.to_thread(warm_wav2vec2)
+            await asyncio.to_thread(warm_asr)
         except Exception:
-            logger.exception("Wav2Vec2 warm failed")
+            logger.exception("ASR warm failed")
 
     if settings.ENABLE_ACOUSTIC_SCORING and settings.WARM_ACOUSTIC_ON_STARTUP:
         try:
-            from app.services.pronunciation.wav2vec2_phonemes import warm_phoneme_model
+            from app.services.pronunciation.phoneme_recognizer import warm_phoneme_model
 
             await asyncio.to_thread(warm_phoneme_model)
         except Exception:
@@ -72,6 +72,7 @@ app.add_middleware(
 app.include_router(health.router, tags=["Health"])
 app.include_router(voice_websocket.router, tags=["Voice WebSocket"])
 app.include_router(phonemes.router, tags=["Phonemes"])
+app.include_router(practice.router, tags=["Practice"])
 app.include_router(pronunciation.router, tags=["Pronunciation"])
 app.include_router(pronunciation_analysis.router, tags=["Pronunciation Analysis"])
 

@@ -51,7 +51,7 @@ export function DataTable<TData, TValue>({
                 colSpan={columns.length}
                 className="h-29 text-center text-muted-foreground"
               >
-                No Agents Found.
+                No Coaches Found.
               </TableCell>
             </TableRow>
           )}

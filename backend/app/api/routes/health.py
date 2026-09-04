@@ -14,7 +14,10 @@ async def root():
 @router.get("/health")
 async def health_check():
     return {
-        "status": "healthy", 
-        "transcription_service": "wav2vec2"
+        "status": "healthy",
+        "transcription_service": "wavlm",
+        "asr_model": settings.ASR_MODEL_ID,
+        "phoneme_model": settings.ACOUSTIC_PHONEME_MODEL_ID,
+        "acoustic_scoring": settings.ENABLE_ACOUSTIC_SCORING,
     }
 

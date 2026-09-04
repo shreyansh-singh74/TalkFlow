@@ -23,12 +23,12 @@ const firstSection = [
   {
     icon: VideoIcon,
     label: "Practice Sessions",
-    href: "/dashboard/meetings",
+    href: "/dashboard/sessions",
   },
   {
     icon: BotIcon,
-    label: "Agents",
-    href: "/dashboard/agents",
+    label: "Coaches",
+    href: "/dashboard/coaches",
   },
 ];
 

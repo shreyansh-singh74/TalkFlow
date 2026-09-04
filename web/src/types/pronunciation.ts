@@ -9,11 +9,49 @@ export type MisalignedWordPair = {
   heard: string;
 };
 
+/** One phone from the acoustic scorer's alignment. `expected`/`actual` are IPA. */
+export type PerPhonemeDetail = {
+  expected: string;
+  actual: string;
+  accuracy: number;
+  is_correct: boolean;
+  distance?: number;
+  confidence?: number;
+};
+
+export type StressPayload = {
+  score: number;
+  method: string;
+  syllables: Array<{
+    syllable: string;
+    expected_stressed: boolean | null;
+    score: number;
+    cues?: Record<string, number>;
+  }>;
+};
+
+export type TimingPayload = {
+  score: number;
+  speech_rate: number;
+  articulation_rate: number;
+  pace_label: "slow" | "natural" | "fast" | string;
+  speech_fraction: number;
+  pauses: Array<{ start: number; end: number; duration: number }>;
+};
+
+export type IntonationPayload = {
+  score: number;
+  dtw_distance: number;
+  slope: number;
+  label: "rising" | "falling" | "level" | string;
+  contour: number[];
+  reference_contour: number[];
+};
+
 export type PronunciationResultPayload = {
   type: "PRONUNCIATION_RESULT";
   turn_id: string;
   target_text: string;
-  deepgram_text: string | null;
   heard_text: string;
   score: number;
   expected_phonemes: string[];
@@ -21,6 +59,15 @@ export type PronunciationResultPayload = {
   errors: PronounceOpcode[];
   feedback: string[];
   misaligned_words?: MisalignedWordPair[];
+  /** "acoustic_ctc" when the phoneme model ran, "text_proxy" when it didn't. */
+  method?: string;
+  per_phoneme?: PerPhonemeDetail[];
+  accent?: string;
+  audio_path?: string | null;
+  stress?: StressPayload | null;
+  timing?: TimingPayload | null;
+  intonation?: IntonationPayload | null;
+  diagnosis?: Record<string, unknown>;
 };
 
 export type PracticeTargetPayload = {
@@ -32,37 +79,60 @@ export type PracticeTargetPayload = {
     current: number;
     total: number;
   };
+  step_index?: number;
+  pass_threshold?: number;
+  /** Neighbouring lines; only sent for custom-text (speech-prep) sessions. */
+  context_before?: string | null;
+  context_after?: string | null;
+  note?: string | null;
 };
 
+/** One phone the speaker actually got wrong, with the evidence behind it. */
+export type PhoneBreakdownEntry = {
+  phone: string;
+  label: string;
+  observations: number;
+  error_rate: number;
+  avg_accuracy: number;
+};
+
+/**
+ * Anything nullable here was *not measured* for that session — the prosody
+ * scorers are config-gated and the text-proxy scorer produces no phone data.
+ * Render null as absent; never substitute a placeholder number.
+ */
 export type SessionAnalysisReport = {
-  overall_score: number;
-  fluency_score: number;
-  clarity_score: number;
-  confidence_score: number;
-  accuracy_score: number;
-  
+  overall_score: number | null;
+  accuracy_score: number | null;
+  fluency_score: number | null;
+
   words_spoken: number;
   sentences_completed: number;
-  wpm: number;
-  avg_pause_duration: number;
-  longest_pause: number;
-  total_speaking_time: number;
-  
+  sentences_total?: number;
+  wpm: number | null;
+  avg_pause_duration: number | null;
+  longest_pause: number | null;
+  total_speaking_time: number | null;
+
   mispronounced_words: string[];
   difficult_sounds: string[];
-  stress_mistakes: string[];
-  syllable_mistakes: string[];
-  intonation_issues: string[];
+  phone_breakdown?: PhoneBreakdownEntry[];
+  stress_mistakes: string[] | null;
+  syllable_mistakes: string[] | null;
+  intonation_issues: string[] | null;
   words_skipped: string[];
   extra_inserted_words: string[];
-  
+
   strengths: string[];
   areas_to_improve: string[];
-  
+
   coach_feedback: string;
+  difficulty?: "easy" | "medium" | "hard";
+  pass_threshold?: number;
+  scoring_method?: string | null;
 };
 
-export type MeetingPhonemeDataPersisted = {
+export type SessionPhonemeDataPersisted = {
   entries: Array<{
     at: string;
     turn_id: string;
@@ -70,7 +140,7 @@ export type MeetingPhonemeDataPersisted = {
     heard_text: string;
     score: number;
     mode?: "word" | "sentence";
-    agent_name?: string;
+    coach_name?: string;
     feedback: string[];
     misaligned_words?: MisalignedWordPair[];
   }>;
@@ -80,12 +150,42 @@ export type MeetingPhonemeDataPersisted = {
 export type ArpabetSyllableItem = {
   phones: string;
   display: string;
+  /** Primary stress only — exactly one syllable per word has this set. */
   stressed: boolean;
+  /** Real ARPABET level: 1 primary, 2 secondary, 0 none. */
+  stress_level?: number;
+};
+
+/**
+ * One phone from the reference dictionary, mirroring the backend's
+ * `PhonemeEntry`. `symbol` is a stress-stripped ARPABET base (`"AE"`, never
+ * `"AE1"`).
+ *
+ * `expected_duration_ms` is a *measurement* slot — null until forced alignment
+ * lands in Phase 5. The mouth animation does not wait for it and must not fill
+ * it; see the header of `@/lib/viseme-timing` for why that separation matters.
+ */
+export type ApiPhoneme = {
+  symbol: string;
+  stress: number;
+  /** Coarse mouth-shape group 0–9; refined per-symbol in `@/lib/viseme-poses`. */
+  viseme_id: number;
+  /** Index into `arpabet_syllables`. */
+  syllable_index?: number;
+  confidence?: number | null;
+  expected_duration_ms?: number | null;
 };
 
 export type PronunciationReferenceResponse = {
   word: string;
   arpabet_syllables: ArpabetSyllableItem[];
+  /**
+   * Optional because `usePronunciationReference` holds a module-level cache
+   * that is never invalidated: a tab open across a deploy can serve a payload
+   * predating these fields. Consumers must tolerate their absence.
+   */
+  ipa?: string;
+  phonemes?: ApiPhoneme[];
 };
 
 export interface PhonemeSegment {

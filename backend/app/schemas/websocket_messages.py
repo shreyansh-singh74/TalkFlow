@@ -9,11 +9,26 @@ class ControlMessage(BaseModel):
     timestamp: float
 
 
+class PracticeStepMessage(BaseModel):
+    index: int
+    text: str
+    note: Optional[str] = None
+
+
 class SessionConfigMessage(BaseModel):
     type: Literal["SESSION_CONFIG"]
-    meeting_id: Optional[str] = None
-    agent_name: Optional[str] = None
-    agent_instructions: Optional[str] = None
+    session_id: Optional[str] = None
+    coach_name: Optional[str] = None
+    coach_instructions: Optional[str] = None
+    topic: Optional[str] = None
+    difficulty: Literal["easy", "medium", "hard"] = "medium"
+    accent: str = "en-US"
+    #: Falls back to the difficulty tier's default when omitted.
+    pass_threshold: Optional[float] = None
+    #: The full script, decided at session-creation time. The engine executes
+    #: this list -- it no longer picks content of its own.
+    steps: List[PracticeStepMessage] = Field(default_factory=list)
+    source: Literal["coach", "custom"] = "coach"
 
 
 class PracticeProgressMessage(BaseModel):
@@ -27,6 +42,13 @@ class PracticeTargetMessage(BaseModel):
     mode: Literal["word", "sentence"]
     sentence: str
     progress: PracticeProgressMessage
+    step_index: int = 0
+    pass_threshold: float = 88.0
+    #: Surrounding sentences, so someone rehearsing a speech can see where this
+    #: line sits. Only populated for custom-text sessions.
+    context_before: Optional[str] = None
+    context_after: Optional[str] = None
+    note: Optional[str] = None
 
 
 class PartialTranscriptMessage(BaseModel):
@@ -70,7 +92,6 @@ class PronunciationResultMessage(BaseModel):
     type: Literal["PRONUNCIATION_RESULT"]
     turn_id: str
     target_text: str
-    deepgram_text: Optional[str] = None
     heard_text: str
     score: float
     expected_phonemes: List[str] = Field(default_factory=list)

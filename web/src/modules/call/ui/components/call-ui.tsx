@@ -2,57 +2,85 @@ import { useState } from "react";
 import { CallLobby } from "./call-lobby";
 import { CallActive } from "./call-active";
 import { CallEnded } from "./call-ended";
-import { useUpdateMeeting } from "@/hooks/use-api";
-import { MeetingStatus } from "@/modules/meetings/types";
+import { useUpdatePracticeSession } from "@/hooks/use-api";
+import { SessionStatus } from "@/modules/sessions/types";
+import type { Difficulty, PracticeScript, SessionSource } from "@/types/practice";
 
 interface Props {
-  meetingId: string;
-  meetingName: string;
-  agentName: string;
-  agentInstructions: string;
+  sessionId: string;
+  sessionName: string;
+  coachName: string;
+  coachInstructions: string;
+  /** Null for sessions created before scripts existed; the engine then falls
+   * back to a generic bank for the difficulty. */
+  script: PracticeScript | null;
+  source: SessionSource;
+  difficulty: Difficulty;
+  topic: string;
+  accent: string;
 }
 
-export const CallUI = ({ meetingId, meetingName, agentName, agentInstructions }: Props) => {
+export const CallUI = ({
+  sessionId,
+  sessionName,
+  coachName,
+  coachInstructions,
+  script,
+  source,
+  difficulty,
+  topic,
+  accent,
+}: Props) => {
   const [show, setShow] = useState<"lobby" | "call" | "ended">("lobby");
-  const updateMeeting = useUpdateMeeting();
+  const updateSession = useUpdatePracticeSession();
 
   const handleJoin = async () => {
-    updateMeeting.mutate({
-      id: meetingId,
-      status: MeetingStatus.Active,
+    updateSession.mutate({
+      id: sessionId,
+      status: SessionStatus.Active,
       startedAt: new Date().toISOString(),
     });
     setShow("call");
   };
-  
+
   const handleLeave = async () => {
-    updateMeeting.mutate({
-      id: meetingId,
-      status: MeetingStatus.Completed,
+    updateSession.mutate({
+      id: sessionId,
+      status: SessionStatus.Completed,
       endedAt: new Date().toISOString(),
     });
     setShow("ended");
   };
-  
+
   return (
     <div className="flex h-full max-h-full min-h-0 flex-col overflow-hidden">
       {show == "lobby" && (
         <CallLobby
           onJoin={handleJoin}
+          sessionName={sessionName}
+          coachName={coachName}
+          script={script}
+          source={source}
+          difficulty={difficulty}
         />
       )}
       {show == "call" && (
         <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
           <CallActive
             onLeave={handleLeave}
-            meetingName={meetingName}
-            meetingId={meetingId}
-            agentName={agentName}
-            agentInstructions={agentInstructions}
+            sessionName={sessionName}
+            sessionId={sessionId}
+            coachName={coachName}
+            coachInstructions={coachInstructions}
+            script={script}
+            source={source}
+            difficulty={difficulty}
+            topic={topic}
+            accent={accent}
           />
         </div>
       )}
-      {show == "ended" && <CallEnded />} 
+      {show == "ended" && <CallEnded />}
     </div>
   );
 };

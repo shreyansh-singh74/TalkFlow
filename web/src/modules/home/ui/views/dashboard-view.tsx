@@ -14,7 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 
-// Accent colors for agent avatars
+// Accent colors for coach avatars
 const AVATAR_COLORS = [
   "#6366f1", // indigo
   "#8b5cf6", // violet
@@ -90,7 +90,7 @@ export const DashboardView = () => {
           </p>
         </div>
         <Button
-          onClick={() => router.push("/dashboard/meetings")}
+          onClick={() => router.push("/dashboard/sessions")}
           className="gap-2 "
         >
           <PlusIcon className="h-4 w-4" />
@@ -122,8 +122,8 @@ export const DashboardView = () => {
           {/* Focus Areas */}
           {data.focusAreas.length > 0 && <FocusAreasCard data={data} />}
 
-          {/* Practice with an Agent */}
-          <AgentsCard data={data} />
+          {/* Practice with an Coach */}
+          <CoachesCard data={data} />
         </div>
       </div>
     </div>
@@ -148,7 +148,7 @@ function ContinuePracticeCard({
           Start your first practice session
         </h3>
         <Button asChild size="sm" className="gap-2">
-          <Link href="/dashboard/meetings">
+          <Link href="/dashboard/sessions">
             <ArrowRightIcon className="h-4 w-4" />
             Start something new
           </Link>
@@ -201,7 +201,7 @@ function ContinuePracticeCard({
           size="sm"
           className="gap-2 border-white/20 bg-transparent! text-white! hover:bg-white/10! hover:text-white!"
         >
-          <Link href="/dashboard/meetings">
+          <Link href="/dashboard/sessions">
             <ArrowRightIcon className="h-3.5 w-3.5" />
             Start something new
           </Link>
@@ -289,8 +289,8 @@ function RecentSessionsCard({
       </h3>
       <div className="space-y-1">
         {data.recentSessions.map((session) => {
-          const color = getAvatarColor(session.agentName);
-          const initial = session.agentName.charAt(0).toUpperCase();
+          const color = getAvatarColor(session.coachName);
+          const initial = session.coachName.charAt(0).toUpperCase();
           const timeAgo = formatDistanceToNow(new Date(session.endedAt), {
             addSuffix: false,
           });
@@ -298,7 +298,7 @@ function RecentSessionsCard({
           return (
             <Link
               key={session.id}
-              href={`/dashboard/meetings/${session.id}`}
+              href={`/dashboard/sessions/${session.id}`}
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 -mx-1 transition-colors hover:bg-muted/60"
             >
               {/* Avatar */}
@@ -315,7 +315,7 @@ function RecentSessionsCard({
                   {session.name}
                   <span className="text-muted-foreground font-normal">
                     {" "}
-                    · {session.agentName}
+                    · {session.coachName}
                   </span>
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -410,7 +410,7 @@ function FocusAreasCard({
         size="sm"
         className="w-full gap-2"
       >
-        <Link href="/dashboard/meetings">
+        <Link href="/dashboard/sessions">
           <ArrowRightIcon className="h-3.5 w-3.5" />
           Drill these sounds
         </Link>
@@ -419,33 +419,33 @@ function FocusAreasCard({
   );
 }
 
-// ─── Practice with an Agent Card ─────────────────────────────────────
-function AgentsCard({
+// ─── Practice with an Coach Card ─────────────────────────────────────
+function CoachesCard({
   data,
 }: {
   data: NonNullable<ReturnType<typeof useDashboard>["data"]>;
 }) {
-  if (data.agents.length === 0) return null;
+  if (data.coaches.length === 0) return null;
 
   return (
     <div className="rounded-2xl border bg-card p-5">
       <h3 className="text-base font-semibold text-foreground mb-4">
-        Practice with an agent
+        Practice with an coach
       </h3>
       <div className="space-y-1">
-        {data.agents.map((agent) => {
-          const color = getAvatarColor(agent.name);
-          const initial = agent.name.charAt(0).toUpperCase();
+        {data.coaches.map((coach) => {
+          const color = getAvatarColor(coach.name);
+          const initial = coach.name.charAt(0).toUpperCase();
 
-          // Create a friendly short description from the agent name
-          const shortDesc = agent.name
+          // Create a friendly short description from the coach name
+          const shortDesc = coach.name
             .replace(/ Coach$/, "")
             .replace(/^Daily /, "")
             .replace(/^Interview /, "");
 
           return (
             <div
-              key={agent.id}
+              key={coach.id}
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 -mx-1"
             >
               {/* Avatar */}
@@ -459,7 +459,7 @@ function AgentsCard({
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">
-                  {agent.name}
+                  {coach.name}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
                   {shortDesc}
@@ -473,7 +473,7 @@ function AgentsCard({
                 size="sm"
                 className="shrink-0"
               >
-                <Link href={`/dashboard/meetings`}>Start</Link>
+                <Link href={`/dashboard/sessions`}>Start</Link>
               </Button>
             </div>
           );

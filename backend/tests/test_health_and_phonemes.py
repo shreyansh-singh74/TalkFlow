@@ -16,7 +16,8 @@ class HealthSmokeTests(unittest.IsolatedAsyncioTestCase):
         response = await get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "healthy")
-        self.assertEqual(response.json()["transcription_service"], "wav2vec2")
+        self.assertEqual(response.json()["transcription_service"], "wavlm")
+        self.assertIn("wavlm", response.json()["asr_model"])
 
 
 if __name__ == "__main__":

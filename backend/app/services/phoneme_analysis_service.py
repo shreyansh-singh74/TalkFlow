@@ -6,8 +6,8 @@ against a user-produced sequence using longest-common-subsequence alignment
 pronunciation coaching.
 
 Audio-based phoneme extraction is intentionally not implemented here; the
-caller is expected to provide the user's transcript text (e.g. from Wav2Vec2)
-as the "actual" pronunciation input.
+caller is expected to provide the user's transcript text (e.g. from the ASR
+model) as the "actual" pronunciation input.
 """
 
 from __future__ import annotations
