@@ -14,6 +14,7 @@ interface SegmentedControlProps<T extends string> {
   onChange: (value: T) => void;
   disabled?: boolean;
   className?: string;
+  stackOnMobile?: boolean;
 }
 
 /**
@@ -28,16 +29,22 @@ export function SegmentedControl<T extends string>({
   onChange,
   disabled,
   className,
+  stackOnMobile = false,
 }: SegmentedControlProps<T>) {
   return (
     <div
       role="radiogroup"
       className={cn(
         "bg-muted grid gap-1 rounded-lg p-1",
-        `grid-cols-${options.length}`,
+        stackOnMobile && options.length === 2
+          ? "grid-cols-1 min-[420px]:grid-cols-2"
+          : options.length === 2
+            ? "grid-cols-2"
+            : options.length === 3
+              ? "grid-cols-3"
+              : "grid-flow-col auto-cols-fr",
         className
       )}
-      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
     >
       {options.map((option) => {
         const selected = option.value === value;

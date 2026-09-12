@@ -33,7 +33,13 @@ export interface DashboardData {
     accuracy: number;
     context: string;
   };
+  /** Measured weak phones, from the per-phone evidence in past reports. */
   focusAreas: string[];
+  /**
+   * Sounds predicted to be hard from the learner's first language. Shown only
+   * while `focusAreas` is empty, and always labelled as a prediction.
+   */
+  suggestedSounds: string[];
   coaches: Array<{
     id: string;
     name: string;

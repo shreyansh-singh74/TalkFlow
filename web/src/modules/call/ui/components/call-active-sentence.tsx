@@ -30,6 +30,8 @@ interface CallActiveSentenceProps {
   contextAfter?: string | null;
   /** Segmenter hint for the current step, e.g. "continues in the next step". */
   stepNote?: string | null;
+  /** Learner's listening speed from settings. 1 when unset. */
+  rate?: number;
 }
 
 /**
@@ -52,10 +54,14 @@ export function CallActiveSentence({
   contextBefore = null,
   contextAfter = null,
   stepNote = null,
+  rate = 1,
 }: CallActiveSentenceProps) {
   const audioSrc = useMemo(() => {
-    return `${getBackendUrl()}/api/phonemes/tts?text=${encodeURIComponent(targetText)}&lang=${encodeURIComponent(speechLang)}`;
-  }, [targetText, speechLang]);
+    // `rate` is the learner's listening speed; it changes the URL because the
+    // backend synthesises at that rate, so a cached clip is never reused at the
+    // wrong speed.
+    return `${getBackendUrl()}/api/phonemes/tts?text=${encodeURIComponent(targetText)}&lang=${encodeURIComponent(speechLang)}&rate=${rate}`;
+  }, [targetText, speechLang, rate]);
 
   return (
     /* Target sentence panel — the container's baked-in `gap-3` is overridden by

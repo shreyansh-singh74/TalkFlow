@@ -4,6 +4,8 @@ import { coaches, practiceSessions } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { and, eq, getTableColumns, sql } from "drizzle-orm";
 import { sessionsUpdateSchema } from "@/modules/sessions/schemas";
+import { recordPhoneOutcomes } from "@/lib/sound-goals";
+import type { SessionPhonemeDataPersisted } from "@/types/pronunciation";
 
 export async function GET(
   request: NextRequest,
@@ -81,6 +83,21 @@ export async function PUT(
 
     if (!updatedSession) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    // Fold the finished session's per-phone evidence into the drill queue. This
+    // is the only place a session's measurements re-enter the product as a
+    // *decision* about what to practise next.
+    const report = (updateData.phonemeData as SessionPhonemeDataPersisted | undefined)
+      ?.report;
+    if (report) {
+      try {
+        await recordPhoneOutcomes(session.user.id, report);
+      } catch (queueError) {
+        // A queue-scheduling failure must never fail the save: the learner's
+        // report is the important part.
+        console.error("Failed to update the sound-goal queue:", queueError);
+      }
     }
 
     return NextResponse.json(updatedSession);

@@ -56,6 +56,8 @@ export type ScriptRequest = {
   coach_name?: string;
   accent?: string;
   focus_sounds?: string[];
+  /** First language. Only used when the coach supplied no focus sounds. */
+  l1?: string;
   source_text?: string;
 };
 

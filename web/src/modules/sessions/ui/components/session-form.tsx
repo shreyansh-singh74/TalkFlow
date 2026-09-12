@@ -40,6 +40,8 @@ interface SessionFormProps {
   onSuccess?: (id?: string) => void;
   onCancel?: () => void;
   initialValues?: SessionGetOne;
+  /** Pre-selects a coach when the form was opened from a coach's "Start". */
+  initialCoachId?: string;
 }
 
 const SOURCE_OPTIONS: ReadonlyArray<{
@@ -79,6 +81,7 @@ export const SessionForm = ({
   onSuccess,
   onCancel,
   initialValues,
+  initialCoachId,
 }: SessionFormProps) => {
   const [openNewCoachDialog, setOpenNewCoachDialog] = useState(false);
   const [coachSearch, setCoachSearch] = useState("");
@@ -95,7 +98,7 @@ export const SessionForm = ({
     resolver: zodResolver(sessionsInsertSchema),
     defaultValues: {
       name: initialValues?.name ?? "",
-      coachId: initialValues?.coachId ?? null,
+      coachId: initialValues?.coachId ?? initialCoachId ?? null,
       source: initialValues?.source ?? "coach",
       sourceText: initialValues?.sourceText ?? "",
       difficulty: initialValues?.difficulty ?? "medium",
@@ -222,6 +225,7 @@ export const SessionForm = ({
                   <SegmentedControl
                     options={SOURCE_OPTIONS}
                     value={field.value as SessionSource}
+                    stackOnMobile
                     onChange={(value) => {
                       field.onChange(value);
                       // The two modes are mutually exclusive on the server.
@@ -353,7 +357,7 @@ export const SessionForm = ({
           />
 
           <div className="rounded-lg border p-4">
-            <div className="flex items-center justify-between gap-x-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-medium">Practice steps</p>
                 <p className="text-muted-foreground text-xs">
@@ -394,7 +398,7 @@ export const SessionForm = ({
                     </Badge>
                   )}
                 </div>
-                <ol className="max-h-64 space-y-1 overflow-y-auto">
+                <ol className="max-h-48 space-y-1 overflow-y-auto sm:max-h-64">
                   {script.steps.map((step) => (
                     <li
                       key={step.index}
@@ -424,18 +428,23 @@ export const SessionForm = ({
             )}
           </div>
 
-          <div className="flex justify-between gap-x-2">
+          <div className="flex flex-col-reverse gap-2 min-[420px]:flex-row min-[420px]:justify-end">
             {onCancel && (
               <Button
                 variant={"ghost"}
                 disabled={isPending}
                 type="button"
                 onClick={() => onCancel()}
+                className="w-full min-[420px]:w-auto"
               >
                 Cancel
               </Button>
             )}
-            <Button disabled={isPending} type="submit">
+            <Button
+              className="w-full min-[420px]:w-auto"
+              disabled={isPending}
+              type="submit"
+            >
               {isPending
                 ? "Saving..."
                 : isEdit

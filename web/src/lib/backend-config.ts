@@ -36,6 +36,25 @@ export function getBackendUrl(): string {
   return url;
 }
 
+/**
+ * Headers for server-to-server backend calls.
+ *
+ * Script generation spends OpenRouter credit, so the backend guards
+ * `/api/practice/*` with a shared secret (see the backend's
+ * app/core/internal_auth.py). This is deliberately NOT a NEXT_PUBLIC_* var:
+ * the token is a server credential and must never reach the browser.
+ */
+export function getBackendHeaders(
+  extra?: Record<string, string>
+): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
+  const token = typeof process !== 'undefined' ? process.env.INTERNAL_API_TOKEN : undefined;
+  if (token) {
+    headers['X-Internal-Token'] = token;
+  }
+  return headers;
+}
+
 export function getWebSocketUrl(path: string = '/ws/voice'): string {
   const backendUrl = getBackendUrl();
   const wsUrl = backendUrl.replace(/^http/, 'ws');

@@ -21,6 +21,11 @@ type Props = {
   onLangChange: (lang: string) => void;
   /** Misaligned pairs for the phoneme diff row */
   misalignedPairs?: MisalignedWordPair[];
+  /**
+   * The learner's listening speed, from settings. Multiplied by the Slow toggle
+   * rather than replacing it, so Slow stays slower than normal at every setting.
+   */
+  rate?: number;
 };
 
 /**
@@ -36,6 +41,7 @@ export function PronunciationReferenceCard({
   lang,
   onLangChange,
   misalignedPairs,
+  rate = 1,
 }: Props) {
   const idSlow = useId();
   const [isSlow, setIsSlow] = useState(false);
@@ -57,7 +63,7 @@ export function PronunciationReferenceCard({
     text: spoken,
     phonemes: data?.phonemes,
     lang,
-    rate: isSlow ? 0.65 : 1,
+    rate: rate * (isSlow ? 0.65 : 1),
   });
 
   const isBusy = status === "playing" || status === "loading";

@@ -37,7 +37,15 @@ interface CallActiveControlsProps {
   onMobileTalkStop: () => void;
   onMicToggle: () => void;
   onSkip: () => void;
-  onNextLevel: () => void;
+  /**
+   * A step earned by passing, waiting to be revealed. Until it is, this button
+   * is the only way forward -- the engine has already moved its cursor, so
+   * there is nothing else for a "next" action to do.
+   */
+  hasPendingNext: boolean;
+  onContinue: () => void;
+  /** Why the learner cannot move on yet. Shown so the bar is not silent. */
+  gateMessage?: string | null;
   onPrevLevel?: () => void;
   canGoBack?: boolean;
   onCancelEvaluating?: () => void;
@@ -59,7 +67,9 @@ export function CallActiveControls({
   onMobileTalkStop,
   onMicToggle,
   onSkip,
-  onNextLevel,
+  hasPendingNext,
+  onContinue,
+  gateMessage,
   onPrevLevel,
   canGoBack = false,
   onCancelEvaluating,
@@ -115,7 +125,7 @@ export function CallActiveControls({
             onClick={onSkip}
             disabled={isTransitioning}
             className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-all duration-150 active:scale-95 disabled:opacity-40 cursor-pointer shadow-2xs bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200"
-            title="Skip sentence"
+            title="Skip this step without passing it. The report records the skip."
           >
             <SkipForward className="h-3.5 w-3.5 text-amber-700" />
             <span>Skip Level</span>
@@ -247,24 +257,35 @@ export function CallActiveControls({
           </div>
         </div>
 
-        {/* Right Bottom: Next button */}
+        {/* Right Bottom: reveal the step earned by passing.
+            Deliberately disabled when there is nothing pending: the server moves
+            the cursor itself on a pass, so a free-standing "next" would skip a
+            step. Skipping is the button on the left, and it is recorded. */}
         <div className="flex-1 flex justify-end">
           <button
             type="button"
-            onClick={onNextLevel}
-            disabled={isTransitioning}
-            className="flex items-center gap-1.5 rounded-full px-4.5 py-2 text-xs font-bold text-white transition-all active:scale-95 disabled:opacity-40 cursor-pointer shadow-md bg-emerald-600 hover:bg-emerald-700"
-            title="Next level"
+            onClick={onContinue}
+            disabled={!hasPendingNext || isTransitioning}
+            className="flex items-center gap-1.5 rounded-full px-4.5 py-2 text-xs font-bold text-white transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-md bg-emerald-600 hover:bg-emerald-700"
+            title={
+              hasPendingNext
+                ? "Show the next step"
+                : (gateMessage ??
+                  "Pass this step to move on -- or use Skip Level")
+            }
           >
-            <span>Next Level</span>
+            <span>{hasPendingNext ? "Continue" : "Next Level"}</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
       {/* Bottom hint row — carries the Transitioning / Evaluating states that
-          used to occupy their own banner above the controls. */}
-      <div className="mt-1.5 flex items-center justify-center gap-3 text-[10px] font-medium text-neutral-500">
+          used to occupy their own banner above the controls. The `·` separators
+          are gone: the static hint is `lg`-only, so on a phone they collapsed
+          into a run of leading dots, and every remaining item already carries
+          its own pill border. */}
+      <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] font-medium text-neutral-500">
         {uiState === "Transitioning" ? (
           <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-neutral-600 bg-neutral-100 border border-neutral-200">
             <RotateCcw className="h-3 w-3 animate-spin text-neutral-500" />
@@ -301,10 +322,6 @@ export function CallActiveControls({
           <span className={cn("h-1.5 w-1.5 rounded-full", isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />
           {isConnected ? "Voice Ready" : "Connecting..."}
         </span>
-        <span className="text-neutral-300">·</span>
-        <span className="text-neutral-300">·</span>
-        <span className="text-neutral-300">·</span>
-        <span className="text-neutral-300">·</span>
         <button
           type="button"
           onClick={onMicToggle}
@@ -313,11 +330,11 @@ export function CallActiveControls({
         >
           {isMicEnabled ? "Mic on" : "Mic off"}
         </button>
-        {coachStatus && (
-          <>
-            <span className="text-neutral-300">·</span>
-            <span className="text-neutral-500">{coachStatus}</span>
-          </>
+        {coachStatus && <span className="text-neutral-500">{coachStatus}</span>}
+        {gateMessage && !hasPendingNext && (
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200">
+            {gateMessage}
+          </span>
         )}
       </div>
     </div>

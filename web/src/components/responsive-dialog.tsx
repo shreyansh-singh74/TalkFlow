@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 
 interface ResponsiveDialogProps {
@@ -8,6 +9,7 @@ interface ResponsiveDialogProps {
   children: React.ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  contentClassName?: string;
 }
 
 export const ResponsiveDialog = ({
@@ -15,11 +17,12 @@ export const ResponsiveDialog = ({
   description,
   children,
   open,
-  onOpenChange
-}:ResponsiveDialogProps) => {
+  onOpenChange,
+  contentClassName,
+}: ResponsiveDialogProps) => {
   return(
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className={cn(contentClassName)}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -27,7 +30,6 @@ export const ResponsiveDialog = ({
         {children}
       </DialogContent>
     </Dialog>
-  )
-
+  );
 };
  

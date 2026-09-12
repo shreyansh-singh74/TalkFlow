@@ -2,7 +2,6 @@ import {
   CircleCheckIcon,
   CircleXIcon,
   ClockArrowUpIcon,
-  LoaderIcon,
   VideoIcon,
 } from "lucide-react";
 import { SessionStatus } from "../../types";
@@ -40,16 +39,9 @@ const options = [
       </div>
     ),
   },
-  {
-    id: SessionStatus.Processing,
-    value: SessionStatus.Processing,
-    children: (
-      <div className="flex items-center gap-x-2 capitalize">
-        <LoaderIcon />
-        {SessionStatus.Processing}
-      </div>
-    ),
-  },
+  // No "processing" option. Nothing ever wrote that status: the report is
+  // generated inline when the session ends, so there is no queue to wait on.
+  // Offering the filter implied a background job that does not exist.
   {
     id: SessionStatus.Cancelled,
     value: SessionStatus.Cancelled,

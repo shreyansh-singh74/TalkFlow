@@ -4,6 +4,7 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { AudioChunker } from "@/lib/audio-processing";
 import { StreamingAudioPlayer } from "@/lib/streaming-audio-player";
 import { getWebSocketUrl } from "@/lib/backend-config";
+import { fetchVoiceToken } from "@/lib/voice-token";
 import { SentencePhonemeAnalysis } from "@/types/pronunciation";
 import type { PracticeTargetPayload, PronunciationResultPayload, SessionAnalysisReport } from "@/types/pronunciation";
 import type { Difficulty, PracticeStep, SessionSource } from "@/types/practice";
@@ -54,9 +55,28 @@ export interface UsePushToTalkReturn {
   clearTranscripts: () => void;
   sessionReport: SessionAnalysisReport | null;
   sendNextSentence: () => void;
+  sendSkipSentence: () => void;
   sendPrevSentence: () => void;
+  /**
+   * Ask the server to summarise the session now. Sent when the learner leaves,
+   * so an abandoned session still produces the report it earned instead of the
+   * end-of-call screen promising one that never arrives.
+   */
+  finalizeSession: () => void;
   isTransitioning: boolean;
   restartSession: () => void;
+  /** Set when the server refused to move on, e.g. the score was below the bar. */
+  gateMessage: string | null;
+  /**
+   * The next step, held back until the learner is ready for it.
+   *
+   * When a pass advances the cursor the server sends the new step immediately,
+   * but the learner is still reading the feedback they just earned. Holding it
+   * here means the sentence they are looking at doesn't change under them.
+   */
+  pendingTarget: PracticeTargetPayload | null;
+  /** Reveal the held-back step. */
+  acceptPendingTarget: () => void;
   micStream?: MediaStream | null;
 }
 
@@ -75,6 +95,17 @@ interface UsePushToTalkOptions {
   passThreshold: number;
   accent?: string;
   topic?: string;
+  /**
+   * The learner's first language. Coaching hint only: the backend uses it to
+   * bias which sounds the coach names. It never changes how a turn is scored.
+   */
+  l1?: string;
+  /**
+   * The learner's recorded consent to raw audio retention. The backend still
+   * requires its own PERSIST_TURN_AUDIO switch; both must agree before a turn is
+   * written to disk.
+   */
+  retainAudio?: boolean;
 }
 
 export function usePushToTalk({
@@ -87,6 +118,8 @@ export function usePushToTalk({
   passThreshold: configuredThreshold,
   accent = "en-US",
   topic = "",
+  l1 = "",
+  retainAudio = false,
 }: UsePushToTalkOptions): UsePushToTalkReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [isTalking, setIsTalking] = useState(false);
@@ -112,6 +145,10 @@ export function usePushToTalk({
   const [stepNote, setStepNote] = useState<string | null>(null);
   const [sessionReport, setSessionReport] = useState<SessionAnalysisReport | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [gateMessage, setGateMessage] = useState<string | null>(null);
+  const [pendingTarget, setPendingTarget] = useState<PracticeTargetPayload | null>(
+    null
+  );
 
   const targetTextRef = useRef(targetText);
   useEffect(() => {
@@ -132,6 +169,8 @@ export function usePushToTalk({
     passThreshold: configuredThreshold,
     accent,
     topic,
+    l1,
+    retainAudio,
   });
   configRef.current = {
     sessionId,
@@ -143,6 +182,8 @@ export function usePushToTalk({
     passThreshold: configuredThreshold,
     accent,
     topic,
+    l1,
+    retainAudio,
   };
 
   const buildSessionConfig = useCallback(() => {
@@ -155,6 +196,8 @@ export function usePushToTalk({
       topic: config.topic,
       difficulty: config.difficulty,
       accent: config.accent,
+      l1: config.l1 || null,
+      retain_audio: config.retainAudio,
       pass_threshold: config.passThreshold,
       source: config.source,
       steps: config.steps.map((step) => ({
@@ -215,15 +258,9 @@ export function usePushToTalk({
         // Don't set isAISpeaking here - wait for first TTS chunk
         break;
 
-      case "PHONEME_ANALYSIS":
-        if (message.analysis) {
-          const analysis = message.analysis as SentencePhonemeAnalysis;
-          setPhonemeAnalysis(analysis);
-          if (message.target_text || analysis.sentence) {
-            setTargetText(message.target_text || analysis.sentence);
-          }
-        }
-        break;
+      // There is no PHONEME_ANALYSIS case: the backend has never emitted that
+      // message. `SentencePhonemeAnalysis` is still the shape /api/phonemes/*
+      // returns for the HTTP analysis endpoints.
 
       case "PRONUNCIATION_RESULT": {
         const p = message as PronunciationResultPayload;
@@ -246,7 +283,18 @@ export function usePushToTalk({
 
       case "PRACTICE_TARGET": {
         const target = message as PracticeTargetPayload;
+        // A step reached by passing is held back one click, so the feedback for
+        // the turn just scored stays on screen. A step reached by skipping or
+        // navigating replaces what's on screen immediately.
+        if (target.advanced_from_pass) {
+          setPendingTarget(target);
+          setGateMessage(null);
+          setIsTransitioning(false);
+          break;
+        }
         setLastPronunciation(null);
+        setPendingTarget(null);
+        setGateMessage(target.gate_message ?? null);
         setTargetText(target.target_text);
         setPracticeMode(target.mode);
         setPracticeSentence(target.sentence || target.target_text);
@@ -301,8 +349,14 @@ export function usePushToTalk({
     }
     
     try {
-      const wsUrl = getWebSocketUrl();
-      
+      // A fresh token per attempt: it is short-lived, and `connect` is also the
+      // reconnect path, so a token fetched once at mount would expire mid-usage
+      // and turn every retry into a rejected handshake.
+      const token = await fetchVoiceToken(configRef.current.sessionId);
+      const wsUrl = token
+        ? `${getWebSocketUrl()}?token=${encodeURIComponent(token)}`
+        : getWebSocketUrl();
+
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       
@@ -523,6 +577,7 @@ export function usePushToTalk({
     setError(null);
     setPhonemeAnalysis(null);
     setLastPronunciation(null);
+    setGateMessage(null);
   }, []);
   
   /**
@@ -536,10 +591,44 @@ export function usePushToTalk({
     return "Hold SPACE to talk";
   }, [isConnected, isAISpeaking, streamingAIText, isTalking]);
   
+  const acceptPendingTarget = useCallback(() => {
+    setPendingTarget((target) => {
+      if (target) {
+        setLastPronunciation(null);
+        setTargetText(target.target_text);
+        setPracticeMode(target.mode);
+        setPracticeSentence(target.sentence || target.target_text);
+        setPracticeProgress(target.progress || { current: 1, total: 1 });
+        setStepIndex(target.step_index ?? 0);
+        setContextBefore(target.context_before ?? null);
+        setContextAfter(target.context_after ?? null);
+        setStepNote(target.note ?? null);
+      }
+      return null;
+    });
+  }, []);
+
   const sendNextSentence = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       setIsTransitioning(true);
       wsRef.current.send(JSON.stringify({ type: "NEXT_SENTENCE" }));
+    }
+  }, []);
+
+  /**
+   * Skip this step without passing it. The server records the step as skipped,
+   * so the session report cannot claim a step was completed when it wasn't.
+   */
+  const sendSkipSentence = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      setIsTransitioning(true);
+      wsRef.current.send(JSON.stringify({ type: "SKIP_SENTENCE" }));
+    }
+  }, []);
+
+  const finalizeSession = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "FINALIZE_SESSION" }));
     }
   }, []);
 
@@ -555,6 +644,8 @@ export function usePushToTalk({
       clearTranscripts();
       setSessionReport(null);
       setStepIndex(0);
+      setGateMessage(null);
+      setPendingTarget(null);
       setIsTransitioning(true);
       wsRef.current.send(JSON.stringify(buildSessionConfig()));
     }
@@ -594,8 +685,13 @@ export function usePushToTalk({
     clearTranscripts,
     sessionReport,
     sendNextSentence,
+    sendSkipSentence,
     sendPrevSentence,
+    finalizeSession,
     isTransitioning,
+    gateMessage,
+    pendingTarget,
+    acceptPendingTarget,
     restartSession,
     micStream: streamRef.current,
   };

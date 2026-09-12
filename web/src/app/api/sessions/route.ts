@@ -6,7 +6,9 @@ import { and, count, desc, eq, getTableColumns, ilike, sql } from "drizzle-orm";
 import { z } from "zod";
 import { sessionsInsertSchema } from "@/modules/sessions/schemas";
 import { SessionStatus } from "@/modules/sessions/types";
-import { getBackendUrl } from "@/lib/backend-config";
+import { getBackendHeaders, getBackendUrl } from "@/lib/backend-config";
+import { getQuota, quotaMessage } from "@/lib/billing";
+import { getUserSettings } from "@/lib/settings";
 import type { PracticeScript, ScriptRequest } from "@/types/practice";
 
 const getManySchema = z.object({
@@ -107,7 +109,7 @@ async function resolveScript(
   try {
     const response = await fetch(`${getBackendUrl()}/api/practice/script`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getBackendHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(45_000),
     });
@@ -152,6 +154,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // The learner's own settings fill in what the coach doesn't specify: the
+    // accent they are practising and the first language whose interference the
+    // generator should pre-empt.
+    const userPrefs = await getUserSettings(session.user.id);
+
+    // Free-tier gate. Checked before the script is generated so a capped learner
+    // is not charged an OpenRouter call for a session they cannot start; the
+    // voice socket re-checks when the token is minted.
+    const quota = await getQuota(session.user.id, userPrefs);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        { error: quotaMessage(quota.limit), code: "quota_exceeded", quota },
+        { status: 402 }
+      );
+    }
+
     // The client may pass a script it already previewed and edited; only
     // generate when it didn't.
     const script =
@@ -162,8 +180,9 @@ export async function POST(request: NextRequest) {
         step_count: data.stepCount,
         topic: coach?.topic || undefined,
         coach_name: coach?.name,
-        accent: coach?.accent ?? "en-US",
+        accent: coach?.accent || userPrefs.targetAccent,
         focus_sounds: coach?.focusSounds ?? [],
+        l1: userPrefs.nativeLanguage || undefined,
         source_text: data.sourceText ?? undefined,
       }));
 

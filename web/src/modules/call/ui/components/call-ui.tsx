@@ -18,6 +18,11 @@ interface Props {
   difficulty: Difficulty;
   topic: string;
   accent: string;
+  /** Learner settings that shape the session: L1 coaching bias, audio-retention
+   * consent, and listening speed. */
+  l1?: string;
+  retainAudio?: boolean;
+  listeningRate?: number;
 }
 
 export const CallUI = ({
@@ -30,6 +35,9 @@ export const CallUI = ({
   difficulty,
   topic,
   accent,
+  l1,
+  retainAudio,
+  listeningRate,
 }: Props) => {
   const [show, setShow] = useState<"lobby" | "call" | "ended">("lobby");
   const updateSession = useUpdatePracticeSession();
@@ -77,10 +85,13 @@ export const CallUI = ({
             difficulty={difficulty}
             topic={topic}
             accent={accent}
+            l1={l1}
+            retainAudio={retainAudio}
+            listeningRate={listeningRate}
           />
         </div>
       )}
-      {show == "ended" && <CallEnded />}
+      {show == "ended" && <CallEnded sessionId={sessionId} />}
     </div>
   );
 };

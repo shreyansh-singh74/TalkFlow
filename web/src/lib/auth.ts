@@ -2,6 +2,8 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
+import { coaches, userSettings } from "@/db/schema";
+import { DEFAULT_COACHES } from "@/modules/coaches/default-coaches";
 import nodemailer from "nodemailer";
 
 // Normalize baseURL - remove trailing slash and /api/auth if present
@@ -38,6 +40,32 @@ export const auth = betterAuth({
       ...schema,
     },
   }),
+  // Provision the account's starting state at the moment it exists.
+  //
+  // Seeding the default coaches here (rather than lazily inside the first
+  // GET /api/coaches) means a learner's coach list is never a side effect of
+  // viewing it, and settings exist before the first session reads an accent.
+  // Both writes are best-effort: a failure must not block sign-up, and every
+  // reader already creates what it needs on first read.
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          try {
+            await db
+              .insert(coaches)
+              .values(DEFAULT_COACHES.map((coach) => ({ ...coach, userId: user.id })));
+            await db
+              .insert(userSettings)
+              .values({ userId: user.id })
+              .onConflictDoNothing({ target: userSettings.userId });
+          } catch (error) {
+            console.error("Failed to seed a new account:", error);
+          }
+        },
+      },
+    },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,

@@ -1,5 +1,6 @@
 import {
   createLoader,
+  parseAsBoolean,
   parseAsInteger,
   parseAsString,
   parseAsStringEnum,
@@ -14,6 +15,8 @@ export const filterSearchParams = {
     .withOptions({ clearOnDefault: true }),
   status: parseAsStringEnum(Object.values(SessionStatus)),
   coachId: parseAsString.withDefault("").withOptions({ clearOnDefault: true }),
+  // Opens the create dialog on arrival, optionally with a coach pre-selected.
+  create: parseAsBoolean.withDefault(false).withOptions({ clearOnDefault: true }),
 };
 
 export const loadSearchParams = createLoader(filterSearchParams);

@@ -68,6 +68,22 @@ export type PronunciationResultPayload = {
   timing?: TimingPayload | null;
   intonation?: IntonationPayload | null;
   diagnosis?: Record<string, unknown>;
+  /** What this turn did to the step cursor. Absent on older servers. */
+  practice_update?: PracticeUpdatePayload | null;
+};
+
+/**
+ * The engine's verdict on the cursor after scoring a turn.
+ *
+ * `advanced` is true only when the score met the step's threshold, which is what
+ * makes the tier meaningful: the client no longer decides for itself that a step
+ * is done.
+ */
+export type PracticeUpdatePayload = {
+  advanced: boolean;
+  completed_sentence: boolean;
+  session_complete: boolean;
+  message: string;
 };
 
 export type PracticeTargetPayload = {
@@ -81,6 +97,15 @@ export type PracticeTargetPayload = {
   };
   step_index?: number;
   pass_threshold?: number;
+  /**
+   * True when this step arrived because the previous one was passed, rather than
+   * because the learner navigated. The previous score and feedback are kept on
+   * screen in that case, so earning a pass does not erase the feedback you just
+   * earned.
+   */
+  advanced_from_pass?: boolean;
+  /** Why the cursor did not move, when it did not. */
+  gate_message?: string | null;
   /** Neighbouring lines; only sent for custom-text (speech-prep) sessions. */
   context_before?: string | null;
   context_after?: string | null;
@@ -130,20 +155,34 @@ export type SessionAnalysisReport = {
   difficulty?: "easy" | "medium" | "hard";
   pass_threshold?: number;
   scoring_method?: string | null;
+  /**
+   * Steps the learner skipped past. Reported so "completed N steps" can never
+   * quietly include a step that was never passed.
+   */
+  steps_skipped?: number;
+  skipped_step_indexes?: number[];
+};
+
+/**
+ * One scored turn as stored on the session.
+ *
+ * `score` and `at` are the field names *both* the dashboard aggregate and the
+ * session timeline read. Changing a name here means changing them there.
+ */
+export type PersistedTurnEntry = {
+  at: string;
+  turn_id: string;
+  target_text: string;
+  heard_text: string;
+  score: number;
+  mode?: "word" | "sentence";
+  coach_name?: string;
+  feedback: string[];
+  misaligned_words?: MisalignedWordPair[];
 };
 
 export type SessionPhonemeDataPersisted = {
-  entries: Array<{
-    at: string;
-    turn_id: string;
-    target_text: string;
-    heard_text: string;
-    score: number;
-    mode?: "word" | "sentence";
-    coach_name?: string;
-    feedback: string[];
-    misaligned_words?: MisalignedWordPair[];
-  }>;
+  entries: PersistedTurnEntry[];
   report?: SessionAnalysisReport;
 };
 

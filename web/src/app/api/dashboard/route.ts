@@ -2,8 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { coaches, practiceSessions } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { getUserSettings, loadSettingsCatalog } from "@/lib/settings";
 import { and, desc, eq, sql, count } from "drizzle-orm";
 import type { SessionPhonemeDataPersisted } from "@/types/pronunciation";
+import type { PracticeScript } from "@/types/practice";
+
+/**
+ * What to call a session in a list.
+ *
+ * A coach-backed session is named for its coach. A session built from the
+ * learner's own pasted text has no coach, so it is named for the script's own
+ * source label ("Your text · Medium") rather than a placeholder that reads like
+ * a bug.
+ */
+function sessionLabel(row: {
+  coachName: string | null;
+  source?: string | null;
+  script?: unknown;
+}): string {
+  if (row.coachName) return row.coachName;
+  const label = (row.script as PracticeScript | null)?.source_label;
+  if (label) return label;
+  return row.source === "custom" ? "Your text" : "TalkFlow Coach";
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +38,13 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id;
 
-    // 1. Fetch all completed sessions with coach info and phoneme data
+    // 1. Fetch all completed sessions with coach info and phoneme data.
+    //
+    // `leftJoin`, not `innerJoin`: a session built from the user's own pasted
+    // text has no coach (`coachId` is null), and an inner join silently dropped
+    // every one of them -- so a learner who spent an hour rehearsing their own
+    // speech saw an empty dashboard, no streak, and no "continue" card. Those
+    // sessions are labelled from the persisted script instead.
     const completedSessions = await db
       .select({
         id: practiceSessions.id,
@@ -28,6 +55,9 @@ export async function GET(request: NextRequest) {
         phonemeData: practiceSessions.phonemeData,
         coachId: practiceSessions.coachId,
         coachName: coaches.name,
+        source: practiceSessions.source,
+        script: practiceSessions.script,
+        difficulty: practiceSessions.difficulty,
         createdAt: practiceSessions.createdAt,
         duration:
           sql<number>`EXTRACT(EPOCH FROM (${practiceSessions.endedAt} - ${practiceSessions.startedAt}))`.as(
@@ -35,7 +65,7 @@ export async function GET(request: NextRequest) {
           ),
       })
       .from(practiceSessions)
-      .innerJoin(coaches, eq(practiceSessions.coachId, coaches.id))
+      .leftJoin(coaches, eq(practiceSessions.coachId, coaches.id))
       .where(
         and(
           eq(practiceSessions.userId, userId),
@@ -56,6 +86,9 @@ export async function GET(request: NextRequest) {
         phonemeData: practiceSessions.phonemeData,
         coachId: practiceSessions.coachId,
         coachName: coaches.name,
+        source: practiceSessions.source,
+        script: practiceSessions.script,
+        difficulty: practiceSessions.difficulty,
         createdAt: practiceSessions.createdAt,
         duration:
           sql<number>`EXTRACT(EPOCH FROM (${practiceSessions.endedAt} - ${practiceSessions.startedAt}))`.as(
@@ -63,7 +96,7 @@ export async function GET(request: NextRequest) {
           ),
       })
       .from(practiceSessions)
-      .innerJoin(coaches, eq(practiceSessions.coachId, coaches.id))
+      .leftJoin(coaches, eq(practiceSessions.coachId, coaches.id))
       .where(eq(practiceSessions.userId, userId))
       .orderBy(desc(practiceSessions.createdAt))
       .limit(1);
@@ -106,8 +139,13 @@ export async function GET(request: NextRequest) {
     let bestAccuracy = 0;
     let bestAccuracyContext = "";
 
-    // Track phoneme errors for focus areas
-    const phonemeErrorCounts: Record<string, number> = {};
+    // Focus areas are built from the per-phone evidence the scorer already
+    // produced. This previously regexed quoted substrings out of the coach's
+    // English feedback ("...for 'th'") and treated whatever it found as a
+    // phoneme, while the real data -- phone, observation count, error rate --
+    // sat unread in the report right next to it.
+    const phoneEvidence: Record<string, { weightedErrors: number; observations: number }> =
+      {};
 
     // Track unique practice days for streak
     const practiceDays = new Set<string>();
@@ -147,30 +185,19 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Aggregate phoneme errors for focus areas
-        for (const entry of pd.entries) {
-          if (entry.feedback) {
-            for (const fb of entry.feedback) {
-              // Try to extract phoneme sounds from feedback
-              const phonemeMatch = fb.match(/['"]([^'"]+)['"]/g);
-              if (phonemeMatch) {
-                for (const match of phonemeMatch) {
-                  const sound = match.replace(/['"]/g, "").toLowerCase();
-                  if (sound.length <= 4) {
-                    phonemeErrorCounts[sound] =
-                      (phonemeErrorCounts[sound] || 0) + 1;
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // Also extract from report if available
-        if (pd.report?.difficult_sounds) {
-          for (const sound of pd.report.difficult_sounds) {
-            phonemeErrorCounts[sound] = (phonemeErrorCounts[sound] || 0) + 3;
-          }
+        // Aggregate per-phone evidence across sessions. Weighting by the
+        // observation count means a phone missed twice in two attempts does not
+        // outrank one missed ten times in twelve.
+        for (const item of pd.report?.phone_breakdown ?? []) {
+          const phone = (item.phone || "").trim();
+          if (!phone) continue;
+          const bucket = (phoneEvidence[phone] ??= {
+            weightedErrors: 0,
+            observations: 0,
+          });
+          const observations = item.observations ?? 0;
+          bucket.weightedErrors += (item.error_rate ?? 0) * observations;
+          bucket.observations += observations;
         }
       }
     }
@@ -199,11 +226,39 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Top 5 weakest phonemes
-    const focusPhonemes = Object.entries(phonemeErrorCounts)
-      .sort((a, b) => b[1] - a[1])
+    // Weakest phones by observed error rate, requiring enough observations that
+    // a single unlucky frame is never promoted to a verdict about the speaker.
+    const MIN_PHONE_OBSERVATIONS = 3;
+    const focusPhonemes = Object.entries(phoneEvidence)
+      .filter(([, v]) => v.observations >= MIN_PHONE_OBSERVATIONS)
+      .map(([phone, v]) => ({
+        phone,
+        errorRate: v.weightedErrors / v.observations,
+      }))
+      .filter((p) => p.errorRate > 0)
+      .sort((a, b) => b.errorRate - a.errorRate)
       .slice(0, 5)
-      .map(([phoneme]) => phoneme);
+      .map((p) => p.phone);
+
+    // What to practise when there is no evidence yet.
+    //
+    // The focus areas below are measured, which is the right default -- but a
+    // learner on day one has nothing measured, so the card that says "drill
+    // /ð/" had nothing to say. Their first language does: these are the sounds
+    // speakers of that language typically find hardest. Labelled as a
+    // prediction, and never mixed into the measured list.
+    let suggestedSounds: string[] = [];
+    try {
+      const [settings, catalog] = await Promise.all([
+        getUserSettings(userId),
+        loadSettingsCatalog(),
+      ]);
+      suggestedSounds =
+        catalog.l1Profiles.find((p) => p.code === settings.nativeLanguage)
+          ?.weak_phones?.slice(0, 3) ?? [];
+    } catch (error) {
+      console.error("Could not load L1 suggestions:", error);
+    }
 
     // Recent sessions (top 4)
     const recentSessions = completedSessions.slice(0, 4).map((m) => {
@@ -219,7 +274,7 @@ export async function GET(request: NextRequest) {
       return {
         id: m.id,
         name: m.name,
-        coachName: m.coachName,
+        coachName: sessionLabel(m),
         endedAt: m.endedAt?.toISOString() ?? m.createdAt.toISOString(),
         duration: m.duration,
         accuracy: avgScore,
@@ -241,7 +296,7 @@ export async function GET(request: NextRequest) {
       continuePractice = {
         id: lastSession.id,
         name: lastSession.name,
-        coachName: lastSession.coachName,
+        coachName: sessionLabel(lastSession),
         status: lastSession.status,
         accuracy: avgScore,
         duration: lastSession.duration,
@@ -271,6 +326,7 @@ export async function GET(request: NextRequest) {
         context: bestAccuracyContext,
       },
       focusAreas: focusPhonemes,
+      suggestedSounds,
       coaches: userAgents.map((a) => ({
         id: a.id,
         name: a.name,

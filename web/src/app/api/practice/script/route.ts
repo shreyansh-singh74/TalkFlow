@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getBackendUrl } from "@/lib/backend-config";
+import { getBackendHeaders, getBackendUrl } from "@/lib/backend-config";
+import { getUserSettings } from "@/lib/settings";
 
 /**
  * Proxies script generation to the FastAPI backend for the *preview* in the
@@ -15,10 +16,18 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
+    // The preview must promise the same script the session will get, so it is
+    // generated with the same accent and L1 the create path uses.
+    const userPrefs = await getUserSettings(session.user.id);
     const response = await fetch(`${getBackendUrl()}/api/practice/script`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      headers: getBackendHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        l1: userPrefs.nativeLanguage || undefined,
+        ...body,
+        // An explicit accent from the form (a coach being previewed) wins.
+        accent: body?.accent || userPrefs.targetAccent,
+      }),
       signal: AbortSignal.timeout(45_000),
     });
 
