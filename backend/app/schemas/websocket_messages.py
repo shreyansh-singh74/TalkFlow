@@ -23,6 +23,12 @@ class SessionConfigMessage(BaseModel):
     topic: Optional[str] = None
     difficulty: Literal["easy", "medium", "hard"] = "medium"
     accent: str = "en-US"
+    #: Bare ISO-639-1 / BCP-47 code for the learner's first language. Coaching
+    #: only: it biases which sounds get named, never how a turn is scored.
+    l1: Optional[str] = None
+    #: Whether the learner consented to raw audio being written to disk. The
+    #: server-wide PERSIST_TURN_AUDIO switch still has to allow it.
+    retain_audio: bool = False
     #: Falls back to the difficulty tier's default when omitted.
     pass_threshold: Optional[float] = None
     #: The full script, decided at session-creation time. The engine executes
@@ -44,6 +50,13 @@ class PracticeTargetMessage(BaseModel):
     progress: PracticeProgressMessage
     step_index: int = 0
     pass_threshold: float = 88.0
+    #: True when this step arrived because the previous one was *passed*, not
+    #: because the learner skipped or navigated. The client keeps the last
+    #: score and feedback on screen in that case, so a pass does not yank the
+    #: feedback away the instant it is earned.
+    advanced_from_pass: bool = False
+    #: Why the cursor did not move, when it did not. Rendered as a hint.
+    gate_message: Optional[str] = None
     #: Surrounding sentences, so someone rehearsing a speech can see where this
     #: line sits. Only populated for custom-text sessions.
     context_before: Optional[str] = None
@@ -104,11 +117,16 @@ class PronunciationResultMessage(BaseModel):
     per_phoneme: List[dict] = Field(default_factory=list)
     # Phase 0/2/3 additive fields.
     accent: str = "en-US"
+    accent_label: str = "American English"
     audio_path: Optional[str] = None
     stress: Optional[dict] = None
     timing: Optional[dict] = None
     intonation: Optional[dict] = None
     diagnosis: dict = Field(default_factory=dict)
+    #: What this turn did to the cursor: {advanced, completed_sentence,
+    #: session_complete, message}. Additive; older clients ignore it and keep
+    #: using the explicit NEXT_SENTENCE command.
+    practice_update: Optional[dict] = None
 
 
 class SessionCompleteMessage(BaseModel):

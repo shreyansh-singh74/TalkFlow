@@ -16,6 +16,7 @@ import asyncio
 import io
 import logging
 import os
+import re
 import time
 import wave
 from typing import Optional
@@ -35,6 +36,20 @@ def _ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
 
 
+def _safe_segment(value: str, fallback: str) -> str:
+    """Reduce one path component to something that cannot escape the root.
+
+    Both ids reach us from the client, so they are untrusted input being turned
+    into a filesystem path. Only ``[A-Za-z0-9_-]`` survives: no path separator
+    (``/`` *or* ``\\``, which matters on Windows), no ``..``, no leading dot.
+    Length is capped so a hostile id cannot overrun the filename limit. The
+    previous version replaced only ``/`` -- which left ``..`` and ``\\`` intact.
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9_-]", "_", str(value or ""))
+    cleaned = cleaned.strip("._-")[:64]
+    return cleaned or fallback
+
+
 def save_turn_audio(session_id: str, turn_id: str, pcm16: bytes) -> Optional[str]:
     """Persist a turn's PCM16 audio as a WAV. Returns the file path or None.
 
@@ -45,8 +60,8 @@ def save_turn_audio(session_id: str, turn_id: str, pcm16: bytes) -> Optional[str
         return None
     if not pcm16:
         return None
-    safe_session = (session_id or "unknown").replace("/", "_") or "unknown"
-    safe_turn = (turn_id or "turn").replace("/", "_") or "turn"
+    safe_session = _safe_segment(session_id, "unknown")
+    safe_turn = _safe_segment(turn_id, "turn")
     folder = os.path.join(settings.TURN_AUDIO_DIR, safe_session)
     try:
         _ensure_dir(folder)
@@ -60,6 +75,42 @@ def save_turn_audio(session_id: str, turn_id: str, pcm16: bytes) -> Optional[str
     except Exception:
         logger.exception("Failed to persist turn audio for %s/%s", safe_session, safe_turn)
         return None
+
+
+def delete_session_audio(session_id: str) -> int:
+    """Delete every retained file for one practice session. Returns count removed.
+
+    This is what backs the "delete my stored audio" control: retention has to be
+    revocable by the person who consented to it, not only by an expiry sweep.
+    The session id is untrusted input turned into a path, so it goes through the
+    same sanitiser as writes, and the resolved directory is re-checked against
+    the audio root before anything is unlinked.
+    """
+    safe_session = _safe_segment(session_id, "")
+    if not safe_session:
+        return 0
+    root = os.path.abspath(settings.TURN_AUDIO_DIR)
+    folder = os.path.abspath(os.path.join(root, safe_session))
+    # `_safe_segment` already removes separators; this is the belt to its braces.
+    if folder != root and not folder.startswith(root + os.sep):
+        logger.warning("Refusing to delete outside the audio root: %s", folder)
+        return 0
+    removed = 0
+    try:
+        for name in os.listdir(folder):
+            if not name.endswith(".wav"):
+                continue
+            try:
+                os.remove(os.path.join(folder, name))
+                removed += 1
+            except OSError:
+                pass
+        os.rmdir(folder)
+    except FileNotFoundError:
+        return 0
+    except OSError:
+        logger.warning("Could not remove audio directory %s", folder)
+    return removed
 
 
 def pcm16_to_wav_bytes(pcm16: bytes) -> bytes:

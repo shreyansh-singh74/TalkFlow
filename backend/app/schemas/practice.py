@@ -45,5 +45,8 @@ class ScriptRequest(BaseModel):
     coach_name: Optional[str] = None
     accent: str = "en-US"
     focus_sounds: List[str] = Field(default_factory=list)
+    #: Learner's first language. Only consulted when L1_AWARE_ENABLED and the
+    #: coach supplied no focus sounds of its own.
+    l1: Optional[str] = None
     # Custom pasted text
     source_text: Optional[str] = None

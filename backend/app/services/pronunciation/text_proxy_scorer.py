@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from app.core.config import settings
+from app.services.pronunciation.accents import get_accent_profile
 from app.services.phoneme_analysis_service import (
     build_pronunciation_result_dict,
     phoneme_analyzer,
@@ -23,7 +25,14 @@ class TextProxyScorer:
         target_text: str,
         heard_text: str,
         audio_pcm16: Optional[bytes] = None,
+        accent: Optional[str] = None,
     ) -> PronunciationResult:
+        # This scorer compares two transcripts, so it has no phones to align
+        # against an accent reference and the profile cannot change its score.
+        # It still reports the accent it was asked to evaluate, so a fallback
+        # turn never claims to have been scored against General American when
+        # the session was configured for something else.
+        profile = get_accent_profile(accent or settings.TARGET_ACCENT)
         body = build_pronunciation_result_dict(phoneme_analyzer, target_text, heard_text)
         return PronunciationResult(
             expected_phonemes=body["expected_phonemes"],
@@ -33,4 +42,6 @@ class TextProxyScorer:
             feedback=body["feedback"],
             method=self.name,
             per_phoneme=[],
+            accent=profile.code,
+            accent_label=profile.label,
         )

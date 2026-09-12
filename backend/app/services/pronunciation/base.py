@@ -32,6 +32,9 @@ class PronunciationResult:
     # Additive Phase 0/2/3 fields. All optional + default-empty so the text-proxy
     # scorer and any older client keep working unchanged.
     accent: str = "en-US"
+    #: Human label for the accent the reference was evaluated against, so the UI
+    #: never has to keep its own copy of the code -> name mapping.
+    accent_label: str = "American English"
     audio_path: Optional[str] = None
     stress: Optional[StressResult] = None
     timing: Optional[TimingResult] = None
@@ -48,6 +51,7 @@ class PronunciationResult:
             "method": self.method,
             "per_phoneme": self.per_phoneme,
             "accent": self.accent,
+            "accent_label": self.accent_label,
             "audio_path": self.audio_path,
             "stress": self.stress.to_dict() if self.stress else None,
             "timing": self.timing.to_dict() if self.timing else None,
@@ -70,5 +74,6 @@ class PronunciationScorer(Protocol):
         target_text: str,
         heard_text: str,
         audio_pcm16: Optional[bytes] = None,
+        accent: Optional[str] = None,
     ) -> PronunciationResult:
         ...

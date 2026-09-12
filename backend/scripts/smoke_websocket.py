@@ -20,6 +20,12 @@ the protocol the browser uses, which is the only way to exercise three things:
      the ground truth; a unit test can only assert what the registry returns in
      process.
 
+Authentication: `/ws/voice` verifies a short-lived HMAC token minted by the web
+app. This script mints its own locally with the same secret, so it works
+against a server running with `WS_AUTH_REQUIRED=1` **provided the token secret
+in this checkout matches the running server's** (`WS_TOKEN_SECRET`). With
+`WS_AUTH_REQUIRED=0` it connects anonymously, as it always used to.
+
 Usage:
     uvicorn main:app --host 127.0.0.1 --port 8000     # in another terminal
     python scripts/smoke_websocket.py [ws://host:port/ws/voice]
@@ -40,6 +46,9 @@ from scripts.smoke_pipeline import LONG_RATE, LONG_TEXT, SAMPLE_RATE, _synthesiz
 
 DEFAULT_URL = "ws://127.0.0.1:8000/ws/voice"
 CHUNK_BYTES = 8192
+# The token binds one practice session, and the server refuses a SESSION_CONFIG
+# for any other, so every check here drives the same id.
+SMOKE_SESSION_ID = "smoke-script"
 
 # Substitutions a learner actually makes, keyed by the word they apply to. Used
 # to build a deliberately mispronounced take on the practice step we supply. TH
@@ -202,7 +211,7 @@ async def check_script_execution(ws) -> bool:
 
     await ws.send(json.dumps({
         "type": "SESSION_CONFIG",
-        "session_id": "smoke-script",
+        "session_id": SMOKE_SESSION_ID,
         "coach_name": "Coach",
         "difficulty": "easy",
         "source": "custom",
@@ -269,7 +278,7 @@ async def check_script_execution(ws) -> bool:
     # to win over the tier default.
     await ws.send(json.dumps({
         "type": "SESSION_CONFIG",
-        "session_id": "smoke-script",
+        "session_id": SMOKE_SESSION_ID,
         "coach_name": "Coach",
         "difficulty": "easy",
         "pass_threshold": 91.5,
@@ -293,7 +302,7 @@ async def check_mispronunciation(ws) -> bool:
 
     await ws.send(json.dumps({
         "type": "SESSION_CONFIG",
-        "session_id": "smoke-mispro",
+        "session_id": SMOKE_SESSION_ID,
         "coach_name": "Coach",
         "difficulty": "medium",
         "steps": MISPRO_STEPS,
@@ -367,10 +376,29 @@ async def run(url: str) -> int:
     return 1 if failed else 0
 
 
+def _url_with_token(url: str) -> str:
+    """Add the auth token the running server expects, if it expects one."""
+    from app.core.config import settings
+    from app.core.ws_auth import mint_token
+
+    if not settings.WS_AUTH_REQUIRED:
+        print("WS_AUTH_REQUIRED=0 in this checkout; connecting anonymously\n")
+        return url
+    if not settings.WS_TOKEN_SECRET:
+        raise SystemExit(
+            "WS_AUTH_REQUIRED=1 but WS_TOKEN_SECRET is empty in this checkout.\n"
+            "Set it to the same value the server uses, or set "
+            "WS_AUTH_REQUIRED=0 to accept anonymous connections."
+        )
+    token = mint_token("smoke-test-user", SMOKE_SESSION_ID)
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}token={token}"
+
+
 def main(argv: list[str]) -> int:
     url = argv[0] if argv else DEFAULT_URL
     try:
-        return asyncio.run(run(url))
+        return asyncio.run(run(_url_with_token(url)))
     except (OSError, TimeoutError) as exc:
         print(f"\nFAILED: {type(exc).__name__}: {exc}")
         print(f"Is the backend running on {url}?")

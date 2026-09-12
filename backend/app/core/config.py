@@ -14,6 +14,12 @@ logger = logging.getLogger(__name__)
 _TRUTHY = ("1", "true", "yes")
 
 
+def _split_csv_env(name: str, default: str = "") -> List[str]:
+    """Read a comma-separated env var as a clean list."""
+    raw = os.getenv(name, default)
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
 def _env_flag(name: str, default: str, *legacy_names: str) -> bool:
     """Read a boolean env var, honouring deprecated names as aliases.
 
@@ -37,7 +43,16 @@ def _env_flag(name: str, default: str, *legacy_names: str) -> bool:
 
 class Settings:
     """Application settings and configuration"""
-    
+
+    # Deployment environment. "production" switches off dev-only affordances
+    # (the localhost CORS convenience regex). Defaults to development so a bare
+    # checkout behaves the way a developer expects.
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+
+    @property
+    def IS_PRODUCTION(self) -> bool:
+        return self.ENVIRONMENT.strip().lower() in ("production", "prod")
+
     # API Configuration
     APP_NAME: str = "TalkFlow Backend"
     APP_VERSION: str = "1.0.0"
@@ -59,16 +74,26 @@ class Settings:
         origin.rstrip('/') for origin in _production_origins if origin and origin.strip()
     ]
     
-    # API Keys
+    # OpenRouter LLM configuration. Do not put a direct Gemini/Google AI key here;
+    # OpenRouter keys are issued by https://openrouter.ai/settings/keys and start
+    # with the OpenRouter account, not Google AI Studio.
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
-    
-    # API URLs & Models
     OPENROUTER_API_URL: str = os.getenv(
         "OPENROUTER_API_URL", "https://openrouter.ai/api/v1/chat/completions"
     )
     OPENROUTER_MODEL: str = os.getenv(
         "OPENROUTER_MODEL", "google/gemini-2.5-flash"
     )
+    OPENROUTER_SITE_URL: str = os.getenv(
+        "OPENROUTER_SITE_URL",
+        os.getenv("FRONTEND_URL", os.getenv("NEXT_PUBLIC_APP_URL", "http://localhost:3000")),
+    )
+    OPENROUTER_APP_NAME: str = os.getenv("OPENROUTER_APP_NAME", "TalkFlow")
+    OPENROUTER_FALLBACK_MODELS: List[str] = _split_csv_env(
+        "OPENROUTER_FALLBACK_MODELS",
+        "meta-llama/llama-3.2-3b-instruct:free,qwen/qwen-2.5-7b-instruct:free",
+    )
+    
     
     # Google Cloud Credentials - Support both file path and base64 encoded JSON
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
@@ -126,6 +151,23 @@ class Settings:
     WEBSOCKET_PING_INTERVAL: int = 20  # seconds
     WEBSOCKET_PING_TIMEOUT: int = 60
     WEBSOCKET_MAX_SIZE: int = 16_777_216  # 16MB
+
+    # --- WebSocket authentication -------------------------------------------
+    # The browser cannot present Better Auth's cookie to this service, so the
+    # Next.js route handler mints a short-lived HMAC token (shared secret below)
+    # and the client passes it in the connect URL. Without this, /ws/voice
+    # accepts anonymous sockets that can spend OpenRouter + Google TTS credit
+    # and name an arbitrary practice_session_id.
+    WS_AUTH_REQUIRED: bool = _env_flag("WS_AUTH_REQUIRED", "1")
+    WS_TOKEN_SECRET: str = os.getenv("WS_TOKEN_SECRET", "")
+    WS_TOKEN_TTL_SECONDS: int = int(os.getenv("WS_TOKEN_TTL_SECONDS", "120"))
+
+    # --- Server-to-server authentication ------------------------------------
+    # Script generation spends OpenRouter credit, so it is not open to anonymous
+    # callers. Set this (and the web app's copy) to require the header; see
+    # app/core/internal_auth.py. Empty means "unprotected", which validate()
+    # warns about.
+    INTERNAL_API_TOKEN: str = os.getenv("INTERNAL_API_TOKEN", "")
     
     # Session Management
     SESSION_TIMEOUT_MINUTES: int = 30
@@ -185,15 +227,24 @@ class Settings:
     INSERTION_PENALTY: float = float(os.getenv("INSERTION_PENALTY", "0.5"))
     SOFTEN_ON_UNCERTAINTY: float = float(os.getenv("SOFTEN_ON_UNCERTAINTY", "0.5"))
 
-    # Prosody scoring (Phase 2/3). Each dimension is independently flag-gated so
-    # they can be rolled out one at a time. All run CPU-only, load-once.
-    ENABLE_PROSODY_SCORING: bool = os.getenv("ENABLE_PROSODY_SCORING", "0").lower() in (
+    # Prosody scoring (dimensions B and C): timing, rhythm, lexical stress.
+    # On by default now that it is implemented and unit-tested. Safe to enable
+    # because every dimension returns None when it cannot be measured -- no
+    # voiced audio, or a syllable count that disagrees with the reference -- and
+    # the report renders None as absent rather than as a number. CPU-only, and
+    # a single FFT pass over the turn (~50 ms on 2 vCPUs).
+    # Note: stress uses the heuristic scorer (`method: "heuristic"`), the one
+    # weak-tooling area in this stack; a trained classifier is still future work.
+    ENABLE_PROSODY_SCORING: bool = os.getenv("ENABLE_PROSODY_SCORING", "1").lower() in (
         "1",
         "true",
         "yes",
     )
+    # Dimension D (intonation). Judged on contour *shape* against what the
+    # sentence's own punctuation requires -- no reference recording to curate,
+    # and no penalty for a lower voice or a narrower range.
     ENABLE_INTONATION_SCORING: bool = os.getenv(
-        "ENABLE_INTONATION_SCORING", "0"
+        "ENABLE_INTONATION_SCORING", "1"
     ).lower() in ("1", "true", "yes")
 
     # Voice-activity detection (silero-vad) used by timing + noisy-audio guards.
@@ -229,26 +280,60 @@ class Settings:
     )
 
     # Resilience (Phase 6).
-    SCORE_TIMEOUT_SECONDS: float = float(os.getenv("SCORE_TIMEOUT_SECONDS", "8.0"))
+    # Both are now actually enforced in the voice socket: a hung forward pass
+    # used to hang the connection forever, and nothing bounded how many turns a
+    # single client could run. 20s is ~3x the measured warm phoneme pass on a
+    # 2-vCPU box, so it bounds a real hang without failing a slow turn.
+    SCORE_TIMEOUT_SECONDS: float = float(os.getenv("SCORE_TIMEOUT_SECONDS", "20.0"))
+    # Cold model load (first call with warming disabled) can take minutes; that
+    # is a download, not compute, so ASR gets its own larger budget.
+    ASR_TIMEOUT_SECONDS: float = float(os.getenv("ASR_TIMEOUT_SECONDS", "120.0"))
     MAX_TURNS_PER_MINUTE: int = int(os.getenv("MAX_TURNS_PER_MINUTE", "20"))
 
-    # Forced Alignment (Phase 2).
-    ENABLE_ALIGNMENT: bool = os.getenv("ENABLE_ALIGNMENT", "1").lower() in ("1", "true", "yes")
-    ALIGNMENT_PROVIDER: str = os.getenv("ALIGNMENT_PROVIDER", "whisperx")
-    ALIGNMENT_TIMEOUT_SECONDS: float = float(os.getenv("ALIGNMENT_TIMEOUT_SECONDS", "15.0"))
-    ALIGNMENT_LANGUAGE: str = os.getenv("ALIGNMENT_LANGUAGE", "en")
-    WARM_ALIGNMENT_ON_STARTUP: bool = os.getenv("WARM_ALIGNMENT_ON_STARTUP", "0").lower() in ("1", "true", "yes")
+    # Forced alignment is gone. `ENABLE_ALIGNMENT=1` and
+    # `ALIGNMENT_PROVIDER=whisperx` used to be the *defaults* for a code path
+    # that imported WhisperX, which is not in requirements.txt -- so the two
+    # routers that called it could never have run. Phone boundaries now come
+    # from the CTC decode in app/services/pronunciation/.
 
     def validate(self):
         """Validate required settings"""
+        legacy_gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_GENERATIVE_AI_API_KEY")
         if not self.OPENROUTER_API_KEY:
             logger.warning("OPENROUTER_API_KEY is not set - AI responses will not work")
+            if legacy_gemini_key:
+                logger.warning(
+                    "A direct Gemini API key is present, but TalkFlow now uses OpenRouter. "
+                    "Create an OpenRouter key and set OPENROUTER_API_KEY instead."
+                )
+        elif legacy_gemini_key:
+            logger.warning(
+                "A direct Gemini API key is still present but ignored for LLM calls; "
+                "TalkFlow uses OPENROUTER_API_KEY."
+            )
         if not self.GOOGLE_APPLICATION_CREDENTIALS:
             logger.warning("GOOGLE_APPLICATION_CREDENTIALS is not set - TTS will not work")
         elif self.GOOGLE_APPLICATION_CREDENTIALS and not os.path.exists(self.GOOGLE_APPLICATION_CREDENTIALS):
             logger.warning(
                 "Google credentials file not found at %s",
                 self.GOOGLE_APPLICATION_CREDENTIALS,
+            )
+        if self.WS_AUTH_REQUIRED and not self.WS_TOKEN_SECRET:
+            logger.error(
+                "WS_AUTH_REQUIRED is on but WS_TOKEN_SECRET is empty. Voice "
+                "connections will be REJECTED. Set WS_TOKEN_SECRET to the same "
+                "value in the web app and here (openssl rand -hex 32)."
+            )
+        if not self.INTERNAL_API_TOKEN:
+            logger.warning(
+                "INTERNAL_API_TOKEN is not set: server-to-server routes "
+                "(/api/practice/*) accept any caller, including one that spends "
+                "OpenRouter credit. Set it in development and production."
+            )
+        elif not self.WS_AUTH_REQUIRED:
+            logger.warning(
+                "WS_AUTH_REQUIRED=0: /ws/voice accepts unauthenticated "
+                "connections. Development only."
             )
         # WAV2VEC2_MODEL_ID is intentionally NOT read as an alias for
         # ASR_MODEL_ID: honouring it would let a stale wav2vec2 checkpoint win
