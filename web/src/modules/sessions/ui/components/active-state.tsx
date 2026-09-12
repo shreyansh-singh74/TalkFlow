@@ -16,7 +16,7 @@ export const ActiveState = ({ sessionId }: Props) => {
         description="The session will finish when you leave."
       />
       <div className="flex flex-col-reverse lg:flex-row lg:justify-center items-center gap-2 w-full">
-        <Button className="w-full lg:w-auto">
+        <Button asChild className="w-full lg:w-auto">
           <Link href={`/call/${sessionId}`}>
             <VideoIcon />
             Join Session

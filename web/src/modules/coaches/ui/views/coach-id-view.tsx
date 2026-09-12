@@ -1,11 +1,12 @@
 "use client";
 import { ErrorState } from "@/components/error-state";
-import { LoadingState } from "@/components/loading-state";
 import { useCoach, useDeleteCoach } from "@/hooks/use-api";
 import { CoachIdViewHeader } from "../components/coach-id-view-header";
 import { NameAvatar } from "@/components/name-avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { VideoIcon } from "lucide-react";
+import { ACCENT_OPTIONS, DIFFICULTY_LABELS } from "@/types/practice";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -35,7 +36,7 @@ export const CoachIdView = ({ coachId }: Props) => {
     removeCoach.mutate(coachId, {
       onSuccess: () => {
         toast.success("Coach deleted successfully");
-        router.push("/dashboard/coaches");
+        router.push("/coaches");
       },
       onError: (error) => {
         toast.error(error.message || "Failed to delete coach");
@@ -91,15 +92,67 @@ export const CoachIdView = ({ coachId }: Props) => {
             </div>
             <Badge
               variant="outline"
-              className="flex items-center gap-x-2 [&>svg]:size-4"
+              className="flex items-center gap-x-2 [&>svg]:size-4 w-fit"
             >
               <VideoIcon className="text-blue-700" />
               {data.sessionCount}{" "}
               {data.sessionCount === 1 ? "session" : "sessions"}
             </Badge>
-            <div className="flex flex-col gap-y-4">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 border-t pt-5">
+              <div className="flex flex-col gap-y-1">
+                <dt className="text-sm font-medium text-muted-foreground">
+                  Drill topic
+                </dt>
+                <dd className="text-neutral-900">
+                  {data.topic || "—"}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-y-1">
+                <dt className="text-sm font-medium text-muted-foreground">
+                  Difficulty
+                </dt>
+                <dd className="text-neutral-900 capitalize">
+                  {data.difficulty
+                    ? (DIFFICULTY_LABELS[
+                        data.difficulty as keyof typeof DIFFICULTY_LABELS
+                      ] ?? data.difficulty)
+                    : "—"}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-y-1">
+                <dt className="text-sm font-medium text-muted-foreground">
+                  Target accent
+                </dt>
+                <dd className="text-neutral-900">
+                  {ACCENT_OPTIONS.find((a) => a.value === data.accent)?.label ??
+                    data.accent ??
+                    "—"}
+                </dd>
+              </div>
+              <div className="flex flex-col gap-y-1">
+                <dt className="text-sm font-medium text-muted-foreground">
+                  Focus sounds
+                </dt>
+                <dd className="text-neutral-900">
+                  {data.focusSounds && data.focusSounds.length > 0 ? (
+                    <span className="flex flex-wrap gap-1.5">
+                      {data.focusSounds.map((sound: string) => (
+                        <Badge key={sound} variant="secondary">
+                          {sound}
+                        </Badge>
+                      ))}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </dd>
+              </div>
+            </dl>
+            <div className="flex flex-col gap-y-4 border-t pt-5">
               <p className="text-lg font-medium">Instructions</p>
-              <p className="text-neutral-800">{data.instructions}</p>
+              <p className="text-neutral-800 whitespace-pre-wrap">
+                {data.instructions || "—"}
+              </p>
             </div>
           </div>
         </div>
@@ -110,10 +163,38 @@ export const CoachIdView = ({ coachId }: Props) => {
 
 export const CoachesIdViewLoading = () => {
   return (
-    <LoadingState
-      title="Loading Coaches"
-      description="This may take few seconds"
-    />
+    <div className="flex-1 py-4 md:px-8 flex flex-col gap-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-5 w-5" />
+          <Skeleton className="h-5 w-32" />
+        </div>
+        <Skeleton className="h-9 w-9 rounded-md" />
+      </div>
+      <div className="bg-white rounded-lg border">
+        <div className="px-4 py-5 gap-y-5 flex flex-col">
+          <div className="flex items-center gap-x-3">
+            <Skeleton className="h-10 w-10 rounded-full" />
+            <Skeleton className="h-7 w-48" />
+          </div>
+          <Skeleton className="h-6 w-28 rounded-full" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 border-t pt-5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-5 w-3/4" />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2 border-t pt-5">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
