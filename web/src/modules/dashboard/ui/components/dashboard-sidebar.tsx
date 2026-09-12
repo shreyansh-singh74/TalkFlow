@@ -1,6 +1,6 @@
 "use client";
 
-import { BotIcon, VideoIcon } from "lucide-react";
+import { BotIcon, SettingsIcon, TrendingUpIcon, VideoIcon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,12 +23,22 @@ const firstSection = [
   {
     icon: VideoIcon,
     label: "Practice Sessions",
-    href: "/dashboard/sessions",
+    href: "/sessions",
   },
   {
     icon: BotIcon,
     label: "Coaches",
-    href: "/dashboard/coaches",
+    href: "/coaches",
+  },
+  {
+    icon: TrendingUpIcon,
+    label: "Progress",
+    href: "/progress",
+  },
+  {
+    icon: SettingsIcon,
+    label: "Settings",
+    href: "/settings",
   },
 ];
 
@@ -38,7 +48,7 @@ export const DashboardSidebar = () => {
   return (
     <Sidebar style={{ borderRightWidth: "0px" }}>
       <SidebarHeader>
-        <Link href="/dashboard" className="flex items-center gap-2 px-2 pt-2">
+        <Link href="/home" className="flex items-center gap-2 px-2 pt-2">
           <Image src="/logo.svg" height={36} width={36} alt="TalkFlow" />
           <p className="text-2xl font-semibold ">TalkFlow</p>
         </Link>

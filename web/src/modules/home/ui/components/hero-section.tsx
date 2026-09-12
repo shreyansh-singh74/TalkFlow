@@ -45,7 +45,7 @@ export function HeroSection() {
 
         <div className="mt-9 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <Link
-            href={signedIn ? "/dashboard" : "/sign-up"}
+            href={signedIn ? "/home" : "/sign-up"}
             className="group inline-flex items-center justify-center rounded-full bg-tf-green px-7 py-3.5 text-sm font-semibold text-white shadow-[0_14px_34px_-10px_rgba(24,164,75,0.65)] transition-all hover:bg-tf-green-strong hover:shadow-[0_18px_40px_-10px_rgba(24,164,75,0.7)] active:scale-[0.98]"
           >
             {signedIn ? "Go to dashboard" : "Start practicing free"}

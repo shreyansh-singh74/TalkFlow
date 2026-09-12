@@ -26,6 +26,7 @@ import {
   type SessionSource,
 } from "@/types/practice";
 import type {
+  SessionAnalysisReport,
   SessionPhonemeDataPersisted,
   PronunciationResultPayload,
 } from "@/types/pronunciation";
@@ -49,6 +50,12 @@ interface Props {
   difficulty: Difficulty;
   topic: string;
   accent: string;
+  /** Learner's first language, from settings. Coaching bias only. */
+  l1?: string;
+  /** Learner's audio-retention consent, from settings. */
+  retainAudio?: boolean;
+  /** Learner's listening speed, from settings. */
+  listeningRate?: number;
   initialPhonemeData?: SessionPhonemeDataPersisted | null;
 }
 
@@ -63,9 +70,20 @@ export const CallActive = ({
   difficulty,
   topic,
   accent,
+  l1 = "",
+  retainAudio = false,
+  listeningRate = 1,
   initialPhonemeData,
 }: Props) => {
-  const updateSession = useUpdatePracticeSession();
+  // `mutate` (not the whole mutation result): the result object gets a new
+  // identity on every render/mutation-state change, and using it in effect
+  // deps re-armed the persist timers after every save -- each completed PUT
+  // scheduled another append+PUT of the same turn, forever. That loop is how
+  // one spoken turn became 100 identical transcript rows.
+  const { mutate: persistSession } = useUpdatePracticeSession();
+  // Turn ids already recorded. Second line of defence against duplicate rows:
+  // even if a persist path runs twice for one turn, the entry is stored once.
+  const recordedTurnIdsRef = useRef<Set<string>>(new Set());
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const scriptSteps = useMemo(() => script?.steps ?? [], [script]);
@@ -77,7 +95,9 @@ export const CallActive = ({
     practiceMode, practiceSentence, practiceProgress,
     passThreshold, stepIndex, contextBefore, contextAfter, stepNote,
     connect, disconnect, startTalking, stopTalking,
-    sessionReport, sendNextSentence, sendPrevSentence, isTransitioning, restartSession,
+    sessionReport, sendSkipSentence, sendPrevSentence,
+    finalizeSession, isTransitioning, gateMessage, pendingTarget,
+    acceptPendingTarget, restartSession,
     micStream,
   } = usePushToTalk({
     sessionId,
@@ -90,6 +110,8 @@ export const CallActive = ({
       script?.pass_threshold ?? DIFFICULTY_PASS_THRESHOLDS[difficulty],
     accent,
     topic,
+    l1,
+    retainAudio,
   });
 
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -100,7 +122,9 @@ export const CallActive = ({
 
   const handleSkipSentence = () => {
     setSkippedSteps((prev) => new Set(prev).add(stepIndex));
-    sendNextSentence();
+    // The engine records the skip too, so the report can never present a
+    // skipped step as completed.
+    sendSkipSentence();
   };
 
   const handleCancelEvaluating = () => {
@@ -210,36 +234,108 @@ export const CallActive = ({
     }
   }, [lastPronunciation, transcriptionError]);
 
-  const phonemeEntriesRef = useRef<Array<Record<string, unknown>>>([]);
+  // Typed as the persisted shape, not `Record<string, unknown>`.
+  //
+  // This ref used to be untyped, and the entry written here used
+  // `{ timestamp, overall_score }` while every reader used `{ at, score }` --
+  // so the session timeline rendered "Score: 0%" for every turn and the
+  // dashboard's average-accuracy maths divided NaN. An untyped bag is what let
+  // the writer and the readers disagree without anyone noticing; this type is
+  // the fix.
+  const phonemeEntriesRef = useRef<SessionPhonemeDataPersisted["entries"]>([]);
   useEffect(() => {
     if (initialPhonemeData?.entries && Array.isArray(initialPhonemeData.entries)) {
       phonemeEntriesRef.current = [...initialPhonemeData.entries];
+      for (const e of initialPhonemeData.entries) {
+        if (e.turn_id) recordedTurnIdsRef.current.add(e.turn_id);
+      }
     }
   }, [initialPhonemeData]);
 
   const appendPronunciationEntry = useCallback((payload: PronunciationResultPayload) => {
-    const entry = {
-      timestamp: new Date().toISOString(),
-      target_text: targetText,
+    const turnId = payload.turn_id ?? "";
+    if (turnId && recordedTurnIdsRef.current.has(turnId)) return;
+    if (turnId) recordedTurnIdsRef.current.add(turnId);
+    const entry: SessionPhonemeDataPersisted["entries"][number] = {
+      at: new Date().toISOString(),
+      turn_id: payload.turn_id ?? "",
+      // The server's target for the turn, not the component's current one: by
+      // the time this runs the cursor may already have moved, and an entry that
+      // records the wrong sentence is worse than no entry.
+      target_text: payload.target_text || targetText,
       heard_text: payload.heard_text,
-      overall_score: payload.score,
-      misaligned_words: payload.misaligned_words,
+      score: payload.score,
+      mode: practiceMode,
       feedback: payload.feedback,
+      misaligned_words: payload.misaligned_words,
     };
     phonemeEntriesRef.current = [...phonemeEntriesRef.current, entry];
-  }, [targetText]);
+  }, [targetText, practiceMode]);
 
   const persistDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Mirrors the latest report for the writers below. Declared up here (before
+  // flushEntries) so every persist path can include it.
+  const sessionReportRef = useRef<SessionAnalysisReport | null>(null);
+
+  /**
+   * Write the entries collected so far.
+   *
+   * Called from the debounce, but also whenever the page is going away -- the
+   * debounce window is a real gap in which a closed tab loses the last turn.
+   */
+  const flushEntries = useCallback(() => {
+    if (persistDebounceRef.current) {
+      clearTimeout(persistDebounceRef.current);
+      persistDebounceRef.current = null;
+    }
+    if (phonemeEntriesRef.current.length === 0) return;
+    // Report-preserving: an entries-only write that lands after the final
+    // report PUT (e.g. the pagehide flush during navigation to the dashboard)
+    // used to wipe the analysis. Every write carries the report once known,
+    // so last-writer-wins is always safe.
+    persistSession({
+      id: sessionId,
+      phonemeData: {
+        entries: phonemeEntriesRef.current,
+        ...(sessionReportRef.current
+          ? { report: sessionReportRef.current }
+          : {}),
+      },
+    });
+  }, [sessionId, persistSession]);
 
   useEffect(() => {
     if (!lastPronunciation) return;
     if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current);
     persistDebounceRef.current = setTimeout(() => {
       appendPronunciationEntry(lastPronunciation);
-      updateSession.mutate({ id: sessionId, phonemeData: { entries: phonemeEntriesRef.current } });
+      persistSession({
+        id: sessionId,
+        phonemeData: {
+          entries: phonemeEntriesRef.current,
+          ...(sessionReportRef.current
+            ? { report: sessionReportRef.current }
+            : {}),
+        },
+      });
     }, 2000);
     return () => { if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current); };
-  }, [lastPronunciation, sessionId, updateSession, appendPronunciationEntry]);
+  }, [lastPronunciation, sessionId, persistSession, appendPronunciationEntry]);
+
+  // Best-effort flush when the tab is hidden or closed, so the 2s debounce is
+  // not the difference between keeping and losing the last attempt.
+  useEffect(() => {
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") flushEntries();
+    };
+    document.addEventListener("visibilitychange", onHidden);
+    window.addEventListener("pagehide", flushEntries);
+    return () => {
+      document.removeEventListener("visibilitychange", onHidden);
+      window.removeEventListener("pagehide", flushEntries);
+    };
+  }, [flushEntries]);
 
   useSpacebarControl({ onSpaceDown: handleStartTalking, onSpaceUp: handleStopTalking, enabled: isConnected && isMicEnabled });
 
@@ -260,37 +356,95 @@ export const CallActive = ({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [sessionReport]);
 
+  const [leavePending, setLeavePending] = useState(false);
+  const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (sessionReport) {
-      if (persistDebounceRef.current) {
-        clearTimeout(persistDebounceRef.current);
-        persistDebounceRef.current = null;
-      }
+    sessionReportRef.current = sessionReport;
+  }, [sessionReport]);
 
-      if (lastPronunciation) {
-        appendPronunciationEntry(lastPronunciation);
-      }
+  useEffect(() => {
+    if (!sessionReport) return;
 
-      updateSession.mutate({
+    if (persistDebounceRef.current) {
+      clearTimeout(persistDebounceRef.current);
+      persistDebounceRef.current = null;
+    }
+
+    if (lastPronunciation) {
+      appendPronunciationEntry(lastPronunciation);
+    }
+
+    persistSession(
+      {
         id: sessionId,
         status: SessionStatus.Completed,
         endedAt: new Date().toISOString(),
         phonemeData: {
           entries: phonemeEntriesRef.current,
-          report: sessionReport
-        }
-      });
-    }
-  }, [sessionReport, sessionId, lastPronunciation, appendPronunciationEntry, updateSession]);
+          report: sessionReport,
+        },
+      },
+      {
+        // Navigate away only once the report is actually stored. Leaving first
+        // was how a finished session ended up saved without its analysis.
+        onSettled: () => {
+          if (leavePending) onLeave();
+        },
+      }
+    );
+  }, [
+    sessionReport,
+    sessionId,
+    lastPronunciation,
+    appendPronunciationEntry,
+    persistSession,
+    leavePending,
+    onLeave,
+  ]);
 
-  const handleLeaveWithPersist = () => {
-    if (persistDebounceRef.current) { clearTimeout(persistDebounceRef.current); persistDebounceRef.current = null; }
-    if (lastPronunciation) appendPronunciationEntry(lastPronunciation);
-    if (phonemeEntriesRef.current.length > 0) {
-      updateSession.mutate({ id: sessionId, phonemeData: { entries: phonemeEntriesRef.current } });
+  useEffect(
+    () => () => {
+      if (leaveTimeoutRef.current) clearTimeout(leaveTimeoutRef.current);
+    },
+    []
+  );
+
+  /**
+   * Leave the session, but ask the server for the summary on the way out.
+   *
+   * Leaving used to persist the raw entries and drop the report entirely, while
+   * the end-of-call screen promised a summary "shortly" that nothing would ever
+   * produce. A short wait for the report fixes the promise rather than the copy.
+   */
+  const beginLeave = useCallback(() => {
+    if (persistDebounceRef.current) {
+      clearTimeout(persistDebounceRef.current);
+      persistDebounceRef.current = null;
     }
-    onLeave();
-  };
+    if (lastPronunciation) appendPronunciationEntry(lastPronunciation);
+
+    const hasTurns = phonemeEntriesRef.current.length > 0;
+    if (sessionReportRef.current || !hasTurns) {
+      flushEntries();
+      onLeave();
+      return;
+    }
+
+    setLeavePending(true);
+    finalizeSession();
+    leaveTimeoutRef.current = setTimeout(() => {
+      // The server never answered. Store what was measured and go -- an
+      // unanswered request must not trap the learner on the page.
+      flushEntries();
+      onLeave();
+    }, 6000);
+  }, [
+    appendPronunciationEntry,
+    finalizeSession,
+    flushEntries,
+    lastPronunciation,
+    onLeave,
+  ]);
 
   const mainMicPress = (e: React.PointerEvent) => {
     if (!isMicEnabled) {
@@ -373,6 +527,7 @@ export const CallActive = ({
                 contextBefore={contextBefore}
                 contextAfter={contextAfter}
                 stepNote={stepNote}
+                rate={listeningRate}
               />
 
               {/* Feedback beside the sentence (Review) */}
@@ -387,7 +542,12 @@ export const CallActive = ({
                 activeKey={activeWordKey}
                 onSelectExpected={(expected, fromWrongBar) => {
                   setActiveWordKey(normalizeWord(expected));
-                  if (fromWrongBar) speakWord(expected, { rate: 0.7, lang: speechLang });
+                  if (fromWrongBar)
+                    speakWord(expected, {
+                      // Follows the learner's listening speed, not just Slow.
+                      rate: 0.7 * listeningRate,
+                      lang: speechLang,
+                    });
                 }}
               />
               <PronunciationReferenceCard
@@ -396,6 +556,7 @@ export const CallActive = ({
                 lang={speechLang}
                 onLangChange={setSelectedLang}
                 misalignedPairs={lastPronunciation?.misaligned_words}
+                rate={listeningRate}
               />
             </section>
           </div>
@@ -437,7 +598,9 @@ export const CallActive = ({
           onMobileTalkStop={handleStopTalking}
           onMicToggle={() => setIsMicEnabled((c) => !c)}
           onSkip={handleSkipSentence}
-          onNextLevel={sendNextSentence}
+          hasPendingNext={pendingTarget !== null}
+          onContinue={acceptPendingTarget}
+          gateMessage={gateMessage}
           onPrevLevel={sendPrevSentence}
           canGoBack={practiceProgress.current > 1}
           onCancelEvaluating={handleCancelEvaluating}
@@ -471,7 +634,7 @@ export const CallActive = ({
               type="button"
               onClick={() => {
                 setShowLeaveConfirm(false);
-                handleLeaveWithPersist();
+                beginLeave();
               }}
               className="w-full sm:w-auto rounded-full px-5 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-all cursor-pointer shadow-md"
             >

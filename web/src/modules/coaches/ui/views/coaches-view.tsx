@@ -1,5 +1,5 @@
 "use client";
-import { LoadingState } from "@/components/loading-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useCoaches } from "@/hooks/use-api";
 import { columns } from "../components/columns";
 import { EmptyState } from "@/components/empty-state";
@@ -41,7 +41,7 @@ export const CoachesView = () => {
       <DataTable
         data={data.items}
         columns={columns}
-        onRowClick={(row) => router.push(`/dashboard/coaches/${row?.id}`)}
+        onRowClick={(row) => router.push(`/coaches/${row?.id}`)}
       />
       <DataPagination
         page={filters.page}
@@ -54,10 +54,32 @@ export const CoachesView = () => {
 
 export const CoachesViewLoading = () => {
   return (
-    <LoadingState
-      title="Loading Coaches"
-      description="This may take few seconds"
-    />
+    <div className="flex-1 pb-4 px-4 md:px-8 flex flex-col gap-y-4">
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="border-b px-4 py-3 flex gap-4">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-4 w-20 hidden sm:block" />
+        </div>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="border-b last:border-0 px-4 py-4 flex items-center gap-4"
+          >
+            <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-2/5" />
+              <Skeleton className="h-3 w-1/3" />
+            </div>
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-center gap-2">
+        <Skeleton className="h-8 w-8 rounded-md" />
+        <Skeleton className="h-8 w-8 rounded-md" />
+        <Skeleton className="h-8 w-8 rounded-md" />
+      </div>
+    </div>
   );
 };
   

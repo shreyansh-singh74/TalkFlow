@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Reveal } from "./reveal";
 import { SectionHeading } from "./section-heading";
 import { authClient } from "@/lib/auth-client";
+import { useBillingRedirect } from "@/hooks/use-settings";
 
 const PLANS = [
   {
@@ -19,6 +20,7 @@ const PLANS = [
     ctaHref: "/sign-up",
     featured: false,
     features: [
+      "10 practice sessions a month",
       "AI conversation partner",
       "Per-word pronunciation scores",
       "IPA breakdown & fix cues",
@@ -51,6 +53,7 @@ const PLANS = [
 export function PricingSection() {
   const { data: session } = authClient.useSession();
   const signedIn = Boolean(session?.user);
+  const billing = useBillingRedirect();
 
   return (
     <section
@@ -192,17 +195,40 @@ export function PricingSection() {
                       ))}
                     </ul>
 
-                    <Link
-                      href={signedIn ? "/dashboard" : ctaHref}
-                      className={cn(
-                        "inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition-all active:scale-[0.98]",
-                        featured
-                          ? "bg-tf-green text-white shadow-[0_14px_34px_-12px_rgba(24,164,75,0.9)] hover:bg-tf-mint hover:text-tf-deep"
-                          : "border border-tf-text/15 bg-tf-text text-white hover:bg-tf-green-strong",
-                      )}
-                    >
-                      {signedIn ? "Go to dashboard" : cta}
-                    </Link>
+                    {featured && signedIn ? (
+                      // Signed-in visitors go straight to Stripe instead of back
+                      // to the dashboard, so the "upgrade" button upgrades.
+                      <button
+                        type="button"
+                        onClick={() => billing.mutate("checkout")}
+                        disabled={billing.isPending}
+                        className={cn(
+                          "inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-60",
+                          "bg-tf-green text-white shadow-[0_14px_34px_-12px_rgba(24,164,75,0.9)] hover:bg-tf-mint hover:text-tf-deep",
+                        )}
+                      >
+                        {billing.isPending ? "Opening checkout…" : cta}
+                      </button>
+                    ) : (
+                      <Link
+                        href={signedIn ? "/home" : ctaHref}
+                        className={cn(
+                          "inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition-all active:scale-[0.98]",
+                          featured
+                            ? "bg-tf-green text-white shadow-[0_14px_34px_-12px_rgba(24,164,75,0.9)] hover:bg-tf-mint hover:text-tf-deep"
+                            : "border border-tf-text/15 bg-tf-text text-white hover:bg-tf-green-strong",
+                        )}
+                      >
+                        {signedIn ? "Go to dashboard" : cta}
+                      </Link>
+                    )}
+                    {featured && signedIn && billing.isError && (
+                      <p className="mt-2 text-center text-[12px] text-tf-deep-text/80">
+                        {billing.error instanceof Error
+                          ? billing.error.message
+                          : "Billing is unavailable right now."}
+                      </p>
+                    )}
                   </div>
                 </article>
               </Reveal>

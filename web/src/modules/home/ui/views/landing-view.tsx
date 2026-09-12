@@ -59,7 +59,7 @@ export function LandingView() {
 
           <div className="flex flex-col items-center gap-3 pt-2 sm:flex-row sm:justify-center">
             <Link
-              href={signedIn ? "/dashboard" : "/sign-up"}
+              href={signedIn ? "/home" : "/sign-up"}
               className="group inline-flex w-full items-center justify-center rounded-full bg-tf-green px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-tf-mint hover:text-tf-deep sm:w-auto"
             >
               {signedIn ? "Go to dashboard" : "Sign up for free"}

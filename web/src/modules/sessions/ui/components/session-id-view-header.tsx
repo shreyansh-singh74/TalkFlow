@@ -23,7 +23,7 @@ export const SessionIdViewHeader = ({
                 <BreadcrumbList>
                     <BreadcrumbItem>
                         <BreadcrumbLink asChild className="font-medium text-xl">
-                            <Link href="/dashboard/sessions">
+                            <Link href="/sessions">
                                 Practice Sessions
                             </Link>
                         </BreadcrumbLink>
@@ -33,7 +33,7 @@ export const SessionIdViewHeader = ({
                     </BreadcrumbSeparator>
                     <BreadcrumbItem>
                         <BreadcrumbLink asChild className="font-medium text-xl text-foreground">
-                            <Link href={`/dashboard/sessions/${sessionId}`}>
+                            <Link href={`/sessions/${sessionId}`}>
                                 {sessionName}
                             </Link>
                         </BreadcrumbLink>

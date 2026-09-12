@@ -23,7 +23,7 @@ export const CoachIdViewHeader = ({
                 <BreadcrumbList>
                     <BreadcrumbItem>
                         <BreadcrumbLink asChild className="font-medium text-xl">
-                            <Link href="/dashboard/coaches">
+                            <Link href="/coaches">
                                 My Coaches
                             </Link>
                         </BreadcrumbLink>
@@ -33,7 +33,7 @@ export const CoachIdViewHeader = ({
                     </BreadcrumbSeparator>
                     <BreadcrumbItem>
                         <BreadcrumbLink asChild className="font-medium text-xl text-foreground">
-                            <Link href={`/dashboard/coaches/${coachId}`}>
+                            <Link href={`/coaches/${coachId}`}>
                                 {coachName}
                             </Link>
                         </BreadcrumbLink>

@@ -1,21 +1,41 @@
 "use client";
 import { ErrorState } from "@/components/error-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { usePracticeSession } from "@/hooks/use-api";
 import { CallUI } from "../components/call-ui";
 
 interface Props {
   sessionId: string;
+  /** Learner settings, resolved on the server so the socket is configured
+   * correctly on the first frame rather than after a client fetch. */
+  settings: {
+    accent: string;
+    l1: string;
+    retainAudio: boolean;
+    listeningRate: number;
+  };
 }
 
-export const CallView = ({ sessionId }: Props) => {
+export const CallView = ({ sessionId, settings }: Props) => {
   const { data, isLoading, error } = usePracticeSession(sessionId);
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-white">Loading practice session...</p>
+      <div className="flex min-h-screen flex-col bg-neutral-50">
+        <div className="flex h-14 shrink-0 items-center justify-end border-b border-neutral-200 bg-white px-4 sm:px-6">
+          <Skeleton className="h-8 w-20 rounded-full" />
+        </div>
+        <div className="flex flex-1 items-center justify-center px-6 py-12">
+          <div className="flex w-full max-w-md flex-col items-center gap-8">
+            <Skeleton className="h-24 w-24 rounded-full" />
+            <div className="space-y-3 w-full flex flex-col items-center">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-9 w-64" />
+              <Skeleton className="h-4 w-80" />
+            </div>
+            <Skeleton className="h-36 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+          </div>
         </div>
       </div>
     );
@@ -54,7 +74,12 @@ export const CallView = ({ sessionId }: Props) => {
         source={data.source ?? "coach"}
         difficulty={data.difficulty ?? "medium"}
         topic={data.coach?.topic ?? ""}
-        accent={data.coach?.accent ?? "en-US"}
+        // A coach that specifies an accent wins; otherwise the learner's own
+        // target accent is used, instead of silently defaulting to en-US.
+        accent={data.coach?.accent || settings.accent}
+        l1={settings.l1}
+        retainAudio={settings.retainAudio}
+        listeningRate={settings.listeningRate}
       />
     </div>
   )

@@ -62,7 +62,7 @@ export function LandingNav() {
             <div className="h-9 w-[132px] animate-pulse rounded-full bg-tf-border" />
           ) : user ? (
             <Link
-              href="/dashboard"
+              href="/home"
               className="rounded-full bg-tf-green px-4 py-2 text-[13.5px] font-semibold text-white transition-colors hover:bg-tf-green-strong sm:px-5"
             >
               Dashboard

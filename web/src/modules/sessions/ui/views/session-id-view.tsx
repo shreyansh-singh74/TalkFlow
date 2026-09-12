@@ -1,6 +1,6 @@
 "use client";
 
-import { LoadingState } from "@/components/loading-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { usePracticeSession, useDeletePracticeSession } from "@/hooks/use-api";
 import { SessionIdViewHeader } from "../components/session-id-view-header";
 import { useRouter } from "next/navigation";
@@ -10,9 +10,9 @@ import { useState } from "react";
 import { UpcomingState } from "../components/upcoming-state";
 import { ActiveState } from "../components/active-state";
 import { CancelledState } from "../components/cancelled-state";
-import { ProcessingState } from "../components/processing-state";
 import { toast } from "sonner";
 import type { SessionPhonemeDataPersisted, SessionAnalysisReport } from "@/types/pronunciation";
+import Link from "next/link";
 import { Bot, CheckCircle2, Sparkles, AlertCircle, Volume2 } from "lucide-react";
 
 interface Props {
@@ -31,7 +31,7 @@ export const SessionIdView = ({ sessionId }: Props) => {
   );
 
   if (isLoading) {
-    return <LoadingState title="Loading Practice Session" description="Fetching transcript and speech analytics..." />;
+    return <SessionsViewLoading />;
   }
 
   if (error || !data) {
@@ -51,7 +51,7 @@ export const SessionIdView = ({ sessionId }: Props) => {
     removeSession.mutate(sessionId, {
       onSuccess: () => {
         toast.success("Session deleted successfully");
-        router.push("/dashboard/sessions");
+        router.push("/sessions");
       },
       onError: (err) => {
         toast.error(err.message || "Failed to delete session");
@@ -63,11 +63,28 @@ export const SessionIdView = ({ sessionId }: Props) => {
   const isUpcoming = data.status === "upcoming";
   const isCancelled = data.status === "cancelled";
   const isCompleted = data.status === "completed";
-  const isProcessing = data.status === "processing";
 
   const phonemeData = data.phonemeData as SessionPhonemeDataPersisted | null;
   const entries = phonemeData?.entries || [];
   const report: SessionAnalysisReport | undefined = phonemeData?.report;
+
+  // Stress, rhythm and pitch, only where something was measured.
+  const prosodyNotes: string[] = [];
+  if (report) {
+    for (const syllable of report.stress_mistakes ?? []) {
+      prosodyNotes.push(
+        `Lost the stress on “${syllable}” — the stressed syllable should be the loudest and longest.`
+      );
+    }
+    for (const syllable of report.syllable_mistakes ?? []) {
+      prosodyNotes.push(
+        `Added stress to “${syllable}” — this syllable should be unstressed.`
+      );
+    }
+    for (const issue of report.intonation_issues ?? []) {
+      prosodyNotes.push(issue);
+    }
+  }
 
   const reportStats: Array<{ label: string; value: string }> = [];
   if (report) {
@@ -102,7 +119,6 @@ export const SessionIdView = ({ sessionId }: Props) => {
           onRemove={handleRemoveSession}
         />
         {isCancelled && <CancelledState />}
-        {isProcessing && <ProcessingState />}
         {isActive && <ActiveState sessionId={sessionId} />}
         {isUpcoming && (
           <UpcomingState
@@ -154,6 +170,16 @@ export const SessionIdView = ({ sessionId }: Props) => {
                   </div>
                 )}
 
+                {/* Steps left behind without passing. Stated separately so the
+                    "Steps Completed" tile can't be read as "all of them". */}
+                {(report.steps_skipped ?? 0) > 0 && (
+                  <p className="pb-4 text-xs font-semibold text-amber-700">
+                    {report.steps_skipped} step
+                    {report.steps_skipped === 1 ? " was" : "s were"} skipped — not
+                    counted as completed.
+                  </p>
+                )}
+
                 {/* Sounds that actually gave trouble, from per-phone data */}
                 {(report.phone_breakdown ?? []).length > 0 && (
                   <div className="pb-6">
@@ -177,6 +203,28 @@ export const SessionIdView = ({ sessionId }: Props) => {
                   </div>
                 )}
 
+                {/* Suprasegmentals. Each line comes from a measured contour,
+                    pause or prominence pattern; a session where those scorers
+                    produced nothing shows no panel at all. */}
+                {prosodyNotes.length > 0 && (
+                  <div className="pb-6">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-400">
+                      Rhythm &amp; melody
+                    </p>
+                    <ul className="space-y-1">
+                      {prosodyNotes.map((note) => (
+                        <li
+                          key={note}
+                          className="flex items-start gap-2 text-sm text-gray-700"
+                        >
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-500" />
+                          {note}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {/* AI Coach Summary text */}
                 {report.coach_feedback && (
                   <div className="bg-white p-5 rounded-xl border border-emerald-100 text-gray-700 text-sm leading-relaxed italic relative">
@@ -189,15 +237,33 @@ export const SessionIdView = ({ sessionId }: Props) => {
                 )}
               </div>
             ) : entries.length === 0 ? (
-              /* Processing / Queue state card */
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-8 text-center space-y-3">
-                <div className="inline-flex items-center justify-center p-3 bg-amber-100 rounded-full text-amber-700 mb-2">
-                  <Sparkles className="w-6 h-6 animate-spin" />
+              /* Nothing was measured.
+
+                 This used to be a spinning "Analysis & Transcript Getting
+                 Ready -- refresh in a few seconds" card, which was a lie twice
+                 over: nothing was being processed, and refreshing never
+                 resolved it. A session that ended without a scored turn really
+                 does have nothing to report, and saying so is the correct
+                 answer. */
+              <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-8 text-center space-y-3">
+                <div className="inline-flex items-center justify-center p-3 bg-white rounded-full text-gray-500 mb-2 border border-gray-200">
+                  <Sparkles className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-amber-900">Analysis & Transcript Getting Ready</h3>
-                <p className="text-sm text-amber-700 max-w-md mx-auto">
-                  Your voice session audio is currently being processed by the AI evaluation pipeline. Refresh in a few seconds to see your report!
+                <h3 className="text-lg font-bold text-gray-900">
+                  No turns were scored in this session
+                </h3>
+                <p className="text-sm text-gray-600 max-w-md mx-auto">
+                  The session ended before you spoke a full step, so there is
+                  nothing to measure yet. Nothing is shown rather than a
+                  placeholder score.
                 </p>
+                <Link
+                  href={`/call/${sessionId}`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                >
+                  <Volume2 className="w-4 h-4" />
+                  Practise this session
+                </Link>
               </div>
             ) : null}
 
@@ -254,9 +320,47 @@ export const SessionIdView = ({ sessionId }: Props) => {
 
 export const SessionsViewLoading = () => {
   return (
-    <LoadingState
-      title="Loading Sessions"
-      description="This may take few seconds"
-    />
+    <div className="flex-1 py-4 px-4 md:px-8 flex flex-col gap-y-6 max-w-6xl mx-auto w-full">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-5 w-5" />
+          <Skeleton className="h-5 w-32" />
+        </div>
+        <Skeleton className="h-9 w-9 rounded-md" />
+      </div>
+      <div className="rounded-2xl border p-6 md:p-8 space-y-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b">
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-32 rounded-full" />
+            <Skeleton className="h-8 w-72" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-20 w-36 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
+          <Skeleton className="h-4 w-4/6" />
+        </div>
+      </div>
+      <div className="rounded-2xl border p-6 md:p-8 space-y-4">
+        <Skeleton className="h-6 w-64" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="space-y-2 border-b last:border-0 pb-4">
+            <Skeleton className="h-4 w-28" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Skeleton className="h-16 rounded-lg" />
+              <Skeleton className="h-16 rounded-lg" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };

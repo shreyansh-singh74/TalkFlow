@@ -4,7 +4,11 @@ import Link from "next/link";
 import { CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export const CallEnded = () => {
+interface CallEndedProps {
+  sessionId: string;
+}
+
+export const CallEnded = ({ sessionId }: CallEndedProps) => {
   return (
     <div
       className="flex h-full min-h-screen flex-col"
@@ -20,7 +24,7 @@ export const CallEnded = () => {
           className="gap-2 rounded-full px-3 text-sm"
           style={{ color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)" }}
         >
-          <Link href="/dashboard/sessions">
+          <Link href="/sessions">
             <X className="h-4 w-4" />
             Close
           </Link>
@@ -50,7 +54,8 @@ export const CallEnded = () => {
               Session complete
             </h1>
             <p className="text-sm text-neutral-400">
-              Your phoneme data has been saved. A session summary will appear in your practice history shortly.
+              Everything you practised is saved, including the analysis for any
+              step you spoke. Open the session to read it back.
             </p>
           </div>
 
@@ -59,14 +64,14 @@ export const CallEnded = () => {
 
           {/* CTA */}
           <Link
-            href="/dashboard/sessions"
+            href={`/sessions/${sessionId}`}
             className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold transition-all duration-200 active:scale-95 text-white"
             style={{
               background: "linear-gradient(135deg, #10b981, #14b8a6)",
               boxShadow: "0 4px 20px rgba(16,185,129,0.25)",
             }}
           >
-            Close
+            View session report
           </Link>
         </div>
       </div>

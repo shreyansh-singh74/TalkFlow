@@ -1,8 +1,10 @@
 "use client";
 
 import { useDashboard } from "@/hooks/use-dashboard";
+import { useCreateDrill } from "@/hooks/use-analytics";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import {
   PlusIcon,
   PlayIcon,
@@ -90,7 +92,9 @@ export const DashboardView = () => {
           </p>
         </div>
         <Button
-          onClick={() => router.push("/dashboard/sessions")}
+          // `?create=1` opens the create dialog on arrival. Without it this
+          // button just landed on the sessions list.
+          onClick={() => router.push("/sessions?create=1")}
           className="gap-2 "
         >
           <PlusIcon className="h-4 w-4" />
@@ -119,8 +123,12 @@ export const DashboardView = () => {
             <PersonalBestCard data={data} />
           )}
 
-          {/* Focus Areas */}
-          {data.focusAreas.length > 0 && <FocusAreasCard data={data} />}
+          {/* Focus Areas. With nothing measured yet, the card falls back to the
+              sounds the learner's first language predicts -- labelled as a
+              prediction, never mixed in with the measured list. */}
+          {(data.focusAreas.length > 0 || data.suggestedSounds.length > 0) && (
+            <FocusAreasCard data={data} />
+          )}
 
           {/* Practice with an Coach */}
           <CoachesCard data={data} />
@@ -148,7 +156,7 @@ function ContinuePracticeCard({
           Start your first practice session
         </h3>
         <Button asChild size="sm" className="gap-2">
-          <Link href="/dashboard/sessions">
+          <Link href="/sessions?create=1">
             <ArrowRightIcon className="h-4 w-4" />
             Start something new
           </Link>
@@ -201,7 +209,7 @@ function ContinuePracticeCard({
           size="sm"
           className="gap-2 border-white/20 bg-transparent! text-white! hover:bg-white/10! hover:text-white!"
         >
-          <Link href="/dashboard/sessions">
+          <Link href="/sessions?create=1">
             <ArrowRightIcon className="h-3.5 w-3.5" />
             Start something new
           </Link>
@@ -298,7 +306,7 @@ function RecentSessionsCard({
           return (
             <Link
               key={session.id}
-              href={`/dashboard/sessions/${session.id}`}
+              href={`/sessions/${session.id}`}
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 -mx-1 transition-colors hover:bg-muted/60"
             >
               {/* Avatar */}
@@ -378,6 +386,26 @@ function FocusAreasCard({
 }: {
   data: NonNullable<ReturnType<typeof useDashboard>["data"]>;
 }) {
+  const router = useRouter();
+  const createDrill = useCreateDrill();
+  const measured = data.focusAreas.length > 0;
+  const sounds = measured ? data.focusAreas : data.suggestedSounds;
+  const weakest = sounds[0] ?? null;
+
+  // The report has always ended with "drill /ð/", and this button used to go to
+  // the sessions list. It now builds a session for that exact sound.
+  const startDrill = () => {
+    if (!weakest) return;
+    createDrill.mutate(
+      { phone: weakest },
+      {
+        onSuccess: (result) => router.push(`/call/${result.id}`),
+        onError: (err) =>
+          toast.error(err.message || "Could not create the drill"),
+      }
+    );
+  };
+
   return (
     <div className="rounded-2xl border bg-card p-5">
       <h3 className="text-base font-semibold text-foreground mb-4">
@@ -386,7 +414,7 @@ function FocusAreasCard({
 
       {/* Phoneme circles */}
       <div className="flex items-center gap-2 mb-3">
-        {data.focusAreas.map((phoneme, i) => (
+        {sounds.map((phoneme, i) => (
           <div
             key={phoneme}
             className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold text-white"
@@ -401,20 +429,34 @@ function FocusAreasCard({
       </div>
 
       <p className="text-xs text-muted-foreground mb-4">
-        Weakest: {data.focusAreas.join(" and ")} sounds.
+        {measured
+          ? `Weakest: ${sounds.map((p) => `/${p}/`).join(" and ")} — from sounds you actually missed.`
+          : `Predicted from your first language: ${sounds
+              .map((p) => `/${p}/`)
+              .join(" and ")}. Nothing has been measured yet — this drill gives the scorer something to work with.`}
       </p>
 
-      <Button
-        asChild
-        variant="outline"
-        size="sm"
-        className="w-full gap-2"
-      >
-        <Link href="/dashboard/sessions">
+      {weakest ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-2"
+          disabled={createDrill.isPending}
+          onClick={startDrill}
+        >
           <ArrowRightIcon className="h-3.5 w-3.5" />
-          Drill these sounds
-        </Link>
-      </Button>
+          {createDrill.isPending
+            ? "Building your drill…"
+            : `Drill /${weakest}/`}
+        </Button>
+      ) : (
+        <Button asChild variant="outline" size="sm" className="w-full gap-2">
+          <Link href="/progress">
+            <ArrowRightIcon className="h-3.5 w-3.5" />
+            See all your sounds
+          </Link>
+        </Button>
+      )}
     </div>
   );
 }
@@ -466,14 +508,16 @@ function CoachesCard({
                 </p>
               </div>
 
-              {/* Start button */}
+              {/* Start button -- starts *this* coach, not the sessions list. */}
               <Button
                 asChild
                 variant="outline"
                 size="sm"
                 className="shrink-0"
               >
-                <Link href={`/dashboard/sessions`}>Start</Link>
+                <Link href={`/sessions?create=1&coachId=${coach.id}`}>
+                  Start
+                </Link>
               </Button>
             </div>
           );
