@@ -1,7 +1,7 @@
 # app/api/routes/voice_websocket.py
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.services.audio_store import save_turn_audio
-from app.services.llm_response import stream_llm_response, generate_coach_summary
+from app.services.llm_response import stream_llm_response, generate_coach_summary, generate_coach_line
 from app.services.pronunciation import get_scorer
 from app.services.pronunciation_coach import build_pronunciation_coach_for_llm
 from app.services.tts_service import tts_service
@@ -20,6 +20,7 @@ from app.schemas.websocket_messages import (
     SessionCompleteMessage,
 )
 from app.core.config import settings
+from app.core.ws_auth import WSClaims, WSTokenError, verify_token
 from app.services.practice_content import (
     DEFAULT_DIFFICULTY,
     fallback_steps,
@@ -28,6 +29,7 @@ from app.services.practice_content import (
 )
 from app.utils.text import tokenize_words
 import json
+import re
 import uuid
 import asyncio
 import base64
@@ -51,18 +53,42 @@ SESSION_TIMEOUT_SECONDS = settings.SESSION_TIMEOUT_MINUTES * 60
 #: client connects and starts a turn before configuring anything.
 EMPTY_SESSION_TEXT = "I want to speak English more naturally"
 
-#: Coach copy kept out of the handler bodies so it is editable in one place.
-COACH_LINES = {
-    "pass": "Excellent pronunciation! Click Next to move to the next step.",
-    "retry": "Almost there. Let's try repeating this one: repeat after me: {target}. ",
-    "advance": "Excellent pronunciation! Moving to the next step.",
-    "retry_short": "Try repeating this step.",
-    "complete": "Perfect! You have completed all {total} steps. Generating session analysis...",
+#: Last-resort fallbacks when the LLM is unreachable (outage, no API key).
+#: These are never the product voice under normal operation — every engine
+#: event is rendered contextually via ``generate_coach_line`` instead.
+FALLBACK_LINES = {
+    "pass": "Nicely done — that's a pass. Carry on when you're ready.",
+    "advance": "Well said! Moving to the next step.",
+    "stuck": "Good try — have another go at this step.",
+    "complete": "You finished all the steps. Generating your analysis...",
+    "already_done": "This session has already been summarised.",
 }
 
 #: A phone needs at least this many observations across the session before it is
 #: reported as a difficulty. Below that, one unlucky frame reads as a weakness.
 MIN_PHONE_OBSERVATIONS = 3
+
+
+class TurnScoringTimeout(Exception):
+    """The scorer exceeded ``SCORE_TIMEOUT_SECONDS`` for one turn.
+
+    Distinct from a scoring *failure*: nothing was measured, so no score may be
+    emitted. Before this existed, a hung forward pass hung the socket forever
+    and the client sat on "Evaluating pronunciation..." indefinitely.
+    """
+
+
+def _split_into_sentences(text: str) -> List[str]:
+    """Split a coach reply into whole-sentence TTS units.
+
+    The LLM streams word-chunks for display speed, but those fragments must
+    never be synthesised individually: Google TTS gives each isolated call
+    final-utterance intonation, heard as random pauses mid-phrase. Splitting
+    only on [. ! ?] keeps intra-sentence prosody (commas, colons) intact, so
+    pauses land where the punctuation puts them.
+    """
+    parts = re.split(r"(?<=[.!?])\s+", (text or "").strip())
+    return [p.strip() for p in parts if p.strip()]
 
 
 def extract_practice_target(ai_text: str) -> Optional[str]:
@@ -133,14 +159,24 @@ Essentially, this module brings together session lifecycle management, speech-to
 """
 
 class VoiceSession:
-    def __init__(self, websocket: WebSocket, session_id: Optional[str] = None):
+    def __init__(
+        self,
+        websocket: WebSocket,
+        session_id: Optional[str] = None,
+        claims: Optional[WSClaims] = None,
+    ):
         self.websocket = websocket
+        # Set only when WS_AUTH_REQUIRED verified a token at connect time. It
+        # carries the user the token was minted for, which is what makes the
+        # practice_session_id below trustworthy rather than client-chosen.
+        self.claims = claims
         # Two distinct ids, deliberately named apart: `connection_id` keys the
         # in-memory `sessions` registry for the lifetime of this socket, while
         # `practice_session_id` is the Postgres practice_sessions row the client
         # is running. They are not interchangeable.
         self.connection_id = str(uuid.uuid4())
-        self.practice_session_id = session_id  # used for audio persistence paths
+        # used for audio persistence paths
+        self.practice_session_id = claims.session_id if claims else session_id
         self.coach_name = "TalkFlow Coach"
         self.coach_instructions = ""
         self.conversation_history = []
@@ -165,13 +201,37 @@ class VoiceSession:
         self.topic = ""
         self.difficulty = DEFAULT_DIFFICULTY
         self.accent = settings.TARGET_ACCENT
+        #: Coaching context only -- never scoring. See app/services/l1_profiles.py.
+        self.l1: Optional[str] = None
+        #: Consent for raw turn audio, defaulting to the server-wide setting.
+        self.retain_audio = False
         self.source = "coach"
         self.score_threshold = pass_threshold_for(DEFAULT_DIFFICULTY)
         self.all_attempts = []
+        #: Best score per step index. This is what makes the tier threshold
+        #: load-bearing: a step is only left behind if one of its attempts met
+        #: it, or the learner explicitly skipped.
+        self.step_best_score: Dict[int, float] = {}
+        self.skipped_steps: set[int] = set()
+        #: True once a report has been emitted, so a late FINALIZE_SESSION does
+        #: not build and send a second one.
+        self.report_generated = False
+        #: START_TURN timestamps inside the sliding rate-limit window.
+        self.turn_start_times: List[float] = []
+        #: Set when a turn was refused; its audio and END_TURN are then dropped.
+        self.turn_rejected = False
 
         # Session metadata
         self.last_activity = time.time()  # Unix timestamp for easy comparison
         self.total_turns = 0
+
+    async def _send_error(self, message: str, *, recoverable: bool = True):
+        """One place to emit an ERROR frame, so shape can never drift."""
+        await self.send_json(
+            ErrorMessage(
+                type="ERROR", message=message, recoverable=recoverable
+            ).model_dump()
+        )
 
     def update_activity(self):
         """Update last activity timestamp"""
@@ -204,7 +264,9 @@ class VoiceSession:
             return self.step_notes[index]
         return None
 
-    async def _send_practice_target(self):
+    async def _send_practice_target(
+        self, *, advanced_from_pass: bool = False, gate_message: Optional[str] = None
+    ):
         before, after = self._context_for(self.current_sentence_index)
         await self.send_json(
             PracticeTargetMessage(
@@ -215,10 +277,34 @@ class VoiceSession:
                 progress=self._practice_progress(),
                 step_index=self.current_sentence_index,
                 pass_threshold=self.score_threshold,
+                advanced_from_pass=advanced_from_pass,
+                gate_message=gate_message,
                 context_before=before,
                 context_after=after,
                 note=self._note_for(self.current_sentence_index),
             ).model_dump()
+        )
+
+    def _coach_context(self, *, extra: str = "") -> str:
+        """Live facts every contextual coach line is rendered against."""
+        total = len(self.session_sentences) or 1
+        bits = [
+            f"Coach: {self.coach_name or 'TalkFlow Coach'}",
+            f"Step {self.current_sentence_index + 1} of {total}",
+            f"Current sentence: {self.current_sentence!r}",
+            f"Pass threshold: {round(self.score_threshold)}%",
+        ]
+        if extra:
+            bits.append(extra)
+        return "\n".join(bits)
+
+    async def _coach_line(self, situation: str, *, extra: str = "", fallback: str) -> str:
+        return await generate_coach_line(
+            situation=situation,
+            context=self._coach_context(extra=extra),
+            coach_name=self.coach_name,
+            coach_instructions=self.coach_instructions,
+            fallback=fallback,
         )
 
     def _set_sentence(self, sentence: str):
@@ -236,43 +322,78 @@ class VoiceSession:
         self.current_sentence_index = max(0, min(index, len(self.session_sentences) - 1))
         self._set_sentence(self.session_sentences[self.current_sentence_index])
 
-    def _advance_practice(self, score: float) -> Dict[str, object]:
+    async def _advance_practice(self, score: float, *, heard_text: str = "") -> Dict[str, object]:
         if score < self.score_threshold:
+            msg = await self._coach_line(
+                "stuck",
+                extra=f"Last attempt scored {round(score, 1)}% (needs {round(self.score_threshold)}%). They said: {heard_text!r}",
+                fallback=FALLBACK_LINES["stuck"],
+            )
             return {
                 "advanced": False,
                 "completed_sentence": False,
                 "session_complete": False,
-                "message": COACH_LINES["retry_short"],
+                "message": msg,
             }
 
         self.completed_sentences.append(self.current_sentence)
         next_index = self.current_sentence_index + 1
         if next_index < len(self.session_sentences):
             self._go_to_step(next_index)
+            msg = await self._coach_line(
+                "advance",
+                extra=f"They passed with {round(score, 1)}%. They said: {heard_text!r}",
+                fallback=FALLBACK_LINES["advance"],
+            )
             return {
                 "advanced": True,
                 "completed_sentence": True,
                 "session_complete": False,
-                "message": COACH_LINES["advance"],
+                "message": msg,
             }
         else:
+            msg = await self._coach_line(
+                "complete",
+                extra=f"They passed the final step with {round(score, 1)}%. Total steps: {len(self.session_sentences) or 1}.",
+                fallback=FALLBACK_LINES["complete"],
+            )
             return {
                 "advanced": True,
                 "completed_sentence": True,
                 "session_complete": True,
-                "message": COACH_LINES["complete"].format(
-                    total=len(self.session_sentences) or 1
-                ),
+                "message": msg,
             }
 
     async def handle_session_config(self, msg: SessionConfigMessage):
         self.update_activity()
+
+        # The token named one practice session; a client may not reconfigure
+        # itself onto another. Without this check an authenticated socket could
+        # still drive (and persist audio under) someone else's session id.
+        if self.claims and msg.session_id and msg.session_id != self.claims.session_id:
+            logger.warning(
+                "Session %s tried to configure %r but is authorised for %r",
+                self.connection_id,
+                msg.session_id,
+                self.claims.session_id,
+            )
+            await self._send_error(
+                "This connection is not authorised for that practice session.",
+                recoverable=False,
+            )
+            return
+
         self.practice_session_id = msg.session_id or self.practice_session_id
         self.coach_name = (msg.coach_name or self.coach_name).strip() or self.coach_name
         self.coach_instructions = (msg.coach_instructions or "").strip()
         self.topic = (msg.topic or "").strip()
         self.difficulty = msg.difficulty
         self.accent = (msg.accent or self.accent).strip() or self.accent
+        self.l1 = (msg.l1 or "").strip() or None
+        # Consent is required, not merely permitted: the server has to allow
+        # persistence at all AND the learner has to have opted in. Either one
+        # off means nothing is written.
+        self.retain_audio = bool(msg.retain_audio and settings.PERSIST_TURN_AUDIO)
         self.source = msg.source
 
         # The client owns the script: it was generated, band-validated and
@@ -295,6 +416,9 @@ class VoiceSession:
         self.score_threshold = msg.pass_threshold or pass_threshold_for(self.difficulty)
         self.completed_sentences = []
         self.all_attempts = []
+        self.step_best_score = {}
+        self.skipped_steps = set()
+        self.report_generated = False
         self.current_sentence_index = 0
         self._set_sentence(self.session_sentences[0])
 
@@ -314,26 +438,69 @@ class VoiceSession:
         full_pcm: bytes,
         expected_for_turn: str,
         heard_text: str,
-    ) -> Optional[Dict]:
+    ) -> Tuple[Optional[Dict], Optional[Dict]]:
+        """Score the turn, emit the result, and report what it did to the cursor.
+
+        Returns ``(coach_payload, practice_update)``. Raises
+        ``TurnScoringTimeout`` when the scorer exceeded its budget -- in that
+        case nothing was measured, so nothing is emitted.
+        """
         cap = settings.TURN_AUDIO_MAX_BYTES
         pcm = full_pcm[:cap] if cap > 0 else full_pcm
 
-        # Persist raw audio for eval datasets + later replay (consent-gated).
-        audio_path = save_turn_audio(self.practice_session_id or "", self.current_turn_id or "", pcm)
+        # Persist raw audio for eval datasets + later replay, only when BOTH the
+        # server allows it and this learner opted in (see handle_session_config).
+        audio_path = (
+            save_turn_audio(self.practice_session_id or "", self.current_turn_id or "", pcm)
+            if self.retain_audio
+            else None
+        )
 
         # If heard_text was not provided, transcribe via the ASR model
         if not (heard_text or "").strip() and pcm:
             try:
-                heard_text = await asyncio.to_thread(pcm16le_to_text, pcm)
+                heard_text = await asyncio.wait_for(
+                    asyncio.to_thread(pcm16le_to_text, pcm),
+                    timeout=settings.ASR_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Fallback ASR timed out after %.0fs", settings.ASR_TIMEOUT_SECONDS)
             except Exception:
                 logger.exception("ASR failed")
 
         # The scorer is chosen by config: acoustic (scores `pcm` directly) or
         # the legacy text proxy. Both return the same result shape.
         scorer = get_scorer()
-        result = await asyncio.to_thread(
-            scorer.score, expected_for_turn, heard_text, pcm
-        )
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(
+                    scorer.score,
+                    expected_for_turn,
+                    heard_text,
+                    pcm,
+                    # The session's accent, so the result reports which reference
+                    # it was evaluated against instead of assuming en-US.
+                    self.accent,
+                ),
+                timeout=settings.SCORE_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError as exc:
+            raise TurnScoringTimeout(
+                f"scorer exceeded {settings.SCORE_TIMEOUT_SECONDS:.0f}s"
+            ) from exc
+
+        # Apply the tier threshold now, so the score this turn earned decides
+        # whether the cursor moves. This is the call the unit tests have always
+        # covered and production never made.
+        practice_update = None
+        if not self.session_sentences:
+            practice_update = None
+        else:
+            step = self.current_sentence_index
+            self.step_best_score[step] = max(
+                self.step_best_score.get(step, -1.0), float(result.score)
+            )
+            practice_update = await self._advance_practice(float(result.score), heard_text=heard_text)
 
         coach = build_pronunciation_coach_for_llm(
             expected_for_turn,
@@ -360,17 +527,21 @@ class VoiceSession:
                 method=result.method,
                 per_phoneme=result.per_phoneme,
                 accent=result.accent,
+                accent_label=result.accent_label,
                 audio_path=audio_path,
                 stress=stress,
                 timing=timing,
                 intonation=intonation,
                 diagnosis=result.diagnosis,
+                practice_update=practice_update,
             ).model_dump()
         )
 
         duration = len(full_pcm) / 32000.0 if full_pcm else 0.0
         self.all_attempts.append({
             "sentence": expected_for_turn,
+            "step_index": self.current_sentence_index,
+            "step_passed": bool(result.score >= self.score_threshold),
             "heard": heard_text,
             "score": float(result.score),
             "errors": result.errors,
@@ -388,11 +559,35 @@ class VoiceSession:
             "timestamp": time.time()
         })
 
-        return coach
+        return coach, practice_update
 
     async def handle_start_turn(self, msg: ControlMessage):
         """Handle START_TURN: Initialize voice turn state"""
         self.update_activity()
+
+        # Sliding-window rate limit. MAX_TURNS_PER_MINUTE was declared in config
+        # and read by nothing, so a single client could queue turns as fast as
+        # it could send them and serialise the CPU-bound scorer behind them.
+        now = time.time()
+        self.turn_start_times = [t for t in self.turn_start_times if now - t < 60.0]
+        if len(self.turn_start_times) >= settings.MAX_TURNS_PER_MINUTE:
+            self.turn_rejected = True
+            logger.warning(
+                "Rate limit reached for connection %s (%d turns/min)",
+                self.connection_id,
+                len(self.turn_start_times),
+            )
+            await self._send_error(
+                await self._coach_line(
+                    "rate_limit",
+                    extra=f"They tried to start {len(self.turn_start_times) + 1} turns within a minute (limit {settings.MAX_TURNS_PER_MINUTE}).",
+                    fallback="You're rushing a little — take a breath and try again in a few seconds.",
+                )
+            )
+            return
+        self.turn_start_times.append(now)
+        self.turn_rejected = False
+
         logger.debug("START_TURN %s", msg.turn_id)
         self.current_turn_id = msg.turn_id
         self.partial_transcript = ""
@@ -408,6 +603,9 @@ class VoiceSession:
         
     async def handle_audio_chunk(self, audio_data: bytes):
         """Handle incoming audio chunk"""
+        if self.turn_rejected:
+            # The turn was refused (rate limit); its audio belongs to no turn.
+            return
         cap = settings.TURN_AUDIO_MAX_BYTES
         if cap > 0:
             room = cap - len(self.turn_audio)
@@ -419,17 +617,37 @@ class VoiceSession:
         self.update_activity()
         logger.debug("END_TURN %s", msg.turn_id)
 
+        if self.turn_rejected:
+            # The matching START_TURN was refused; there is no turn to close.
+            self.turn_rejected = False
+            self.turn_audio.clear()
+            return
+
         full_pcm = bytes(self.turn_audio)
         self.turn_audio.clear()
 
         expected_for_turn = (self.active_expected_target or self.target_text or EMPTY_SESSION_TEXT).strip()
         self.active_expected_target = None
 
-        # Perform primary ASR
+        # Perform primary ASR. Bounded: an unbounded to_thread here blocks this
+        # connection's loop for as long as the model takes.
         heard_text = ""
         if full_pcm:
             try:
-                heard_text = await asyncio.to_thread(pcm16le_to_text, full_pcm)
+                heard_text = await asyncio.wait_for(
+                    asyncio.to_thread(pcm16le_to_text, full_pcm),
+                    timeout=settings.ASR_TIMEOUT_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "ASR exceeded %.0fs for turn %s",
+                    settings.ASR_TIMEOUT_SECONDS,
+                    msg.turn_id,
+                )
+                await self._send_error(
+                    "Transcription took too long on this turn. Please try again."
+                )
+                return
             except Exception:
                 logger.exception("ASR failed during turn processing")
 
@@ -455,12 +673,22 @@ class VoiceSession:
         )
 
         pronunciation_coach: Optional[Dict] = None
+        practice_update: Optional[Dict] = None
         try:
-            pronunciation_coach = await self._emit_pronunciation_result(
+            pronunciation_coach, practice_update = await self._emit_pronunciation_result(
                 full_pcm=full_pcm,
                 expected_for_turn=expected_for_turn,
                 heard_text=self.final_transcript,
             )
+        except TurnScoringTimeout:
+            # No measurement happened, so no score is emitted and the step does
+            # not move. The learner retries rather than being shown a number the
+            # scorer never produced.
+            logger.warning("Scoring timed out for turn %s", msg.turn_id)
+            await self._send_error(
+                "Scoring took too long on this turn, so it was not scored. Please try again."
+            )
+            return
         except Exception:
             logger.exception("Pronunciation pipeline failed")
 
@@ -468,20 +696,28 @@ class VoiceSession:
         is_correct = score >= self.score_threshold
 
         if is_correct:
-            lead_text = COACH_LINES["pass"]
+            # Contextual celebration rendered from the live turn — never a
+            # fixed line, so passing different steps sounds different.
+            lead_text = await self._coach_line(
+                "pass",
+                extra=f"They just passed with {round(score, 1)}% (needed {round(self.score_threshold)}%). They said: {self.final_transcript!r}",
+                fallback=FALLBACK_LINES["pass"],
+            )
         else:
-            lead_text = COACH_LINES["retry"].format(target=self.target_text)
+            # No fixed opener: the LLM below generates the whole retry reply
+            # with a varied, friendly opener (see BASE_SYSTEM_PROMPT).
+            lead_text = ""
 
         full_response_text = lead_text
-        text_batches_for_tts = [lead_text]
 
-        await self.send_json(
-            LLMTextChunkMessage(
-                type="LLM_TEXT_CHUNK",
-                text=lead_text,
-                is_final=False,
-            ).model_dump()
-        )
+        if lead_text.strip():
+            await self.send_json(
+                LLMTextChunkMessage(
+                    type="LLM_TEXT_CHUNK",
+                    text=lead_text,
+                    is_final=False,
+                ).model_dump()
+            )
 
         if not is_correct:
             is_first_turn = len(self.conversation_history) == 0
@@ -492,22 +728,23 @@ class VoiceSession:
                 pronunciation_coach=pronunciation_coach,
                 coach_name=self.coach_name,
                 coach_instructions=self.coach_instructions,
+                l1=self.l1,
                 practice_state={
                     "mode": self.practice_mode,
                     "target_text": self.target_text,
                     "sentence": self.current_sentence,
                     "progress": self._practice_progress(),
                     "score_threshold": self.score_threshold,
-                    "practice_update": {"advanced": False, "message": COACH_LINES["retry_short"]},
+                    "practice_update": practice_update
+                    or {"advanced": False, "message": FALLBACK_LINES["stuck"]},
                 },
             ):
                 if self.should_stop_tts:
                     logger.info("LLM streaming interrupted")
                     break
-                
+
                 full_response_text += text_chunk
-                text_batches_for_tts.append(text_chunk)
-                
+
                 await self.send_json(
                     LLMTextChunkMessage(
                         type="LLM_TEXT_CHUNK",
@@ -540,16 +777,28 @@ class VoiceSession:
         # Keep last 10 turns
         self.conversation_history = self.conversation_history[-10:]
         
-        # Generate and stream TTS with small batches
+        # Speak whole sentences, not streaming word-fragments: each TTS call
+        # gets a complete prosodic unit, so pauses land on the punctuation.
         if not self.should_stop_tts:
-            await self.stream_tts_batched(text_batches_for_tts)
+            await self.stream_tts_batched(_split_into_sentences(full_response_text))
+
+        # Announce where the cursor ended up, *after* the coaching audio, so the
+        # learner hears (and can read) the feedback on the turn they just made
+        # before the next step appears. `advanced_from_pass` tells the client to
+        # keep that feedback on screen instead of clearing it.
+        if practice_update and practice_update.get("advanced"):
+            if practice_update.get("session_complete"):
+                await self._send_report()
+            else:
+                await self._send_practice_target(advanced_from_pass=True)
     
     async def stream_tts_batched(self, text_batches: List[str]):
-        """Generate TTS for small text batches and stream audio chunks"""
+        """Synthesise each whole-sentence batch and stream the audio chunks."""
         self.is_generating_tts = True
         seq = 0
-        
-        for batch_idx, text_batch in enumerate(text_batches):
+
+        batches = [b for b in text_batches if b.strip()]
+        for batch_idx, text_batch in enumerate(batches):
             if self.should_stop_tts:
                 logger.info("TTS interrupted")
                 break
@@ -557,21 +806,21 @@ class VoiceSession:
             # Skip empty batches
             if not text_batch.strip():
                 continue
-            
+
             logger.debug(
                 "Synthesizing TTS batch %s/%s",
                 batch_idx + 1,
-                len(text_batches),
+                len(batches),
             )
-            
-            # Generate TTS for this batch (should be 500-800ms of audio)
+
+            # One sentence per call: Google owns the intra-sentence prosody.
             audio_bytes = await asyncio.to_thread(tts_service.text_to_speech, text_batch)
-            
+
             if not audio_bytes:
                 continue
-            
-            # Send as single chunk (already small ~500-800ms)
-            is_final = (batch_idx == len(text_batches) - 1)
+
+            # Send as single chunk (one sentence, ~1-3s of audio)
+            is_final = (batch_idx == len(batches) - 1)
             
             await self.send_json(
                 TTSChunkMessage(type="TTS_CHUNK", seq=seq, is_final=is_final).model_dump()
@@ -606,19 +855,67 @@ class VoiceSession:
         """Callback for final transcript"""
         self.final_transcript = text
 
-    async def handle_next_sentence(self):
-        """Advance to the next step, or report on the session once it's done."""
+    async def _send_report(self):
+        """Emit the session report, or explain why there isn't one.
+
+        A report is a set of measurements. With no scored turn there is nothing
+        to measure, and an empty report reads to the learner as "you scored 0"
+        rather than "you didn't practise yet", so it is refused instead.
+        """
+        if self.report_generated:
+            await self._send_error(
+                await self._coach_line(
+                    "already_done",
+                    extra="They asked for a session summary that was already generated.",
+                    fallback=FALLBACK_LINES["already_done"],
+                )
+            )
+            return
+        if not self.all_attempts:
+            await self._send_error(
+                await self._coach_line(
+                    "empty_report",
+                    extra="The session is ending with zero scored turns.",
+                    fallback="Nothing was scored yet, so there is no report — practise at least one step first.",
+                )
+            )
+            return
+        report = await self.generate_session_report()
+        self.report_generated = True
+        await self.send_json(
+            SessionCompleteMessage(type="SESSION_COMPLETE", report=report).model_dump()
+        )
+
+    async def handle_next_sentence(self, *, skipped: bool = False):
+        """Leave this step behind without passing it -- the explicit override.
+
+        Passing a step moves the cursor from `_advance_practice`; this is the
+        skip path, and it is the only way forward that ignores the threshold.
+        """
         self.update_activity()
+        if skipped:
+            self.skipped_steps.add(self.current_sentence_index)
         next_index = self.current_sentence_index + 1
         if next_index < len(self.session_sentences):
             self._go_to_step(next_index)
             await self._send_practice_target()
         else:
-            # Session is fully complete! Generate report
-            report = await self.generate_session_report()
-            await self.send_json(
-                SessionCompleteMessage(type="SESSION_COMPLETE", report=report).model_dump()
-            )
+            await self._send_report()
+
+    async def handle_finalize_session(self):
+        """End the session early and still return what was earned.
+
+        The client sends this when the learner leaves. Previously a session that
+        stopped before its last step persisted no report at all, while the
+        end-of-call screen promised a summary "shortly" -- so the promise was
+        the bug. This makes the report exist on every exit path.
+        """
+        self.update_activity()
+        await self._send_report()
+
+    async def handle_skip_sentence(self):
+        """The Skip button: move on and record that this step was skipped."""
+        await self.handle_next_sentence(skipped=True)
 
     async def handle_prev_sentence(self):
         """Go back to the previous step."""
@@ -857,18 +1154,50 @@ class VoiceSession:
             "difficulty": self.difficulty,
             "pass_threshold": self.score_threshold,
             "scoring_method": attempts[-1].get("method") if attempts else None,
+            # Reported so "completed N steps" can never quietly count a step the
+            # learner skipped past.
+            "steps_skipped": len(self.skipped_steps),
+            "skipped_step_indexes": sorted(self.skipped_steps),
         }
 
 
 @router.websocket("/ws/voice")
 async def voice_websocket(websocket: WebSocket):
-    """Main WebSocket endpoint for voice conversation"""
+    """Main WebSocket endpoint for voice conversation.
+
+    Authenticated before the socket is accepted. The browser cannot present
+    Better Auth's cookie to this service, so it connects with the short-lived
+    HMAC token minted by ``POST /api/sessions/[id]/ws-token``. Anonymous sockets
+    are refused: an open voice socket runs two CPU models and spends OpenRouter
+    and Google TTS credit per turn.
+
+    ``WS_AUTH_REQUIRED=0`` disables the check for local development.
+    """
+    claims: Optional[WSClaims] = None
+    if settings.WS_AUTH_REQUIRED:
+        token = websocket.query_params.get("token") or websocket.headers.get(
+            "x-ws-token"
+        )
+        try:
+            claims = verify_token(token)
+        except WSTokenError as exc:
+            logger.warning("Rejected voice connection: %s", exc)
+            # Before accept(), a close becomes a plain HTTP refusal, which is
+            # what the browser's WebSocket API reports as a failed handshake.
+            await websocket.close(code=4401)
+            return
+
     await websocket.accept()
-    
-    session = VoiceSession(websocket)
+
+    session = VoiceSession(websocket, claims=claims)
     sessions[session.connection_id] = session
-    
-    logger.info("WebSocket connected: %s", session.connection_id)
+
+    logger.info(
+        "WebSocket connected: %s (user=%s, practice_session=%s)",
+        session.connection_id,
+        claims.user_id if claims else "anonymous (WS_AUTH_REQUIRED=0)",
+        session.practice_session_id,
+    )
     logger.info("Active sessions: %s", len(sessions))
     
     # Send keep-alive pings every 20s
@@ -903,6 +1232,10 @@ async def voice_websocket(websocket: WebSocket):
                     await session.handle_session_config(SessionConfigMessage(**data))
                 elif msg_type == "NEXT_SENTENCE":
                     await session.handle_next_sentence()
+                elif msg_type == "SKIP_SENTENCE":
+                    await session.handle_skip_sentence()
+                elif msg_type == "FINALIZE_SESSION":
+                    await session.handle_finalize_session()
                 elif msg_type == "PREV_SENTENCE":
                     await session.handle_prev_sentence()
                 elif msg_type == "INTERRUPT":

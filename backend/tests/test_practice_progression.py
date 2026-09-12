@@ -14,8 +14,9 @@ threshold, and does it degrade sanely when a client sends no script at all.
 import asyncio
 import json
 import unittest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+from app.api.routes import voice_websocket as vw
 from app.api.routes.voice_websocket import EMPTY_SESSION_TEXT, VoiceSession
 from app.schemas.websocket_messages import PracticeStepMessage, SessionConfigMessage
 from app.services.practice_content import (
@@ -33,6 +34,19 @@ SCRIPT = [
 
 def run(coro):
     return asyncio.run(coro)
+
+
+async def _fallback_coach_line(*_args, fallback: str = "", **_kwargs) -> str:
+    """Stand in for the contextual coach lines: return the outage fallback."""
+    return fallback
+
+
+# Advancement messages are rendered by the LLM in production. Patch them to
+# the deterministic fallbacks so this suite stays offline, fast, and free.
+_patcher = patch.object(
+    vw, "generate_coach_line", AsyncMock(side_effect=_fallback_coach_line)
+)
+_patcher.start()
 
 
 def make_session(**config) -> VoiceSession:
@@ -97,7 +111,7 @@ class ConfigTests(unittest.TestCase):
 
     def test_reconfiguring_resets_progress(self):
         session = make_session()
-        session._advance_practice(100)
+        run(session._advance_practice(100))
         session.all_attempts.append({"score": 90})
         run(
             session.handle_session_config(
@@ -132,30 +146,30 @@ class ThresholdTests(unittest.TestCase):
     def test_the_same_score_passes_easy_and_fails_medium(self):
         """The tiers have to actually behave differently, or they are cosmetic."""
         easy = make_session(difficulty="easy")
-        self.assertTrue(easy._advance_practice(85)["advanced"])
+        self.assertTrue(run(easy._advance_practice(85))["advanced"])
 
         medium = make_session(difficulty="medium")
-        self.assertFalse(medium._advance_practice(85)["advanced"])
+        self.assertFalse(run(medium._advance_practice(85))["advanced"])
 
     def test_a_score_at_the_threshold_passes(self):
         for name, band in DIFFICULTY_BANDS.items():
             session = make_session(difficulty=name)
             self.assertTrue(
-                session._advance_practice(band.pass_threshold)["advanced"], name
+                run(session._advance_practice(band.pass_threshold))["advanced"], name
             )
 
     def test_a_score_just_below_the_threshold_fails(self):
         for name, band in DIFFICULTY_BANDS.items():
             session = make_session(difficulty=name)
             self.assertFalse(
-                session._advance_practice(band.pass_threshold - 0.01)["advanced"], name
+                run(session._advance_practice(band.pass_threshold - 0.01))["advanced"], name
             )
 
 
 class ProgressionTests(unittest.TestCase):
     def test_a_failing_score_repeats_the_same_step(self):
         session = make_session(difficulty="medium")
-        result = session._advance_practice(50)
+        result = run(session._advance_practice(50))
         self.assertFalse(result["advanced"])
         self.assertFalse(result["completed_sentence"])
         self.assertFalse(result["session_complete"])
@@ -165,7 +179,7 @@ class ProgressionTests(unittest.TestCase):
 
     def test_a_passing_score_advances_and_resyncs_the_derived_fields(self):
         session = make_session(difficulty="medium")
-        result = session._advance_practice(95)
+        result = run(session._advance_practice(95))
         self.assertTrue(result["advanced"])
         self.assertTrue(result["completed_sentence"])
         self.assertFalse(result["session_complete"])
@@ -179,15 +193,17 @@ class ProgressionTests(unittest.TestCase):
     def test_the_last_step_completes_the_session(self):
         session = make_session(difficulty="medium")
         for i in range(len(SCRIPT) - 1):
-            result = session._advance_practice(95)
+            result = run(session._advance_practice(95))
             self.assertTrue(result["advanced"])
             self.assertFalse(result["session_complete"])
             self.assertEqual(session.current_sentence_index, i + 1)
 
-        result = session._advance_practice(95)
+        result = run(session._advance_practice(95))
         self.assertTrue(result["session_complete"])
         self.assertEqual(len(session.completed_sentences), len(SCRIPT))
-        self.assertIn(str(len(SCRIPT)), result["message"])
+        # The completion message is LLM-rendered in production; here the
+        # outage fallback stands in, so only its shape is pinned.
+        self.assertTrue(isinstance(result["message"], str) and result["message"])
 
     def test_next_and_prev_move_the_cursor_and_re_emit_the_target(self):
         session = make_session()
@@ -275,7 +291,7 @@ class DegradationTests(unittest.TestCase):
         ws = MagicMock()
         ws.send_text = AsyncMock()
         session = VoiceSession(ws)
-        result = session._advance_practice(100)
+        result = run(session._advance_practice(100))
         self.assertTrue(result["session_complete"])
 
 

@@ -63,7 +63,7 @@ class PronunciationCoachTests(unittest.TestCase):
         self.assertIn("PRONUNCIATION_ASSESSMENT", user_text)
         j = user_text.split("PRONUNCIATION_ASSESSMENT:\n", 1)[1]
         self.assertEqual(json.loads(j), coach)
-        self.assertEqual(payload["max_tokens"], 256)
+        self.assertEqual(payload["max_tokens"], 120)
 
 
 if __name__ == "__main__":
