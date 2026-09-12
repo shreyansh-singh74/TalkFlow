@@ -4,14 +4,28 @@
 > scores how clearly you speak across **phonemes, stress, timing, and intonation**, and
 > coaches you to be understood — with confidence — anywhere in the world.
 
-**Last updated:** 2026-09-02
-**Status:** Working MVP. **Phase 1 (real audio-based phoneme scoring) is implemented and now
-ON by default** (`ENABLE_ACOUSTIC_SCORING=1`); the text proxy has been demoted to a fallback
-that only runs when the audio or the model is unavailable. ASR is WavLM-Large.
-**Phase 5's practice-content layer has landed** (2026-09-02): the hardcoded sentence banks are
-gone, coaches carry a topic + enforced difficulty, and a user can paste their own speech and
-have it segmented into steps. Next: validate scoring quality against a labeled set, then
-Phase 2 (stress + timing).
+**Last updated:** 2026-09-12
+**Status:** Working product. **Phase 1 (real audio-based phoneme scoring) is implemented and
+ON by default** (`ENABLE_ACOUSTIC_SCORING=1`); the text proxy is a fallback that runs only
+when the audio or the model is unavailable. ASR is WavLM-Large.
+
+**Since 2026-09-02, four substantial changes landed** (see §11 for the full record):
+
+1. **Suprasegmentals are scored.** Timing, intonation and lexical stress run per turn on the
+   same waveform (`app/services/pronunciation/prosody.py`), so dimensions B, C and D are no
+   longer `null`. Stress is explicitly heuristic.
+2. **`/ws/voice` is authenticated** with a short-lived HMAC token minted by the web app; the
+   socket used to accept anonymous connections, and the session id it sent named the folder
+   turn audio was written to.
+3. **The engine enforces its own thresholds.** A passing turn moves the cursor; a failing
+   turn does not; skipping is an explicit, recorded override. Previously the client's Next
+   button advanced unconditionally, which made every tier's pass threshold decorative.
+4. **The second scoring stack is deleted** (~1.5k lines), along with the two HTTP routers
+   that exposed it and could never have run.
+
+Also landed: a progress page with accuracy trend, per-phone evidence and targeted drills
+(§7 Phase 5), one-command local setup, and CI. Next: calibrate against a labelled set and
+publish the correlation number.
 
 ---
 
@@ -116,9 +130,9 @@ FastAPI / OpenRouter / Google TTS · `g2p_en`, `pyphen`, `torch`, `transformers`
 | Dim | Feature | Status | Reality |
 |---|---|---|---|
 | **A** | Phoneme accuracy | 🟢 **Audio-based, live** | Scored from the waveform: phoneme-CTC recognition → Needleman–Wunsch alignment vs the `g2p_en` reference → confidence-weighted GOP, with per-phone S/I/D diagnosis. The text proxy remains only as a fallback. Not yet calibrated against human labels. |
-| **B** | Stress accuracy | 🟠 **Data only, not scored** | ARPAbet stress digits are extracted for the syllable **display** card, then **stripped** before comparison (`_normalize_phoneme`). No stress is ever scored. |
-| **C** | Timing / rhythm | 🔴 **Missing** | No waveform analysis, no durations, no rate, no pause detection. |
-| **D** | Intonation / pitch | 🔴 **Missing** | No F0 extraction, no contour comparison. (TTS can *set* pitch, but nothing *measures* it.) |
+| **B** | Stress accuracy | 🟡 **Live, heuristic** | Per-syllable prominence (energy, length, pitch movement) vs the CMUDict stress pattern, in `prosody.analyse_stress`. Returns `None` rather than a verdict when the syllable count it detects disagrees with the reference. A trained classifier is still future work; the result says `method: "heuristic"`. |
+| **C** | Timing / rhythm | 🟢 **Live** | Frame-energy VAD → speech fraction, speech and articulation rate against the reference syllable count, and pauses between speech runs. Refuses to emit a rate at all when there is no syllable reference, rather than fabricating one. |
+| **D** | Intonation / pitch | 🟡 **Live, no reference recording** | FFT autocorrelation F0 → semitone-normalised contour → slope/label, compared against the *shape the sentence's punctuation requires* (a question rises, a statement falls). Deliberately no curated native reference: that scoring is about intelligibility, not matching one recording. |
 
 ### 4.2 Product surface
 
@@ -144,18 +158,29 @@ FastAPI / OpenRouter / Google TTS · `g2p_en`, `pyphen`, `torch`, `transformers`
 - Backend tests: coach JSON contract, health, reference syllabification, difficulty bands,
   segmenter round-trip token equality, script-generator degradation, session progression (124).
 
+**✅ Also landed since this list was written**
+- Progress analytics: accuracy trend over time, streak, per-phone evidence with trends,
+  mastery, per-topic breakdown (`/dashboard/progress`, `GET /api/analytics`).
+- Targeted drills + a spaced-repetition queue (`sound_goals`): a drill is generated for one
+  phone, and finishing it feeds the schedule.
+- Data export (JSON/CSV).
+- Per-connection turn rate limit, scorer and ASR timeouts, path sanitisation for persisted
+  audio, and a retention sweep that is actually started (it never was).
+- CI (backend suite, web lint/typecheck/unit tests/build), a `docker compose` stack, and a
+  baseline Drizzle migration.
+
 **❌ Missing / weak**
-- Stress, timing, intonation scoring (B/C/D) — §5 is only satisfied for Dimension A.
-- Calibration of the acoustic scorer against human labels (L2-ARCTIC / speechocean762).
-- Progress analytics over time (trends, weak-phoneme tracking, mastery curves).
-- Spaced repetition and minimal-pair drills targeted at the phones a user actually fails.
-  The data to drive them now exists (`difficult_sounds` is aggregated from real `per_phoneme`
-  observations), but nothing schedules practice from it.
-- L1-aware onboarding / error prediction.
-- Multi-accent **scoring** targets (accent is stored on the coach and passed to generation and
-  TTS, but the scorer still evaluates against one reference).
+- Calibration of the acoustic **and prosodic** scorers against human labels (L2-ARCTIC /
+  speechocean762). Until this exists the scores are a consistent internal signal, not a
+  validated measurement — the single most important remaining task.
+- L1-aware onboarding / error prediction (`L1_AWARE_ENABLED` is read by nothing).
+- Multi-accent **scoring** targets: the accent reaches generation and TTS, and the result now
+  reports which reference it was evaluated against, but the segmental reference itself is
+  CMUDict (General American) for every accent.
+- Billing (Stripe) and plan enforcement — the landing page's Pro tier is still a design mock.
 - Streaming/partial STT (ASR runs once on END_TURN over the buffered turn, not live-streamed).
-- Rate limiting and load/latency hardening. Two large CPU models now run per turn.
+- Load/latency testing under *concurrent* turns. §5.2 measures a single turn on an idle box;
+  the models are shared singletons, so simultaneous speakers serialize on the same CPU.
 
 ---
 
@@ -432,16 +457,75 @@ arithmetic on the score (`longest_pause` was literally `1.1 + (100 - score) * 0.
 
 ## 10. Immediate Next Steps
 
-Phase 0, Phase 1, and Phase 5's content layer are done (§7). Next, in order:
+Phases 0, 1, 2, 5-content and 6 are done (§7, §11). Next, in order:
 
-1. Calibrate `CORRECT_DISTANCE_THRESHOLD` against a labeled set (L2-ARCTIC / speechocean762)
-   and publish the correlation number.
+1. **Calibrate against human ratings** — both the segmental threshold and the prosody bands —
+   using L2-ARCTIC / speechocean762, and publish the correlation rather than claiming it. This
+   is now the only thing standing between "a consistent internal signal" and a measurement a
+   learner can trust.
 2. Re-measure latency and RSS under *concurrent* turns. §5.2's numbers are single-turn on an
    idle box; the models are shared singletons, so N simultaneous speakers serialise on the same
    CPU. This is the number that decides the host plan.
-3. Progress analytics over sessions — the rest of Phase 5. `difficult_sounds` is now real
-   per-phone data, so weak-phoneme trends and spaced-repetition drills have something to read.
-4. Begin Phase 2 (stress + timing) on the same waveform the scorer already receives.
+3. Train or adopt a real lexical-stress classifier to replace the heuristic in
+   `prosody.analyse_stress` (the weakest-tooling area of the stack).
+4. Per-accent reference sets, so `en-GB`/`en-IN` coaches are scored against their own reference
+   instead of CMUDict, which the result now reports honestly rather than silently assuming.
+5. L1-aware onboarding, then billing.
+
+---
+
+## 11. Change record — 2026-09-12
+
+A full pass over correctness, security and product surface. Everything below is implemented and
+covered by tests; the counts are `backend: 267` and `web: 19`, both green in CI.
+
+### Correctness — things the product was getting wrong
+
+| Was | Is |
+|---|---|
+| `handle_end_turn` never called `_advance_practice`; the client's Next button advanced unconditionally, so every tier's threshold was decorative | A passing turn advances the cursor on the server; a failing turn does not and says why; `SKIP_SENTENCE` is the explicit override, recorded in the report as `steps_skipped` |
+| Leaving mid-session persisted only the raw entries — no report — while the end-of-call screen promised a summary "shortly" | `FINALIZE_SESSION` builds the report on every exit path, and the client waits for it before navigating |
+| `/api/dashboard` used `innerJoin(coaches)`, so every pasted-text session vanished from stats | `leftJoin`, with coach-less sessions labelled from the saved script |
+| Dashboard "focus areas" regexed quoted words out of the coach's English feedback | Built from `report.phone_breakdown`: observation counts and error rates |
+| Turn entries were written as `{timestamp, overall_score}` and read as `{at, score}` — the timeline showed "Score: 0%" and every dashboard average was `NaN` | One typed persisted shape (`PersistedTurnEntry`); the untyped `Record<string, unknown>` ref that hid the mismatch is gone |
+| A `processing` session status nothing ever set, behind a spinner that never resolved | Removed from the UI; an empty session now says it has nothing to measure |
+| Silence could be scored ~100% (fixed earlier), and a hung forward pass hung the socket forever | `SCORE_TIMEOUT_SECONDS` / `ASR_TIMEOUT_SECONDS` enforced with `asyncio.wait_for`; a timeout emits a recoverable error and no score |
+
+### Security
+
+- `/ws/voice` requires a short-lived HMAC token (`app/core/ws_auth.py`, minted by
+  `POST /api/sessions/[id]/ws-token`, which checks session ownership first). The socket is
+  refused before `accept()`, `SESSION_CONFIG` cannot reconfigure onto another session, and the
+  audio path is no longer built from an unvalidated client id.
+- `MAX_TURNS_PER_MINUTE` is enforced per connection (it was declared and read by nothing).
+- Persisted-audio path segments are reduced to `[A-Za-z0-9_-]` — the old version replaced only
+  `/`, leaving `..` and `\` intact.
+- `sweep_old_audio_loop()` is started in the lifespan; `TURN_AUDIO_RETENTION_HOURS` was a
+  promise in a docstring rather than a policy, because the coroutine was never scheduled.
+- CORS: the localhost-on-any-port regex is development-only, methods are no longer `*`.
+
+### Deleted
+
+The parallel scoring stack (`pronunciation_analysis_service`, `pronunciation_scoring_service`,
+`penalty_engine`, `word_scoring`, `syllable_scoring`, `sentence_scoring`, `sequence_alignment`,
+`phoneme_comparator`, `pronunciation_comparison_service`, `alignment_service`, the `alignment/`
+package, `core/scoring_config`, `utils/phoneme_features`) plus the `/api/pronunciation/*` and
+`/api/pronunciation-analysis/*` routers and three schemas. It was unreachable from the UI and
+unstartable — `ALIGNMENT_PROVIDER` defaulted to `whisperx`, which is not in `requirements.txt`.
+Also removed: `phoneme-real-time-feedback.tsx` and `call-active-coach-drawer.tsx` (imported by
+nobody), and the `PHONEME_ANALYSIS` handler for a message the backend has never sent.
+
+### Added
+
+- `app/services/pronunciation/prosody.py` — timing, intonation, stress (numpy only), with 38
+  tests over synthetic signals whose answers are known in advance.
+- `web/src/lib/progress.ts` + `GET /api/analytics` + `/dashboard/progress`.
+- `POST /api/drills` + `sound_goals` (spaced repetition) — a drill is a normal session whose
+  script was generated for one phone.
+- `GET /api/sessions/export?format=json|csv`.
+- CI, `docker compose`, baseline Drizzle migration (the schema was push-only), `LICENSE`,
+  `.nvmrc`, and env templates that match the variables the code actually reads (`web/.env.example`
+  was both stale and gitignored).
 
 > **Appendix — key source pointers:** phoneme recognizer
 > (`vitouphy/wav2vec2-xls-r-300m-timit-phoneme`; alternatives

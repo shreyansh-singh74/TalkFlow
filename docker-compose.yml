@@ -1,0 +1,119 @@
+# One-command local stack: `docker compose up`.
+#
+# The point of this file is that a reviewer can actually run TalkFlow. Without
+# it, getting to a working voice session means a venv, a 3.6 GB model download,
+# Google TTS credentials, a Postgres instance, and two servers started in the
+# right order -- which is where most people stop.
+#
+# What it does NOT include: real API keys. See `.env.docker.example`. The stack
+# starts and the UI works without them; the voice loop needs OPENROUTER_API_KEY
+# and Google credentials, and the app says so rather than failing silently.
+#
+# Memory: the backend needs ~3.6 GB with WavLM-Large and the phoneme model both
+# resident. If your machine has less, set ASR_MODEL_ID to the base-plus
+# checkpoint in `.env.docker` -- it is ~2.9 GB and leaves the pronunciation
+# score unchanged, because the score comes from the waveform, not the
+# transcript.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: talkflow
+      POSTGRES_PASSWORD: talkflow
+      POSTGRES_DB: talkflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - talkflow-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talkflow -d talkflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    # The models live in a named volume, so a rebuild does not re-download
+    # 3.6 GB. First start is slow; every start after it is not.
+    environment:
+      ENVIRONMENT: development
+      FRONTEND_URL: http://localhost:3000
+      WS_AUTH_REQUIRED: "1"
+      # Must match the web service's value. Compose reads it from .env.docker.
+      WS_TOKEN_SECRET: ${WS_TOKEN_SECRET:-dev-only-shared-secret}
+      # Must match the web service's value. Guards the routes that spend
+      # OpenRouter credit (/api/practice/*).
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-only-internal-token}
+      # L1-aware coaching: the learner's first language biases *content and
+      # coaching vocabulary* only -- it never changes a score.
+      L1_AWARE_ENABLED: "1"
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # 2 threads matches the 2-vCPU target these numbers were measured on;
+      # torch otherwise sizes its pool to the host and oversubscribes.
+      OMP_NUM_THREADS: "2"
+      # Keep the Hugging Face cache inside the volume below, so a rebuild does
+      # not re-download the models.
+      HF_HOME: /models
+      # Set by the entrypoint script when TALKFLOW_GOOGLE_CREDENTIALS points at
+      # a service-account file. Left empty, the backend logs that TTS is
+      # unavailable and the text UI still works.
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/google-credentials.json
+    volumes:
+      - talkflow-models:/models
+      # Mount your own service-account JSON here to enable spoken replies:
+      #   volumes: ["/path/to/gcp.json:/run/secrets/google-credentials.json:ro"]
+    ports:
+      - "8000:8000"
+    healthcheck:
+      # /health is dependency-free on purpose, so this reports the process
+      # rather than the model warm-up.
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+    # Applies the Drizzle migration before starting, so `docker compose up` on a
+    # fresh volume yields a working schema instead of a 500 on first request.
+    command: ["sh", "-c", "npx drizzle-kit migrate && npm run start"]
+    environment:
+      # Server-side: how Next.js reaches FastAPI inside the compose network.
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-only-auth-secret-change-me}
+      DATABASE_URL: postgresql://talkflow:talkflow@db:5432/talkflow
+      WS_TOKEN_SECRET: ${WS_TOKEN_SECRET:-dev-only-shared-secret}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-only-internal-token}
+      # Optional: without these the app runs on the free tier and the upgrade
+      # buttons say billing is not configured.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PRO_PRICE_ID: ${STRIPE_PRO_PRICE_ID:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+volumes:
+  talkflow-pgdata:
+  talkflow-models:

@@ -4,11 +4,39 @@ FastAPI service for realtime voice practice and pronunciation analysis.
 
 ## Runtime
 
-- `/ws/voice`: WebSocket voice session. Receives PCM16 audio chunks, uses WavLM CTC for transcription, OpenRouter for LLM responses, Google Cloud TTS for audio replies, and emits pronunciation feedback.
-- `/api/phonemes/*`: HTTP pronunciation utilities for sentence analysis, word analysis, IPA lookup, comparison, and reference syllables.
+- `/ws/voice`: WebSocket voice session. Receives PCM16 audio chunks, uses WavLM CTC for transcription, OpenRouter for LLM responses, Google Cloud TTS for audio replies, and emits pronunciation feedback. Requires a token (see below).
+- `/api/phonemes/*`: word-level pronunciation reference for the UI — `/info/{word}` and `/reference/{word}` (phonemes, syllables, IPA, visemes) and `/tts` (reference audio).
+- `/api/practice/script`, `/api/practice/difficulty`: practice-content generation.
 - `/health`: service health check.
 
-The old multipart `/transcribe` and `/clear-conversation` HTTP flow has been removed.
+Removed: the old multipart `/transcribe` and `/clear-conversation` flow, and with
+it the second scoring stack that `/api/pronunciation/*` and
+`/api/pronunciation-analysis/*` exposed (penalty engine, word/syllable/sentence
+scoring, WhisperX alignment). That stack was unreachable — the web app never
+called it — and unstartable: `ALIGNMENT_PROVIDER` defaulted to `whisperx`, which
+is not in `requirements.txt`. There is now exactly one scorer, in
+`app/services/pronunciation/`.
+
+## Authenticating `/ws/voice`
+
+Every voice turn runs two CPU models and spends OpenRouter and Google TTS
+credit, and the ``session_id`` in ``SESSION_CONFIG`` used to name the folder that
+turn audio was written to. The socket therefore requires a short-lived HMAC
+token:
+
+```
+ws://host/ws/voice?token=<base64url(payload)>.<hex hmac-sha256(secret, payload)>
+```
+
+The web app mints it in `POST /api/sessions/[id]/ws-token` (cookie-authenticated,
+and it checks session ownership before minting). Both sides must share
+`WS_TOKEN_SECRET`; the payload is `{v, sub, sid, exp}` with keys sorted, and the
+signature is over the base64url payload string, so the Node.js side is three
+lines. `backend/tests/test_ws_auth.py` pins that encoding on this side.
+
+Set `WS_AUTH_REQUIRED=0` for local development to accept anonymous sockets
+(the server logs a warning at startup when you do). With it on and no secret
+configured, connections are refused — fail closed.
 
 ## Environment
 
@@ -135,6 +163,9 @@ pip install -r requirements.txt
 ```bash
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+Or bring the whole stack up with Docker: `docker compose up` from the repository
+root (see the root README).
 
 ## Test
 

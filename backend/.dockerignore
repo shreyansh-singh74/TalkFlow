@@ -1,0 +1,14 @@
+# Never copy secrets or local state into an image.
+.env
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+*.log
+
+# Credentials only. A blanket `*.json` would also drop
+# app/resources/respellings_cache.json, which the app reads at runtime.
+*credentials*.json
+*-*.json

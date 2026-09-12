@@ -3,6 +3,8 @@ node_modules/
 __pycache__/
 *.pyc
 .env
+# Compose reads this; the template beside it is committed.
+.env.docker
 .idea/
 .DS_Store
 *.log
