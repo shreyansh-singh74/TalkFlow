@@ -10,9 +10,11 @@ interface Props {
 }
 
 /**
- * The dashboard shell, plus the one gate that belongs on every page in it:
- * an account that has never answered the first-run questions is sent to them
- * once.
+ * The shell for every signed-in screen — home, sessions, coaches, progress,
+ * settings. They share one layout so the sidebar never disappears when you
+ * move between them, and so there is a single place for the gate that belongs
+ * on all of them: an account that has never answered the first-run questions
+ * is sent to them once.
  *
  * The read is wrapped because a database blip must not lock a learner out of
  * practice — failing open here costs one unanswered question, and failing closed

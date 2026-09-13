@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getBackendHeaders, getBackendUrl } from "@/lib/backend-config";
+import {
+  backendFailureMessage,
+  generatePracticeScript,
+} from "@/lib/backend-fetch";
 import { getUserSettings } from "@/lib/settings";
+import type { ScriptRequest } from "@/types/practice";
 
 /**
  * Proxies script generation to the FastAPI backend for the *preview* in the
@@ -14,36 +18,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  let body: Partial<ScriptRequest>;
   try {
-    const body = await request.json();
-    // The preview must promise the same script the session will get, so it is
-    // generated with the same accent and L1 the create path uses.
-    const userPrefs = await getUserSettings(session.user.id);
-    const response = await fetch(`${getBackendUrl()}/api/practice/script`, {
-      method: "POST",
-      headers: getBackendHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        l1: userPrefs.nativeLanguage || undefined,
-        ...body,
-        // An explicit accent from the form (a coach being previewed) wins.
-        accent: body?.accent || userPrefs.targetAccent,
-      }),
-      signal: AbortSignal.timeout(45_000),
-    });
+    body = (await request.json()) as Partial<ScriptRequest>;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: "Could not build a practice script" },
-        { status: 502 }
-      );
-    }
+  // The preview must promise the same script the session will get, so it is
+  // generated with the same accent and L1 the create path uses.
+  const userPrefs = await getUserSettings(session.user.id);
 
-    return NextResponse.json(await response.json());
-  } catch (error) {
-    console.error("Script preview failed:", error);
+  const result = await generatePracticeScript({
+    ...body,
+    source: body.source ?? "coach",
+    difficulty: body.difficulty ?? "medium",
+    l1: userPrefs.nativeLanguage || undefined,
+    // An explicit accent from the form (a coach being previewed) wins.
+    accent: body.accent || userPrefs.targetAccent,
+  });
+
+  if (!result.ok) {
     return NextResponse.json(
-      { error: "Practice service unreachable. Is the backend running?" },
+      { error: backendFailureMessage(result.failure) },
       { status: 502 }
     );
   }
+
+  return NextResponse.json(result.data);
 }

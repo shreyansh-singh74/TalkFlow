@@ -6,10 +6,12 @@ import { and, count, desc, eq, getTableColumns, ilike, sql } from "drizzle-orm";
 import { z } from "zod";
 import { sessionsInsertSchema } from "@/modules/sessions/schemas";
 import { SessionStatus } from "@/modules/sessions/types";
-import { getBackendHeaders, getBackendUrl } from "@/lib/backend-config";
+import {
+  backendFailureMessage,
+  generatePracticeScript,
+} from "@/lib/backend-fetch";
 import { getQuota, quotaMessage } from "@/lib/billing";
 import { getUserSettings } from "@/lib/settings";
-import type { PracticeScript, ScriptRequest } from "@/types/practice";
 
 const getManySchema = z.object({
   page: z.number().default(1),
@@ -92,39 +94,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * Resolve the practice script for a new session.
- *
- * The script is decided once, here, and persisted — not re-generated when the
- * call starts. That keeps a session reproducible: reopening it practises the
- * same steps, and the WebSocket engine just executes what it is handed.
- *
- * The backend endpoint never throws and never returns short (it degrades to a
- * band-validated fallback bank), so a null return here means the backend was
- * unreachable outright.
- */
-async function resolveScript(
-  body: ScriptRequest
-): Promise<PracticeScript | null> {
-  try {
-    const response = await fetch(`${getBackendUrl()}/api/practice/script`, {
-      method: "POST",
-      headers: getBackendHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(45_000),
-    });
-
-    if (!response.ok) {
-      console.error("Script generation failed", response.status);
-      return null;
-    }
-    return (await response.json()) as PracticeScript;
-  } catch (error) {
-    console.error("Script generation unreachable:", error);
-    return null;
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const session = await auth.api.getSession({
@@ -172,9 +141,17 @@ export async function POST(request: NextRequest) {
 
     // The client may pass a script it already previewed and edited; only
     // generate when it didn't.
-    const script =
-      data.script ??
-      (await resolveScript({
+    //
+    // The script is decided once, here, and persisted — not re-generated when
+    // the call starts. That keeps a session reproducible: reopening it practises
+    // the same steps, and the WebSocket engine just executes what it is handed.
+    //
+    // The backend endpoint never returns short (it degrades to a band-validated
+    // fallback bank), so a failure here means the call never landed -- and the
+    // reason it did not is carried back rather than guessed at.
+    let script = data.script ?? null;
+    if (!script) {
+      const result = await generatePracticeScript({
         source: data.source,
         difficulty: data.difficulty,
         step_count: data.stepCount,
@@ -184,13 +161,15 @@ export async function POST(request: NextRequest) {
         focus_sounds: coach?.focusSounds ?? [],
         l1: userPrefs.nativeLanguage || undefined,
         source_text: data.sourceText ?? undefined,
-      }));
+      });
 
-    if (!script) {
-      return NextResponse.json(
-        { error: "Could not build a practice script. Is the backend running?" },
-        { status: 502 }
-      );
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: backendFailureMessage(result.failure) },
+          { status: 502 }
+        );
+      }
+      script = result.data;
     }
 
     const [createdSession] = await db

@@ -4,10 +4,12 @@ import { z } from "zod";
 import { db } from "@/db";
 import { practiceSessions } from "@/db/schema";
 import { auth } from "@/lib/auth";
-import { getBackendHeaders, getBackendUrl } from "@/lib/backend-config";
+import {
+  backendFailureMessage,
+  generatePracticeScript,
+} from "@/lib/backend-fetch";
 import { getUserSettings } from "@/lib/settings";
 import { upsertSoundGoal } from "@/lib/sound-goals";
-import type { PracticeScript } from "@/types/practice";
 
 /**
  * Build a drill aimed at one sound and open a session for it.
@@ -47,37 +49,25 @@ export async function POST(request: NextRequest) {
 
     // The script the whole session runs on, generated and band-validated by the
     // backend. `focus_sounds` is what steers it at this phone.
-    let script: PracticeScript | null = null;
-    try {
-      const userPrefs = await getUserSettings(userId);
-      const response = await fetch(`${getBackendUrl()}/api/practice/script`, {
-        method: "POST",
-        headers: getBackendHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({
-          source: "coach",
-          difficulty,
-          step_count: stepCount,
-          topic: drillTopic(phone),
-          coach_name: `/${phone}/ drill`,
-          focus_sounds: [phone],
-          accent: userPrefs.targetAccent,
-          l1: userPrefs.nativeLanguage || undefined,
-        }),
-        signal: AbortSignal.timeout(45_000),
-      });
-      if (response.ok) {
-        script = (await response.json()) as PracticeScript;
-      }
-    } catch (error) {
-      console.error("Drill script unreachable:", error);
-    }
+    const userPrefs = await getUserSettings(userId);
+    const result = await generatePracticeScript({
+      source: "coach",
+      difficulty,
+      step_count: stepCount,
+      topic: drillTopic(phone),
+      coach_name: `/${phone}/ drill`,
+      focus_sounds: [phone],
+      accent: userPrefs.targetAccent,
+      l1: userPrefs.nativeLanguage || undefined,
+    });
 
-    if (!script) {
+    if (!result.ok) {
       return NextResponse.json(
-        { error: "Could not build the drill. Is the backend running?" },
+        { error: backendFailureMessage(result.failure, "the drill") },
         { status: 502 }
       );
     }
+    const script = result.data;
 
     const [created] = await db
       .insert(practiceSessions)

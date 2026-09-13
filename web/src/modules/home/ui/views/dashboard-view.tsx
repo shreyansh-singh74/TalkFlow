@@ -1,9 +1,17 @@
 "use client";
 
-import { useDashboard } from "@/hooks/use-dashboard";
+import { useDashboard, type DashboardData } from "@/hooks/use-dashboard";
 import { useCreateDrill } from "@/hooks/use-analytics";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  CoachesSkeleton,
+  ContinuePracticeSkeleton,
+  DashboardHeaderSkeleton,
+  FocusAreasSkeleton,
+  PersonalBestSkeleton,
+  ProgressStatsSkeleton,
+  RecentSessionsSkeleton,
+} from "../components/dashboard-skeleton";
 import { toast } from "sonner";
 import {
   PlusIcon,
@@ -53,15 +61,21 @@ function getAccuracyColor(accuracy: number | null): string {
 // Phoneme badge colors
 const PHONEME_COLORS = ["#ef4444", "#f59e0b", "#6366f1", "#10b981", "#8b5cf6"];
 
+/**
+ * Every card takes the same pair: the dashboard payload (undefined until the
+ * query settles) and whether we are still waiting. A card that owns its own
+ * placeholder is what keeps the frame steady while the data is in flight.
+ */
+type DashboardCardProps = {
+  data: DashboardData | undefined;
+  isLoading: boolean;
+};
+
 export const DashboardView = () => {
   const { data, isLoading, error } = useDashboard();
   const router = useRouter();
 
-  if (isLoading) {
-    return <DashboardSkeleton />;
-  }
-
-  if (error || !data) {
+  if (error || (!isLoading && !data)) {
     return (
       <div className="flex-1 p-6 flex items-center justify-center">
         <div className="text-center space-y-2">
@@ -76,62 +90,65 @@ export const DashboardView = () => {
     );
   }
 
+  // Never bail out of the page for a single placeholder: keep the frame and
+  // hand each card its own state, so cards trade skeleton for content in place.
+  const showSkeleton = isLoading || !data;
   const userName =
-    data.user.name || data.user.email?.split("@")[0] || "there";
+    data?.user.name || data?.user.email?.split("@")[0] || "there";
 
   return (
     <div className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            Welcome back, {userName}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Here&apos;s how your practice is going.
-          </p>
+      {showSkeleton ? (
+        <DashboardHeaderSkeleton />
+      ) : (
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              Welcome back, {userName}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Here&apos;s how your practice is going.
+            </p>
+          </div>
+          <Button
+            // `?create=1` opens the create dialog on arrival. Without it this
+            // button just landed on the sessions list.
+            onClick={() => router.push("/sessions?create=1")}
+            className="gap-2 "
+          >
+            <PlusIcon className="h-4 w-4" />
+            New session
+          </Button>
         </div>
-        <Button
-          // `?create=1` opens the create dialog on arrival. Without it this
-          // button just landed on the sessions list.
-          onClick={() => router.push("/sessions?create=1")}
-          className="gap-2 "
-        >
-          <PlusIcon className="h-4 w-4" />
-          New session
-        </Button>
-      </div>
+      )}
 
       {/* Two-column grid */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4 md:gap-5">
         {/* LEFT COLUMN */}
         <div className="flex flex-col gap-4 md:gap-5">
           {/* Continue Practice Card */}
-          <ContinuePracticeCard data={data} />
+          <ContinuePracticeCard data={data} isLoading={showSkeleton} />
 
           {/* Recent Sessions Card */}
-          <RecentSessionsCard data={data} />
+          <RecentSessionsCard data={data} isLoading={showSkeleton} />
         </div>
 
         {/* RIGHT COLUMN */}
         <div className="flex flex-col gap-4 md:gap-5">
           {/* Progress Stats */}
-          <ProgressStatsCard data={data} />
+          <ProgressStatsCard data={data} isLoading={showSkeleton} />
 
-          {/* Personal Best */}
-          {data.personalBest.accuracy > 0 && (
-            <PersonalBestCard data={data} />
-          )}
+          {/* Personal Best. Shows a placeholder while loading and then hides
+              itself when there is no score to celebrate yet. */}
+          <PersonalBestCard data={data} isLoading={showSkeleton} />
 
           {/* Focus Areas. With nothing measured yet, the card falls back to the
               sounds the learner's first language predicts -- labelled as a
               prediction, never mixed in with the measured list. */}
-          {(data.focusAreas.length > 0 || data.suggestedSounds.length > 0) && (
-            <FocusAreasCard data={data} />
-          )}
+          <FocusAreasCard data={data} isLoading={showSkeleton} />
 
           {/* Practice with an Coach */}
-          <CoachesCard data={data} />
+          <CoachesCard data={data} isLoading={showSkeleton} />
         </div>
       </div>
     </div>
@@ -139,11 +156,9 @@ export const DashboardView = () => {
 };
 
 // ─── Continue Practice Card ──────────────────────────────────────────
-function ContinuePracticeCard({
-  data,
-}: {
-  data: NonNullable<ReturnType<typeof useDashboard>["data"]>;
-}) {
+function ContinuePracticeCard({ data, isLoading }: DashboardCardProps) {
+  if (isLoading || !data) return <ContinuePracticeSkeleton />;
+
   const cp = data.continuePractice;
 
   if (!cp) {
@@ -220,11 +235,9 @@ function ContinuePracticeCard({
 }
 
 // ─── Progress Stats Card ─────────────────────────────────────────────
-function ProgressStatsCard({
-  data,
-}: {
-  data: NonNullable<ReturnType<typeof useDashboard>["data"]>;
-}) {
+function ProgressStatsCard({ data, isLoading }: DashboardCardProps) {
+  if (isLoading || !data) return <ProgressStatsSkeleton />;
+
   const stats = [
     {
       label: "Streak",
@@ -271,11 +284,9 @@ function ProgressStatsCard({
 }
 
 // ─── Recent Sessions Card ────────────────────────────────────────────
-function RecentSessionsCard({
-  data,
-}: {
-  data: NonNullable<ReturnType<typeof useDashboard>["data"]>;
-}) {
+function RecentSessionsCard({ data, isLoading }: DashboardCardProps) {
+  if (isLoading || !data) return <RecentSessionsSkeleton />;
+
   if (data.recentSessions.length === 0) {
     return (
       <div className="rounded-2xl border bg-card p-6">
@@ -348,11 +359,10 @@ function RecentSessionsCard({
 }
 
 // ─── Personal Best Card ──────────────────────────────────────────────
-function PersonalBestCard({
-  data,
-}: {
-  data: NonNullable<ReturnType<typeof useDashboard>["data"]>;
-}) {
+function PersonalBestCard({ data, isLoading }: DashboardCardProps) {
+  if (isLoading || !data) return <PersonalBestSkeleton />;
+  if (data.personalBest.accuracy <= 0) return null;
+
   return (
     <div
       className="rounded-2xl p-4 flex items-start gap-3"
@@ -381,15 +391,17 @@ function PersonalBestCard({
 }
 
 // ─── Focus Areas Card ────────────────────────────────────────────────
-function FocusAreasCard({
-  data,
-}: {
-  data: NonNullable<ReturnType<typeof useDashboard>["data"]>;
-}) {
+function FocusAreasCard({ data, isLoading }: DashboardCardProps) {
+  // Hooks run before any early return, or the skeleton-to-content swap would
+  // change the number of hooks between renders.
   const router = useRouter();
   const createDrill = useCreateDrill();
+
+  if (isLoading || !data) return <FocusAreasSkeleton />;
+
   const measured = data.focusAreas.length > 0;
   const sounds = measured ? data.focusAreas : data.suggestedSounds;
+  if (sounds.length === 0) return null;
   const weakest = sounds[0] ?? null;
 
   // The report has always ended with "drill /ð/", and this button used to go to
@@ -462,11 +474,8 @@ function FocusAreasCard({
 }
 
 // ─── Practice with an Coach Card ─────────────────────────────────────
-function CoachesCard({
-  data,
-}: {
-  data: NonNullable<ReturnType<typeof useDashboard>["data"]>;
-}) {
+function CoachesCard({ data, isLoading }: DashboardCardProps) {
+  if (isLoading || !data) return <CoachesSkeleton />;
   if (data.coaches.length === 0) return null;
 
   return (
@@ -522,37 +531,6 @@ function CoachesCard({
             </div>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Loading Skeleton ────────────────────────────────────────────────
-function DashboardSkeleton() {
-  return (
-    <div className="flex-1 p-4 md:p-6 lg:p-8">
-      {/* Header skeleton */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-4 w-48" />
-        </div>
-        <Skeleton className="h-9 w-32" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
-        {/* Left column */}
-        <div className="space-y-4 md:space-y-5">
-          <Skeleton className="h-40 w-full rounded-2xl" />
-          <Skeleton className="h-64 w-full rounded-2xl" />
-        </div>
-        {/* Right column */}
-        <div className="space-y-4 md:space-y-5">
-          <Skeleton className="h-48 w-full rounded-2xl" />
-          <Skeleton className="h-16 w-full rounded-2xl" />
-          <Skeleton className="h-40 w-full rounded-2xl" />
-          <Skeleton className="h-52 w-full rounded-2xl" />
-        </div>
       </div>
     </div>
   );

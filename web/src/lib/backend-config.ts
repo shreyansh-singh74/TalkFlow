@@ -11,12 +11,29 @@ interface WindowWithBackendLog extends Window {
 
 let backendUrlCache: string | null = null;
 
+/**
+ * The practice service's address.
+ *
+ * Two callers with two different network positions share this: the browser
+ * dials it directly for the voice socket and TTS, and the Next.js server dials
+ * it for script generation. In a deployment those two hosts are often not the
+ * same address -- the server may reach the backend over a private network while
+ * the browser needs the public one -- so a server-only `BACKEND_URL` wins over
+ * the public var when it is set. It is deliberately not a NEXT_PUBLIC_* name:
+ * the browser bundle must never be handed an internal address.
+ */
 export function getBackendUrl(): string {
   if (backendUrlCache) {
     return backendUrlCache;
   }
 
-  const configuredUrl = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_BACKEND_URL : undefined;
+  const serverOnlyUrl =
+    typeof window === 'undefined' && typeof process !== 'undefined'
+      ? process.env.BACKEND_URL
+      : undefined;
+  const configuredUrl =
+    serverOnlyUrl ||
+    (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_BACKEND_URL : undefined);
   const isLocalhost =
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' ||
@@ -24,7 +41,9 @@ export function getBackendUrl(): string {
   const url = (configuredUrl || (isLocalhost ? 'http://localhost:8000' : '')).replace(/\/$/, '');
 
   if (!url) {
-    throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
+    throw new Error(
+      'No practice service configured: set BACKEND_URL (server) or NEXT_PUBLIC_BACKEND_URL'
+    );
   }
 
   backendUrlCache = url;

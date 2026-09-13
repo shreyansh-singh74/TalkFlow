@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { userSettings } from "@/db/schema";
-import { getBackendHeaders, getBackendUrl } from "@/lib/backend-config";
+import { fetchPracticeCatalog } from "@/lib/backend-fetch";
 import type {
   AccentOption,
   L1Option,
@@ -82,29 +82,49 @@ const FALLBACK_L1: L1Option[] = [
   { code: "other", label: "Other / prefer not to say", weak_phones: [] },
 ];
 
+/**
+ * Process-local cache of the catalog.
+ *
+ * `/api/dashboard` needs these lists on every render, and without a cache a
+ * backend that is down is paid for in full on every one of them: two parallel
+ * requests, each running to its timeout, in front of a page that already has a
+ * perfectly good fallback. A successful read is held for a long while (the
+ * lists are static), a failed one only briefly, so a backend that comes back is
+ * picked up without a redeploy.
+ */
+let catalogCache: {
+  at: number;
+  value: SettingsCatalog;
+  complete: boolean;
+} | null = null;
+
+const CATALOG_TTL_MS = 30 * 60_000;
+const CATALOG_FAILURE_TTL_MS = 30_000;
+
 export async function loadSettingsCatalog(): Promise<SettingsCatalog> {
+  const cached = catalogCache;
+  if (cached) {
+    const ttl = cached.complete ? CATALOG_TTL_MS : CATALOG_FAILURE_TTL_MS;
+    if (Date.now() - cached.at < ttl) return cached.value;
+  }
+
   const [accents, l1Profiles] = await Promise.all([
-    fetchCatalog<{ accents: AccentOption[] }>("/api/practice/accents"),
-    fetchCatalog<{ profiles: L1Option[] }>("/api/practice/l1-profiles"),
+    fetchPracticeCatalog<{ accents: AccentOption[] }>("/api/practice/accents"),
+    fetchPracticeCatalog<{ profiles: L1Option[] }>("/api/practice/l1-profiles"),
   ]);
 
-  return {
+  const value: SettingsCatalog = {
     accents: accents?.accents?.length ? accents.accents : FALLBACK_ACCENTS,
     l1Profiles: l1Profiles?.profiles?.length ? l1Profiles.profiles : FALLBACK_L1,
   };
-}
 
-async function fetchCatalog<T>(path: string): Promise<T | null> {
-  try {
-    const response = await fetch(`${getBackendUrl()}${path}`, {
-      headers: getBackendHeaders(),
-      // A reference list, not learner data: cache it for the process lifetime.
-      cache: "force-cache",
-      signal: AbortSignal.timeout(5_000),
-    });
-    if (!response.ok) return null;
-    return (await response.json()) as T;
-  } catch {
-    return null;
-  }
+  catalogCache = {
+    at: Date.now(),
+    value,
+    // A half-answer (one list served, the other not) is retried like a failure
+    // rather than pinned for half an hour.
+    complete: Boolean(accents?.accents?.length && l1Profiles?.profiles?.length),
+  };
+
+  return value;
 }

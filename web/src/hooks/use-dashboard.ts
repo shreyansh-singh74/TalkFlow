@@ -51,6 +51,11 @@ export interface DashboardData {
 export function useDashboard() {
   return useQuery<DashboardData>({
     queryKey: ["dashboard"],
+    // Home is the one screen whose skeleton is part of the design, and a warm
+    // cache would skip straight past it. Dropping the cached copy the moment
+    // nothing is watching means every visit starts from the placeholders
+    // instead of a silent swap of stale numbers.
+    gcTime: 0,
     queryFn: async () => {
       const response = await fetch("/api/dashboard");
       if (!response.ok) {
