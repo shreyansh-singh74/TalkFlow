@@ -38,7 +38,13 @@ export function getBackendUrl(): string {
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1');
-  const url = (configuredUrl || (isLocalhost ? 'http://localhost:8000' : '')).replace(/\/$/, '');
+  const raw =
+    (configuredUrl || (isLocalhost ? 'http://localhost:8000' : '')).replace(/\/$/, '');
+  // Operators often paste the API base with a trailing `/api`
+  // (e.g. `https://backend.example.com/api`). The callers already append
+  // `/api/...`, so that would dial `/api/api/...` and FastAPI answers 404
+  // `{"detail":"Not Found"}`. Strip one trailing `/api` to stay forgiving.
+  const url = raw.replace(/\/api$/, '');
 
   if (!url) {
     throw new Error(

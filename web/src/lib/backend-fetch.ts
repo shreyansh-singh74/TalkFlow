@@ -165,7 +165,7 @@ export async function generatePracticeScript(
     if (!response.ok) {
       const failure: BackendFailure = {
         reason: "rejected",
-        url,
+        url: `${url}/api/practice/script`,
         status: response.status,
         detail: await readDetail(response),
       };
