@@ -52,7 +52,11 @@ export function CallActiveFeedback({ lastPronunciation }: CallActiveFeedbackProp
         </div>
       ) : (
         /* Heard text + coach feedback + per-phone scores */
-        <div data-call-pane="heard" className="min-h-0 overflow-y-auto lg:flex-1">
+        <div
+          key={lastPronunciation.turn_id ?? "result"}
+          data-call-pane="heard"
+          className="min-h-0 animate-fade-in-up overflow-y-auto lg:flex-1"
+        >
           <HeardTextHighlight
             className="text-lg leading-relaxed font-semibold text-neutral-900"
             text={lastPronunciation.heard_text || "—"}

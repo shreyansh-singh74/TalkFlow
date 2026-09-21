@@ -116,7 +116,8 @@ export function CallActiveControls({
               title="Go to previous level"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back Level</span>
+              <span className="sm:hidden">Back</span>
+              <span className="hidden sm:inline">Back Level</span>
             </button>
           )}
 
@@ -128,7 +129,8 @@ export function CallActiveControls({
             title="Skip this step without passing it. The report records the skip."
           >
             <SkipForward className="h-3.5 w-3.5 text-amber-700" />
-            <span>Skip Level</span>
+            <span className="sm:hidden">Skip</span>
+            <span className="hidden sm:inline">Skip Level</span>
           </button>
         </div>
 
@@ -138,7 +140,7 @@ export function CallActiveControls({
               wrapper reserves its space either way, and remounting it would
               re-attach the analyser on every mic press — but faded out, because
               its idle baseline otherwise reads as a broken dotted line. */}
-          <div className="w-20 sm:w-28 h-10 flex items-center justify-end">
+          <div className="hidden sm:flex w-20 sm:w-28 h-10 items-center justify-end">
             <LiveWaveform
               className={cn(
                 "transition-opacity duration-300",
@@ -236,7 +238,7 @@ export function CallActiveControls({
           </div>
 
           {/* Right Live Waveform canvas */}
-          <div className="w-20 sm:w-28 h-10 flex items-center justify-start">
+          <div className="hidden sm:flex w-20 sm:w-28 h-10 items-center justify-start">
             <LiveWaveform
               className={cn(
                 "transition-opacity duration-300",
@@ -274,7 +276,16 @@ export function CallActiveControls({
                   "Pass this step to move on -- or use Skip Level")
             }
           >
-            <span>{hasPendingNext ? "Continue" : "Next Level"}</span>
+            <span>
+              {hasPendingNext ? (
+                "Continue"
+              ) : (
+                <>
+                  <span className="sm:hidden">Next</span>
+                  <span className="hidden sm:inline">Next Level</span>
+                </>
+              )}
+            </span>
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>

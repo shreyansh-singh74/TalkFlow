@@ -95,8 +95,9 @@ export function CallActiveSentence({
             highlighting. The pane shrinks and scrolls internally on desktop;
             below `lg` it grows with the words and the page scrolls. */}
         <div
+          key={targetText}
           data-call-pane="target"
-          className="w-full min-w-0 lg:min-h-0 lg:overflow-y-auto"
+          className="w-full min-w-0 animate-fade-in-up lg:min-h-0 lg:overflow-y-auto"
         >
           <TranscriptViewerWords
             className="px-2"

@@ -149,11 +149,12 @@ export const CallActive = ({
     if (lastPronunciation?.score != null) {
       return lastPronunciation.score;
     }
-    if (scoreHistory.length > 0) {
-      return scoreHistory[scoreHistory.length - 1];
-    }
-    return null;
-  }, [lastPronunciation, scoreHistory]);
+    // Scope the fallback to the current step. Advancing clears
+    // `lastPronunciation`, and the global `scoreHistory` would otherwise leak
+    // the previous step's score into the new one, holding the UI in
+    // "Level Complete" and keeping the mic disabled.
+    return scoreByStep[stepIndex] ?? null;
+  }, [lastPronunciation, scoreByStep, stepIndex]);
 
   const uiState = useMemo(() => {
     if (sessionReport) return "Practice Complete";
@@ -165,6 +166,27 @@ export const CallActive = ({
     }
     return "Level Ready";
   }, [sessionReport, isTransitioning, isEvaluating, isTalking, scoreDisplay, passThreshold]);
+
+  // Auto-advance past a passed step. `pendingTarget` is set only on a pass, so
+  // the feedback for the turn just scored can stay on screen for a beat before
+  // the next step reveals itself. The "Continue" button remains as a "reveal
+  // now" shortcut; both paths clear the same timer so it can't double-fire.
+  const pendingAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!pendingTarget || sessionReport) return;
+    pendingAdvanceTimerRef.current = setTimeout(() => acceptPendingTarget(), 1500);
+    return () => {
+      if (pendingAdvanceTimerRef.current) clearTimeout(pendingAdvanceTimerRef.current);
+    };
+  }, [pendingTarget, sessionReport, acceptPendingTarget]);
+
+  const handleContinue = useCallback(() => {
+    if (pendingAdvanceTimerRef.current) {
+      clearTimeout(pendingAdvanceTimerRef.current);
+      pendingAdvanceTimerRef.current = null;
+    }
+    acceptPendingTarget();
+  }, [acceptPendingTarget]);
 
   const [selectedLang, setSelectedLang] = useState<string | null>(null);
 
@@ -599,7 +621,7 @@ export const CallActive = ({
           onMicToggle={() => setIsMicEnabled((c) => !c)}
           onSkip={handleSkipSentence}
           hasPendingNext={pendingTarget !== null}
-          onContinue={acceptPendingTarget}
+          onContinue={handleContinue}
           gateMessage={gateMessage}
           onPrevLevel={sendPrevSentence}
           canGoBack={practiceProgress.current > 1}

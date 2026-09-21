@@ -1,6 +1,7 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { usePracticeSession, useDeletePracticeSession } from "@/hooks/use-api";
 import { SessionIdViewHeader } from "../components/session-id-view-header";
 import { useRouter } from "next/navigation";
@@ -257,15 +258,41 @@ export const SessionIdView = ({ sessionId }: Props) => {
                   nothing to measure yet. Nothing is shown rather than a
                   placeholder score.
                 </p>
-                <Link
-                  href={`/call/${sessionId}`}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
-                >
-                  <Volume2 className="w-4 h-4" />
-                  Practise this session
-                </Link>
+                <div className="flex flex-col-reverse items-center justify-center gap-2 pt-1 sm:flex-row">
+                  <Button asChild variant="outline" className="rounded-full">
+                    <Link href="/home">Go to Dashboard</Link>
+                  </Button>
+                  <Link
+                    href={`/call/${sessionId}`}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    Practise this session
+                  </Link>
+                </div>
               </div>
-            ) : null}
+            ) : (
+              /* Turns exist but the report never landed. The session is complete
+                 but its analysis is missing, so give the learner an exit rather
+                 than a bare transcript with no summary. */
+              <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-8 text-center space-y-3">
+                <div className="inline-flex items-center justify-center p-3 bg-white rounded-full text-gray-500 mb-2 border border-gray-200">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Analysis unavailable for this session
+                </h3>
+                <p className="text-sm text-gray-600 max-w-md mx-auto">
+                  Your turns were recorded, but the AI analysis could not be
+                  generated. Your practice is still saved below.
+                </p>
+                <div className="flex items-center justify-center pt-1">
+                  <Button asChild variant="outline" className="rounded-full">
+                    <Link href="/home">Go to Dashboard</Link>
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Turn-by-Turn Practice Transcript Timeline */}
             {entries.length > 0 && (

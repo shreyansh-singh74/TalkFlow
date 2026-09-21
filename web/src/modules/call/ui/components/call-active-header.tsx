@@ -188,7 +188,7 @@ export function CallActiveHeader({
 
         {/* Skipped count badge */}
         {skippedCount > 0 && (
-          <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+          <span className="hidden shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 sm:inline">
             {skippedCount} Skipped
           </span>
         )}
