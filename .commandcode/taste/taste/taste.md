@@ -7,3 +7,8 @@
 - Cares about visual polish and uses reference sites (Wispr Flow, pyannote.ai, Google Dictionary) as design inspiration. Confidence: 0.7
 - Wants runnable verification steps (scripts/tests) to check work themselves. Confidence: 0.7
 - Uses terse "continue" to resume long-running work without recap. Confidence: 0.6
+- Cares about mobile responsiveness; treats non-responsive layouts as bugs to fix. Confidence: 0.7
+- Prefers thorough investigation before proposing changes — reading all related files and understanding the full flow. Confidence: 0.7
+- Values production-readiness: wants the codebase swept of unnecessary/dead code, debug logs, and typos for a polished, shippable product. Confidence: 0.7
+- Building for scale — cares about latency/performance optimization and app completeness because the product is intended for many users. Confidence: 0.7
+- Wants conceptual/advice explanations (e.g. SDE concepts) delivered at the end, after the practical work is done. Confidence: 0.8

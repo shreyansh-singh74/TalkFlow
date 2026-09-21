@@ -6,7 +6,7 @@ export const CancelledState = () => {
       <EmptyState
         image="/cancelled.svg"
         title="Session is Cancelled"
-        description="This session has been cancelled ."
+        description="This session has been cancelled."
       />
     </div>
   );

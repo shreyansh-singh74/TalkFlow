@@ -70,18 +70,12 @@ export class AudioChunker {
 
     // ── 1. Create context (must be during a user-gesture call stack) ──────
     this.context = new AudioContext();
-    console.info('[AudioChunker] created', {
-      nativeRate: this.context.sampleRate,
-      state: this.context.state,
-    });
 
     // ── 2. Resume synchronously ───────────────────────────────────────────
     // Calling resume() here is still inside the synchronous portion of the
     // user-gesture handler.  The browser will honour it.
     if (this.context.state !== 'running') {
-      this.context.resume().then(() => {
-        console.info('[AudioChunker] context running');
-      }).catch((err) => {
+      this.context.resume().catch((err) => {
         console.error('[AudioChunker] resume failed:', err);
       });
     }
@@ -112,8 +106,6 @@ export class AudioChunker {
     this.source.connect(this.processor);
     this.processor.connect(this.silentGain);
     this.silentGain.connect(this.context.destination);
-
-    console.info('[AudioChunker] graph connected');
   }
 
   stop() {

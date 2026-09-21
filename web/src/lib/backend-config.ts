@@ -5,10 +5,6 @@ declare const process: {
 };
 
 
-interface WindowWithBackendLog extends Window {
-  __backendUrlLogged?: boolean;
-}
-
 let backendUrlCache: string | null = null;
 
 /**
@@ -53,11 +49,6 @@ export function getBackendUrl(): string {
   }
 
   backendUrlCache = url;
-  if (typeof window !== 'undefined' && !(window as WindowWithBackendLog).__backendUrlLogged) {
-    console.info("Backend URL configured", { backendUrl: url });
-    (window as WindowWithBackendLog).__backendUrlLogged = true;
-  }
-
   return url;
 }
 
