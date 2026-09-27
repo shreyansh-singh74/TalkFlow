@@ -53,9 +53,9 @@ function formatDuration(seconds: number | null): string {
 
 function getAccuracyColor(accuracy: number | null): string {
   if (accuracy === null) return "bg-muted-foreground/20 text-muted-foreground";
-  if (accuracy >= 85) return "bg-emerald-500/20 text-emerald-400";
-  if (accuracy >= 70) return "bg-amber-500/20 text-amber-400";
-  return "bg-red-500/20 text-red-400";
+  if (accuracy >= 85) return "bg-success/15 text-success";
+  if (accuracy >= 70) return "bg-warning/15 text-warning";
+  return "bg-danger/15 text-danger";
 }
 
 // Phoneme badge colors
@@ -187,19 +187,12 @@ function ContinuePracticeCard({ data, isLoading }: DashboardCardProps) {
   const canResume = cp.status === "active" || cp.status === "upcoming";
 
   return (
-    <div
-      className="rounded-2xl border p-6"
-      style={{
-        background:
-          "linear-gradient(135deg, hsl(160 40% 12%) 0%, hsl(160 30% 8%) 100%)",
-        borderColor: "hsl(160 30% 18%)",
-      }}
-    >
-      <p className="text-xs text-emerald-400/70 uppercase tracking-wider mb-2">
+    <div className="rounded-2xl bg-primary p-6 text-primary-foreground">
+      <p className="text-xs uppercase tracking-wider mb-2 text-primary-foreground/70">
         Continue practice
       </p>
-      <h3 className="text-lg font-semibold text-white mb-0.5">{cp.name}</h3>
-      <p className="text-sm text-white/50 mb-4">
+      <h3 className="text-lg font-semibold mb-0.5">{cp.name}</h3>
+      <p className="text-sm text-primary-foreground/60 mb-4">
         {cp.accuracy !== null ? `${cp.accuracy}% accuracy` : "No score yet"}
         {cp.duration ? ` · ${formatDuration(cp.duration)}` : ""}
         {" · "}
@@ -210,7 +203,7 @@ function ContinuePracticeCard({ data, isLoading }: DashboardCardProps) {
           <Button
             asChild
             size="sm"
-            className="gap-2 bg-emerald-500 hover:bg-emerald-600 text-white"
+            className="gap-2 bg-card text-primary hover:bg-card/90"
           >
             <Link href={`/call/${cp.id}`}>
               <PlayIcon className="h-3.5 w-3.5" />
@@ -222,7 +215,7 @@ function ContinuePracticeCard({ data, isLoading }: DashboardCardProps) {
           asChild
           variant="outline"
           size="sm"
-          className="gap-2 border-white/20 bg-transparent! text-white! hover:bg-white/10! hover:text-white!"
+          className="gap-2 border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
         >
           <Link href="/sessions?create=1">
             <ArrowRightIcon className="h-3.5 w-3.5" />
@@ -242,7 +235,7 @@ function ProgressStatsCard({ data, isLoading }: DashboardCardProps) {
     {
       label: "Streak",
       value: `${data.stats.streak} day${data.stats.streak !== 1 ? "s" : ""}`,
-      icon: <FlameIcon className="h-4 w-4 text-orange-400" />,
+      icon: <FlameIcon className="h-4 w-4 text-warning" />,
     },
     {
       label: "Sessions",
@@ -322,7 +315,7 @@ function RecentSessionsCard({ data, isLoading }: DashboardCardProps) {
             >
               {/* Avatar */}
               <div
-                className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold text-white shrink-0"
+                className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold text-primary-foreground shrink-0"
                 style={{ backgroundColor: color }}
               >
                 {initial}
@@ -364,25 +357,15 @@ function PersonalBestCard({ data, isLoading }: DashboardCardProps) {
   if (data.personalBest.accuracy <= 0) return null;
 
   return (
-    <div
-      className="rounded-2xl p-4 flex items-start gap-3"
-      style={{
-        background:
-          "linear-gradient(135deg, hsl(35 80% 15%) 0%, hsl(30 60% 10%) 100%)",
-        border: "1px solid hsl(35 50% 22%)",
-      }}
-    >
-      <div
-        className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-        style={{ background: "hsl(35 80% 25%)" }}
-      >
-        <TrophyIcon className="h-4 w-4 text-amber-400" />
+    <div className="rounded-2xl p-4 flex items-start gap-3 border border-warning/30 bg-warning/10">
+      <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 bg-warning/20">
+        <TrophyIcon className="h-4 w-4 text-warning" />
       </div>
       <div>
-        <p className="text-sm font-semibold text-amber-400">
+        <p className="text-sm font-semibold text-warning">
           New personal best
         </p>
-        <p className="text-xs text-amber-200/60 mt-0.5">
+        <p className="text-xs text-warning/70 mt-0.5">
           {data.personalBest.context || `${data.personalBest.accuracy}% accuracy`}
         </p>
       </div>
@@ -429,7 +412,7 @@ function FocusAreasCard({ data, isLoading }: DashboardCardProps) {
         {sounds.map((phoneme, i) => (
           <div
             key={phoneme}
-            className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold text-white"
+            className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold text-primary-foreground"
             style={{
               backgroundColor:
                 PHONEME_COLORS[i % PHONEME_COLORS.length],
@@ -481,7 +464,7 @@ function CoachesCard({ data, isLoading }: DashboardCardProps) {
   return (
     <div className="rounded-2xl border bg-card p-5">
       <h3 className="text-base font-semibold text-foreground mb-4">
-        Practice with an coach
+        Practice with a coach
       </h3>
       <div className="space-y-1">
         {data.coaches.map((coach) => {
@@ -501,7 +484,7 @@ function CoachesCard({ data, isLoading }: DashboardCardProps) {
             >
               {/* Avatar */}
               <div
-                className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold text-white shrink-0"
+                className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold text-primary-foreground shrink-0"
                 style={{ backgroundColor: color }}
               >
                 {initial}

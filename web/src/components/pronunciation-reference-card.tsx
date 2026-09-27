@@ -107,18 +107,18 @@ export function PronunciationReferenceCard({
     <div className="flex w-full flex-col gap-2">
       {/* Header row */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">
+        <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
           Phonetic Breakdown
         </span>
         <div className="flex items-center gap-3">
           {/* IPA toggle */}
-          <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer text-neutral-600">
+          <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer text-muted-foreground">
             <Switch checked={showIPA} onCheckedChange={setShowIPA} className="scale-75" />
             IPA
           </label>
           {/* Dialect select */}
           <select
-            className="rounded-md border px-2 py-1 text-xs font-semibold cursor-pointer bg-neutral-100 border-neutral-300 text-neutral-800 shadow-2xs"
+            className="rounded-md border px-2 py-1 text-xs font-semibold cursor-pointer bg-secondary border-border text-foreground shadow-2xs"
             value={lang}
             onChange={(e) => onLangChange(e.target.value)}
           >
@@ -133,27 +133,27 @@ export function PronunciationReferenceCard({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
         <div className="min-w-0 space-y-2.5">
           <div>
-            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Sounds like</p>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Sounds like</p>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
               {loading ? (
-                <p className="text-xl font-medium text-neutral-400">Loading phonetic breakdown…</p>
+                <p className="text-xl font-medium text-muted-foreground">Loading phonetic breakdown…</p>
               ) : error ? (
-                <p className="text-sm font-semibold text-amber-600">{error}</p>
+                <p className="text-sm font-semibold text-warning">{error}</p>
               ) : data ? (
                 <div className="flex items-center gap-2">
-                  <div className="text-2xl font-bold tracking-tight text-neutral-900">
+                  <div className="text-2xl font-bold tracking-tight text-foreground">
                     <SyllableLine syllables={syllables} activeIndex={activeSyllable} />
                   </div>
                 </div>
               ) : (
-                <p className="text-2xl font-bold capitalize text-neutral-900">{displayWord}</p>
+                <p className="text-2xl font-bold capitalize text-foreground">{displayWord}</p>
               )}
 
               {/* Play icon button directly next to sounds-like spelling */}
               <button
                 type="button"
                 onClick={() => (isBusy ? stop() : play())}
-                className="flex h-9 w-9 items-center justify-center rounded-full transition-all hover:scale-105 active:scale-95 cursor-pointer bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 shadow-2xs"
+                className="flex h-9 w-9 items-center justify-center rounded-full transition-all hover:scale-105 active:scale-95 cursor-pointer bg-success/10 text-primary border border-success/30 hover:bg-success/15 shadow-2xs"
                 title={isBusy ? "Stop" : isSlow ? "Play slow" : "Play"}
                 aria-label={isBusy ? "Stop pronunciation" : "Play pronunciation"}
               >
@@ -167,7 +167,7 @@ export function PronunciationReferenceCard({
               {/* Slow toggle on the same row as the spelling */}
               <label
                 htmlFor={idSlow}
-                className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-neutral-600"
+                className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-muted-foreground"
               >
                 <Switch id={idSlow} checked={isSlow} onCheckedChange={setIsSlow} className="scale-75" />
                 Slow speed
@@ -177,7 +177,7 @@ export function PronunciationReferenceCard({
 
           {showIPA && data?.ipa && (
             <p
-              className="text-sm font-semibold text-neutral-600"
+              className="text-sm font-semibold text-muted-foreground"
               style={{ fontFamily: "var(--font-phonetic)" }}
             >
               /{data.ipa}/
@@ -186,7 +186,7 @@ export function PronunciationReferenceCard({
 
           {/* Show expected vs heard comparison row if IPA toggle is on */}
           {showIPA && activePair && (
-            <div className="border-t border-dashed border-neutral-200 pt-2">
+            <div className="border-t border-dashed border-border pt-2">
               <HeardVsExpectedRow
                 expected={activePair.expected}
                 heard={activePair.heard}
@@ -198,9 +198,9 @@ export function PronunciationReferenceCard({
               across the cell — a one-line sentence in a full-width band read as
               a banner and pushed the phone strip down. */}
           {activePair && (
-            <p className="w-fit max-w-full rounded-lg px-3 py-1.5 text-xs leading-relaxed bg-blue-50 border border-blue-200 text-blue-800 font-medium">
-              Expected <strong className="text-blue-950">&ldquo;{activePair.expected}&rdquo;</strong>, heard{" "}
-              <span className="font-bold text-red-600">&ldquo;{activePair.heard}&rdquo;</span>.
+            <p className="w-fit max-w-full rounded-lg px-3 py-1.5 text-xs leading-relaxed bg-info/10 border border-info/30 text-info font-medium">
+              Expected <strong className="text-info">&ldquo;{activePair.expected}&rdquo;</strong>, heard{" "}
+              <span className="font-bold text-danger">&ldquo;{activePair.heard}&rdquo;</span>.
             </p>
           )}
 
@@ -209,7 +209,7 @@ export function PronunciationReferenceCard({
               shape. Sits inside the text cell so the mouth stays beside the
               whole block rather than above a full-width strip. */}
           {slots.length > 0 && (
-            <div className="border-t border-dashed border-neutral-200 pt-2.5">
+            <div className="border-t border-dashed border-border pt-2.5">
               <PhoneStrip
                 slots={slots}
                 activeIndex={frame.isRest ? -1 : frame.index}
@@ -237,9 +237,9 @@ export function PronunciationReferenceCard({
           aria-label="Reference mouth position. Press space to play, arrow keys to step through each sound."
           className={cn(
             "flex shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 self-center justify-self-center",
-            "bg-emerald-50/60 border border-emerald-200/80 shadow-2xs transition-colors",
-            "hover:bg-emerald-50 hover:border-emerald-300",
-            "outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
+            "bg-success/10 border border-success/30 shadow-2xs transition-colors",
+            "hover:bg-success/10 hover:border-success/40",
+            "outline-none focus-visible:ring-2 focus-visible:ring-brand-accent/60"
           )}
         >
           <VisemeMouth
@@ -248,10 +248,10 @@ export function PronunciationReferenceCard({
             dimmed={status === "loading"}
             className="call-mouth"
           />
-          <p className="min-h-7 max-w-32 text-center text-[10px] font-semibold leading-tight text-emerald-900/80">
+          <p className="min-h-7 max-w-32 text-center text-[10px] font-semibold leading-tight text-primary/80">
             {status === "loading" ? "Loading audio…" : hintFor(frame.pose)}
           </p>
-          <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-800/70">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-primary/70">
             {isBusy
               ? silent
                 ? "Silent demo"
@@ -276,18 +276,18 @@ function SyllableLine({
   if (!syllables.length) return null;
   return (
     <span
-      className="text-2xl font-bold leading-snug text-neutral-900"
+      className="text-2xl font-bold leading-snug text-foreground"
       style={{ fontFamily: "var(--font-phonetic)" }}
     >
       {syllables.map((s, i) => (
         <span key={i}>
           {i > 0 && (
-            <span className="text-neutral-400"> · </span>
+            <span className="text-muted-foreground"> · </span>
           )}
           <span
             className={cn(
               "rounded px-0.5 transition-colors duration-150",
-              i === activeIndex && "bg-emerald-100 text-emerald-900"
+              i === activeIndex && "bg-success/15 text-primary"
             )}
             // Only primary stress is bold. `stressed` is already primary-only,
             // but fall back to `stress_level` for payloads cached before the
@@ -326,8 +326,8 @@ function PhoneStrip({
           className={cn(
             "rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide transition-colors cursor-pointer",
             s.index === activeIndex
-              ? "border-emerald-400 bg-emerald-100 text-emerald-900"
-              : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:border-emerald-200 hover:text-emerald-800"
+              ? "border-success/50 bg-success/15 text-primary"
+              : "border-border bg-muted text-muted-foreground hover:border-success/30 hover:text-primary"
           )}
           style={{ fontFamily: "var(--font-phonetic)" }}
         >
@@ -351,11 +351,11 @@ function HeardVsExpectedRow({
 }) {
   return (
     <div className="mt-1 flex items-center gap-2 text-sm font-semibold" style={{ fontFamily: "var(--font-phonetic)" }}>
-      <span className="rounded px-2.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
+      <span className="rounded px-2.5 py-0.5 bg-success/10 text-primary border border-success/30">
         {expected}
       </span>
-      <span className="text-neutral-400">→</span>
-      <span className="rounded px-2.5 py-0.5 bg-red-50 text-red-700 border border-red-200">
+      <span className="text-muted-foreground">→</span>
+      <span className="rounded px-2.5 py-0.5 bg-danger/10 text-danger border border-danger/30">
         {heard}
       </span>
     </div>

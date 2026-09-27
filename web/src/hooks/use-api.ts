@@ -15,8 +15,23 @@ async function apiCall<T>(
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "API call failed");
+    // The error body is usually `{ error: string }`, but a crashed route can
+    // answer HTML or nothing at all — parsing it unconditionally then threw a
+    // JSON syntax error that replaced the real message with a useless one.
+    let message: string | null = null;
+    try {
+      const text = await response.text();
+      if (text) {
+        const parsed = JSON.parse(text) as { error?: string };
+        message = parsed.error ?? null;
+      }
+    } catch {
+      // Not JSON — fall through to the status-based message below.
+    }
+    throw new Error(
+      message ||
+        `Request failed (${response.status} ${response.statusText || "error"})`
+    );
   }
 
   return response.json();

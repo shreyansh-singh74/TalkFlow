@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -13,6 +13,30 @@ class PracticeStepMessage(BaseModel):
     index: int
     text: str
     note: Optional[str] = None
+
+
+class SessionResumeState(BaseModel):
+    """Where a reconnecting client left off.
+
+    The engine keeps attempts in memory per connection, so a dropped socket
+    used to throw the learner back to step 1 with every score forgotten. A
+    client that has already connected once on this practice session sends this
+    along with SESSION_CONFIG, and the engine seeks instead of resetting. A
+    first connect (or a deliberate "Practise Again") omits it, which keeps the
+    old from-scratch behaviour.
+    """
+
+    step_index: int = 0
+    #: Steps the learner explicitly skipped.
+    skipped: List[int] = Field(default_factory=list)
+    #: Best score reached per step index. Keys are ints: over the wire JSON
+    #: makes them strings, and pydantic's int key coerces them back -- leaving
+    #: them as bare ``dict`` str keys would make the range filter compare
+    #: ``0 <= "2"`` and raise.
+    best_scores: Dict[int, float] = Field(default_factory=dict)
+    #: Target texts of steps already passed, so the session report still
+    #: counts them as completed.
+    completed_targets: List[str] = Field(default_factory=list)
 
 
 class SessionConfigMessage(BaseModel):
@@ -35,6 +59,8 @@ class SessionConfigMessage(BaseModel):
     #: this list -- it no longer picks content of its own.
     steps: List[PracticeStepMessage] = Field(default_factory=list)
     source: Literal["coach", "custom"] = "coach"
+    #: Progress to restore on a reconnect. Absent on a first connect.
+    resume: Optional[SessionResumeState] = None
 
 
 class PracticeProgressMessage(BaseModel):

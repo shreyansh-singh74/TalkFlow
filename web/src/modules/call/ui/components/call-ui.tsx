@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CallLobby } from "./call-lobby";
 import { CallActive } from "./call-active";
 import { CallEnded } from "./call-ended";
@@ -23,6 +23,9 @@ interface Props {
   l1?: string;
   retainAudio?: boolean;
   listeningRate?: number;
+  /** Signals the route that the learner is inside the call UI, so refetches
+   * after their own join/leave mutations stop gating the screen on status. */
+  onEntered?: () => void;
 }
 
 export const CallUI = ({
@@ -38,9 +41,16 @@ export const CallUI = ({
   l1,
   retainAudio,
   listeningRate,
+  onEntered,
 }: Props) => {
   const [show, setShow] = useState<"lobby" | "call" | "ended">("lobby");
   const updateSession = useUpdatePracticeSession();
+
+  useEffect(() => {
+    onEntered?.();
+    // Fires once: entering is a fact about this mount, not a repeating event.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleJoin = async () => {
     updateSession.mutate({

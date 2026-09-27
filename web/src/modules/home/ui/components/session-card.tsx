@@ -163,7 +163,7 @@ export function SessionCard({ sample, className, compact = false }: SessionCardP
                   key={`${expected}-${actual}`}
                   className="flex items-center gap-1.5 rounded-md border border-tf-border bg-tf-surface px-2 py-1 font-mono text-[12px]"
                 >
-                  <span className="font-semibold text-tf-green-strong">{expected}</span>
+                  <span className="font-semibold text-tf-mint">{expected}</span>
                   <span className="text-tf-subtle" aria-label="became">
                     &rarr;
                   </span>
@@ -176,8 +176,8 @@ export function SessionCard({ sample, className, compact = false }: SessionCardP
 
         {/* The coaching cue — the differentiator, so it gets its own block */}
         <div className="rounded-xl border border-tf-green/25 bg-tf-green-light/70 p-4">
-          <p className="mb-1.5 flex flex-wrap items-center gap-2 font-mono text-[12px] font-semibold text-tf-green-strong">
-            <span className="rounded bg-tf-green px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-white">
+          <p className="mb-1.5 flex flex-wrap items-center gap-2 font-mono text-[12px] font-semibold text-tf-mint">
+            <span className="rounded bg-tf-green px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-primary-foreground">
               Fix
             </span>
             /{fix.sound}/ in &ldquo;{fix.word}&rdquo;

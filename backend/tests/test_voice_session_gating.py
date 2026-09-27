@@ -101,18 +101,20 @@ def sent_messages(session: VoiceSession):
     return [json.loads(c.args[0]) for c in session.websocket.send_text.call_args_list]
 
 
-def score_turn(session: VoiceSession, score: float, heard: str = "the first step"):
+def score_turn(session: VoiceSession, score: float, heard: str = "the first step", tts=None):
     """Run one scored turn through the real handler with a stubbed scorer.
 
     Audio is supplied (and ASR stubbed) because `handle_end_turn` treats an
     empty buffer as a silent turn and returns before scoring -- which is its own
-    tested behaviour, and not what these cases are about.
+    tested behaviour, and not what these cases are about. Pass `tts` to make
+    the coach audible (non-empty synthesis output), e.g. for ordering tests.
     """
     session.turn_audio = bytearray(b"\x00\x01" * 4000)
     # A local .env can hold real OpenRouter and Google credentials. Patching
     # both keeps this suite offline, fast, and free.
-    silent_tts = MagicMock()
-    silent_tts.text_to_speech = MagicMock(return_value=b"")
+    silent_tts = tts if tts is not None else MagicMock()
+    if tts is None:
+        silent_tts.text_to_speech = MagicMock(return_value=b"")
     with (
         patch.object(vw, "get_scorer", lambda: FakeScorer(score)),
         patch.object(vw, "pcm16le_to_text", lambda _pcm: heard),
@@ -179,6 +181,36 @@ class AdvancementTests(unittest.TestCase):
         self.assertTrue(session.report_generated)
         self.assertEqual(len(session.completed_sentences), len(SCRIPT))
 
+    def test_the_report_arrives_before_the_closing_audio(self):
+        """Passing the final step must show the completion screen at once.
+
+        The report used to be queued behind the coach's whole spoken reply --
+        seconds of the practice screen sitting there with no "Practice
+        Complete" popup -- and a learner who clicked Leave inside that window
+        raced their own report out of existence.
+        """
+        session = make_session(difficulty="medium")
+        audible_tts = MagicMock()
+        audible_tts.text_to_speech = MagicMock(return_value=b"\x01\x02")
+        # Earlier turns may legitimately stream TTS; only the FINAL turn's
+        # message order is under test, so its frames are captured alone.
+        score_turn(session, 95.0)
+        score_turn(session, 95.0)
+        session.websocket.send_text.reset_mock()
+        score_turn(session, 95.0, tts=audible_tts)
+
+        kinds = [m["type"] for m in sent_messages(session)]
+        complete_index = kinds.index("SESSION_COMPLETE")
+        tts_indexes = [i for i, t in enumerate(kinds) if t == "TTS_CHUNK"]
+        self.assertTrue(
+            tts_indexes, "this test needs audible TTS to be meaningful"
+        )
+        self.assertLess(
+            complete_index,
+            tts_indexes[0],
+            "SESSION_COMPLETE must precede the closing TTS chunks",
+        )
+
     def test_a_best_score_from_an_earlier_attempt_is_remembered(self):
         session = make_session(difficulty="medium")
         score_turn(session, 50.0)
@@ -207,6 +239,82 @@ class SkipTests(unittest.TestCase):
             report = run(session.generate_session_report())
         self.assertEqual(report["steps_skipped"], 1)
         self.assertEqual(report["skipped_step_indexes"], [1])
+
+
+class ResumeTests(unittest.TestCase):
+    """A reconnecting client resumes where it left off.
+
+    The engine keeps its state per connection, so before `resume` existed a
+    dropped socket (or a mic toggle, which also closes the socket) sent the
+    learner back to step 1 with every score forgotten. These tests pin the
+    seek-on-reconnect behaviour, and that its absence still means reset.
+    """
+
+    def test_a_resume_config_seeks_to_the_sent_step(self):
+        session = make_session(
+            resume={
+                "step_index": 2,
+                "skipped": [1],
+                "best_scores": {0: 95.0, 1: 40.0},
+                "completed_targets": [SCRIPT[0]],
+            }
+        )
+        self.assertEqual(session.current_sentence_index, 2)
+        self.assertEqual(session.target_text, SCRIPT[2])
+        self.assertEqual(session.skipped_steps, {1})
+        self.assertEqual(session.step_best_score, {0: 95.0, 1: 40.0})
+        self.assertEqual(session.completed_sentences, [SCRIPT[0]])
+        # The first frame the reconnecting client receives is the restored
+        # step. (make_session resets the send mock, so emit it explicitly.)
+        run(session._send_practice_target())
+        target = sent_messages(session)[-1]
+        self.assertEqual(target["type"], "PRACTICE_TARGET")
+        self.assertEqual(target["target_text"], SCRIPT[2])
+        self.assertEqual(target["step_index"], 2)
+
+    def test_a_resume_step_out_of_range_is_clamped(self):
+        session = make_session(
+            resume={"step_index": 99, "skipped": [7], "best_scores": {9: 10.0}}
+        )
+        self.assertEqual(session.current_sentence_index, len(SCRIPT) - 1)
+        # Out-of-range ledger entries are dropped, not trusted.
+        self.assertEqual(session.skipped_steps, set())
+        self.assertEqual(session.step_best_score, {})
+
+    def test_resume_best_scores_arrive_with_string_keys_over_the_wire(self):
+        # JSON object keys are strings; the schema's int-keyed dict has to
+        # coerce them, or the range filter would compare `0 <= "0"`.
+        session = make_session(
+            resume={
+                "step_index": 1,
+                "skipped": [],
+                "best_scores": {"0": 95.0, "2": 40.0},
+                "completed_targets": [SCRIPT[0]],
+            }
+        )
+        self.assertEqual(session.step_best_score, {0: 95.0, 2: 40.0})
+
+    def test_a_config_without_resume_starts_from_step_one(self):
+        session = make_session()
+        self.assertEqual(session.current_sentence_index, 0)
+        self.assertEqual(session.completed_sentences, [])
+
+    def test_resumed_progress_counts_in_the_report(self):
+        session = make_session(
+            resume={
+                "step_index": 1,
+                "skipped": [],
+                "best_scores": {0: 95.0},
+                "completed_targets": [SCRIPT[0]],
+            }
+        )
+        score_turn(session, 95.0)  # passes step 1
+
+        with patch.object(vw, "generate_coach_summary", AsyncMock(return_value="ok")):
+            report = run(session.generate_session_report())
+        # One completed before the drop, one after the reconnect.
+        self.assertEqual(report["sentences_completed"], 2)
+        self.assertEqual(len(session.completed_sentences), 2)
 
 
 class FinalizeTests(unittest.TestCase):

@@ -152,8 +152,8 @@ export const ResetPasswordView = () => {
                 </div>
 
                 {success && (
-                  <Alert className="bg-green-500/10 border-green-500/50">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <Alert className="bg-success/10 border-success/30">
+                    <CheckCircle2 className="w-4 h-4 text-success" />
                     <AlertTitle>Password reset successful!</AlertTitle>
                     <AlertDescription>
                       Redirecting you to sign in...
@@ -188,13 +188,12 @@ export const ResetPasswordView = () => {
 
           <div className="bg-radial from-sidebar-accent to-sidebar p-10 relative hidden md:flex flex-col gap-y-4 items-center justify-center">
             <Image
-              src="/logo.svg"
-              alt="TalkFlow Logo"
-              width={92}
-              height={92}
-              className="h-[92px] w-[92px]"
+              src="/Talkflow_logo.svg"
+              alt="TalkFlow"
+              width={128}
+              height={128}
+              className="h-[128px] w-[128px] object-contain"
             />
-            <p className="text-2xl font-semibold text-white">TalkFlow</p>
           </div>
         </CardContent>
       </Card>

@@ -77,7 +77,7 @@ export function CallActiveSentence({
           not repeated here — the score pill straddling the panel's top edge is
           the one authoritative readout for it, and it sits directly above. */}
       <div className="flex shrink-0 items-center justify-center gap-2 text-xs">
-        <span className="rounded-full px-3 py-1 font-semibold bg-neutral-100 text-neutral-600 border border-neutral-200/80">
+        <span className="rounded-full px-3 py-1 font-semibold bg-secondary text-muted-foreground border border-border/80">
           Level target
         </span>
       </div>
@@ -121,9 +121,9 @@ export function CallActiveSentence({
                   <span
                     className={cn(
                       "call-target-word font-bold leading-tight tracking-tight transition-all duration-200",
-                      status === "current" && "bg-emerald-100/90 text-emerald-950 scale-105 rounded-lg px-2 py-0.5 shadow-2xs border-b-3 border-emerald-600",
-                      status === "spoken" && !wrong && "text-neutral-900",
-                      status === "unspoken" && !wrong && !active && "text-neutral-600",
+                      status === "current" && "bg-success/15 text-primary scale-105 rounded-lg px-2 py-0.5 shadow-2xs border-b-3 border-primary",
+                      status === "spoken" && !wrong && "text-foreground",
+                      status === "unspoken" && !wrong && !active && "text-muted-foreground",
                       active && isTalking && "animate-word-glow"
                     )}
                     style={{
@@ -153,7 +153,7 @@ export function CallActiveSentence({
         <CallActiveContext text={contextAfter} position="after" />
 
         {/* Audio controls row: Play/Pause button + ScrubBar */}
-        <div className="mx-auto flex w-full max-w-sm shrink-0 items-center gap-3 rounded-full border border-neutral-200/80 bg-neutral-50/80 px-4 py-2 shadow-2xs backdrop-blur-xs">
+        <div className="mx-auto flex w-full max-w-sm shrink-0 items-center gap-3 rounded-full border border-border/80 bg-muted/80 px-4 py-2 shadow-2xs backdrop-blur-xs">
           <TranscriptViewerPlayPauseButton />
           <TranscriptViewerScrubBar />
         </div>
@@ -180,7 +180,7 @@ export function CallActiveSentence({
 
       {/* Word mode sentence context */}
       {practiceMode === "word" && practiceSentence !== targetText && (
-        <p className="mt-1 shrink-0 text-center text-xs italic text-neutral-500">
+        <p className="mt-1 shrink-0 text-center text-xs italic text-muted-foreground">
           Sentence: &ldquo;{practiceSentence}&rdquo;
         </p>
       )}

@@ -43,8 +43,27 @@ export const SessionsView = () => {
   if (!data) {
     return <SessionsViewLoading />;
   }
-  if (!data || data.items.length === 0) {
-    return (
+  if (data.items.length === 0) {
+    // Two different empties: no sessions at all is an invitation to create
+    // one, but an empty result *with* filters active is the filters doing
+    // their job — telling them to create a session would be confusing.
+    const hasFilters = Boolean(filters.status || filters.search || filters.coachId);
+    return hasFilters ? (
+      <div className="flex-1 flex flex-col">
+        <EmptyState
+          title="No Sessions Match These Filters"
+          description="Try a different search, status or coach — or clear the filters to see everything."
+        />
+        <div className="flex justify-center pb-4">
+          <button
+            onClick={() => setFilters({ status: null, coachId: "", search: "", page: 1 })}
+            className="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors"
+          >
+            Clear filters
+          </button>
+        </div>
+      </div>
+    ) : (
       <EmptyState
         title="Create Your First Practice Session"
         description="Create a session to start practicing with your speaking coach."

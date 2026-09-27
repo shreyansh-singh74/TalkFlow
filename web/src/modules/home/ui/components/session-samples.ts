@@ -23,7 +23,7 @@ export const SAMPLES: SessionSample[] = [
     fix: {
       sound: "ə",
       word: "pro·nun·ci·a·tion",
-      cue: "Relax your tongue to center. The schwa is neutral and unstressed — no jaw movement, no lip rounding.",
+      cue: "Relax your tongue to center. The schwa is neutral and unstressed, with no jaw movement and no lip rounding.",
     },
     duration: "02:14",
   },

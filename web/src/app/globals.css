@@ -23,6 +23,10 @@
   --color-tf-green-light: var(--tf-green-light);
   --color-tf-green-strong: var(--tf-green-strong);
   --color-tf-green-tint: var(--tf-green-tint);
+  --color-tf-lime: var(--tf-lime);
+  --color-tf-lime-deep: var(--tf-lime-deep);
+  --color-tf-accent: var(--tf-accent);
+  --color-tf-accent-deep: var(--tf-accent-deep);
   --color-tf-border: var(--tf-border);
   /* Dark ("deep forest") sections — lifted from the app sidebar so the landing
      page and the signed-in product read as the same brand. */
@@ -34,6 +38,21 @@
   --color-tf-mint: var(--tf-mint);
   --color-tf-amber: var(--tf-amber);
   --color-tf-amber-light: var(--tf-amber-light);
+  /* Brand semantic tokens */
+  --color-hero: var(--hero);
+  --color-surface-soft: var(--surface-soft);
+  --color-elevated-surface: var(--elevated-surface);
+  --color-brand: var(--brand);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-bright: var(--brand-bright);
+  --color-primary-hover: var(--primary-hover);
+  --color-text-muted: var(--text-muted);
+  --color-strong-border: var(--strong-border);
+  /* Status tokens */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
   --color-ink: var(--ink);
   --color-parchment: var(--parchment);
   --color-cobalt: var(--cobalt);
@@ -79,117 +98,153 @@
 
 :root {
   --radius: 0.625rem;
-  /* Landing palette — derived from the product itself, not a separate identity.
-     --tf-green is the app's --primary (oklch(0.63 0.1699 149.21) = #18A44B) and
-     --tf-deep / --tf-deep-raise are the app sidebar (#061A15 / #0C4234), so the
-     marketing page and the signed-in UI share one core colour. */
-  --tf-bg: #F4F8F5;
-  --tf-white: #FFFFFF;
-  --tf-text: #08201A;
-  --tf-muted: #4A5F57;
-  --tf-subtle: #7C9089;
-  --tf-green: #18A44B;
-  --tf-green-strong: #087A35;
-  --tf-green-light: #E4F6EA;
-  --tf-green-tint: #EDF7F1;
-  --tf-border: #DDE8E1;
-  --tf-deep: #061A15;
-  --tf-deep-raise: #0C4234;
-  --tf-deep-line: rgba(255, 255, 255, 0.1);
-  --tf-deep-text: #E9F2EC;
-  --tf-deep-muted: #94AFA5;
-  --tf-mint: #5FD98B;
-  /* Signals "this is what actually came out" — the app's --amber-warm. */
-  --tf-amber: #C25E2F;
-  --tf-amber-light: #FAEDE6;
-  /* TalkFlow palette */
-  --ink: #14161A;
-  --parchment: #EFEAE1;
-  --cobalt: #3457D5;
-  --cobalt-muted: rgba(52, 87, 213, 0.15);
-  --emerald: #00A878;
-  --emerald-muted: rgba(0, 168, 120, 0.15);
-  --amber-warm: #C25E2F;
-  --amber-muted: rgba(194, 94, 47, 0.15);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  /* Primary color (e.g. button) */
-  --primary: oklch(0.63 0.1699 149.21);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+
+  /* Brand semantic tokens (light) */
+  --hero: #D5FAC3;
+  --surface-soft: #E8FBDD;
+  --elevated-surface: #F0F8EA;
+  --brand: #D5FAC3;
+  --brand-accent: #42B866;
+  --brand-bright: #8BE36B;
+  --primary-hover: #0F612D;
+  --text-muted: #718073;
+  --strong-border: #A9D394;
+
+  /* Status tokens */
+  --success: #167A3A;
+  --warning: #B45309;
+  --danger: #B91C1C;
+  --info: #2563EB;
+
+  /* shadcn tokens (light) */
+  --background: #F5FBEF;
+  --foreground: #122015;
+  --card: #FFFFFF;
+  --card-foreground: #122015;
+  --popover: #FFFFFF;
+  --popover-foreground: #122015;
+  --primary: #167A3A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #E8FBDD;
+  --secondary-foreground: #122015;
+  --muted: #E8FBDD;
+  --muted-foreground: #526457;
+  --accent: #E8FBDD;
+  --accent-foreground: #167A3A;
+  --destructive: #B91C1C;
+  --border: #C7E4B9;
+  --input: #C7E4B9;
+  --ring: #42B866;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  /* Sidebar background color */
-  --sidebar: oklch(0.2 0.0283 174.92);
-  /* Sidebar text color */
-  --sidebar-foreground: oklch(0.82 0.0057 182.99);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  /* Sidebar active background color */
-  --sidebar-accent: oklch(0.34 0.0601 171.21);
-  /* Sidebar active text color */
-  --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #122015;
+  --sidebar-primary: #167A3A;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #E8FBDD;
+  --sidebar-accent-foreground: #167A3A;
+  --sidebar-border: #C7E4B9;
+  --sidebar-ring: #42B866;
+
+  /* TalkFlow palette — aliases to the semantic tokens above (one source of truth) */
+  --tf-bg: var(--background);
+  --tf-white: var(--card);
+  --tf-text: var(--foreground);
+  --tf-muted: var(--muted-foreground);
+  --tf-subtle: var(--text-muted);
+  --tf-green: var(--primary);
+  --tf-green-strong: var(--primary-hover);
+  --tf-green-light: var(--elevated-surface);
+  --tf-green-tint: var(--surface-soft);
+  --tf-lime: var(--hero);
+  --tf-lime-deep: var(--brand-bright);
+  --tf-accent: var(--brand-accent);
+  --tf-accent-deep: var(--primary-hover);
+  --tf-border: var(--border);
+  --tf-mint: var(--brand-accent);
+  --tf-amber: var(--warning);
+  --tf-amber-light: #FDEEDF;
+  --tf-deep: #0B120D;
+  --tf-deep-raise: #142419;
+  --tf-deep-line: rgba(241, 248, 237, 0.14);
+  --tf-deep-text: #F1F8ED;
+  --tf-deep-muted: #B5C5B5;
+
+  /* Call-page accents */
+  --ink: #0B120D;
+  --parchment: #F1F8ED;
+  --cobalt: #42B866;
+  --cobalt-muted: rgba(66, 184, 102, 0.15);
+  --emerald: #167A3A;
+  --emerald-muted: rgba(22, 122, 58, 0.15);
+  --amber-warm: #B45309;
+  --amber-muted: rgba(180, 83, 9, 0.15);
 }
 
 .dark {
-  /* TalkFlow palette — same values work on both themes */
-  --ink: #14161A;
-  --parchment: #EFEAE1;
-  --cobalt: #3457D5;
-  --cobalt-muted: rgba(52, 87, 213, 0.2);
-  --emerald: #00A878;
-  --emerald-muted: rgba(0, 168, 120, 0.25);
-  --amber-warm: #C25E2F;
-  --amber-muted: rgba(194, 94, 47, 0.2);
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  /* Brand semantic tokens (dark) */
+  --hero: #192D1D;
+  --surface-soft: #142419;
+  --elevated-surface: #192D1D;
+  --brand: #D5FAC3;
+  --brand-accent: #5FD47A;
+  --brand-bright: #8BE36B;
+  --primary-hover: #A5EE89;
+  --text-muted: #829482;
+  --strong-border: #3C5C42;
+
+  /* Status tokens (dark) */
+  --success: #5FD47A;
+  --warning: #F59E0B;
+  --danger: #F87171;
+  --info: #60A5FA;
+
+  /* shadcn tokens (dark) */
+  --background: #0B120D;
+  --foreground: #F1F8ED;
+  --card: #16251A;
+  --card-foreground: #F1F8ED;
+  --popover: #16251A;
+  --popover-foreground: #F1F8ED;
+  --primary: #8BE36B;
+  --primary-foreground: #0B120D;
+  --secondary: #142419;
+  --secondary-foreground: #F1F8ED;
+  --muted: #142419;
+  --muted-foreground: #B5C5B5;
+  --accent: #142419;
+  --accent-foreground: #8BE36B;
+  --destructive: #F87171;
+  --border: #29422E;
+  --input: #29422E;
+  --ring: #5FD47A;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: #101A12;
+  --sidebar-foreground: #F1F8ED;
+  --sidebar-primary: #8BE36B;
+  --sidebar-primary-foreground: #0B120D;
+  --sidebar-accent: #142419;
+  --sidebar-accent-foreground: #F1F8ED;
+  --sidebar-border: #29422E;
+  --sidebar-ring: #5FD47A;
+
+  /* Landing-only dark overrides (non-alias tokens) */
+  --tf-amber-light: #2A1A0C;
+
+  /* Call-page accents (dark) */
+  --cobalt: #5FD47A;
+  --cobalt-muted: rgba(95, 212, 122, 0.2);
+  --emerald: #5FD47A;
+  --emerald-muted: rgba(95, 212, 122, 0.25);
+  --amber-warm: #F59E0B;
+  --amber-muted: rgba(245, 158, 11, 0.2);
 }
 
 @layer base {
@@ -260,15 +315,11 @@
 }
 
 .arc-dial-track {
-  stroke: oklch(0.922 0 0);
-}
-
-.dark .arc-dial-track {
-  stroke: oklch(1 0 0 / 10%);
+  stroke: var(--border);
 }
 
 .arc-dial-fill {
-  stroke: var(--cobalt);
+  stroke: var(--brand-accent);
   transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -329,31 +380,30 @@
 
 /* Glass panel & Light cards — reusable light card utilities */
 .glass-panel {
-  background: #ffffff;
-  border: 1px solid oklch(0.92 0 0);
+  background: var(--card);
+  border: 1px solid var(--border);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .glass-panel-strong {
-  background: #ffffff;
-  border: 1px solid oklch(0.9 0 0);
+  background: var(--card);
+  border: 1px solid var(--border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-/* Fixed bottom control bar — Light Theme */
+/* Fixed bottom control bar */
 .control-bar {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--card);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid oklch(0.9 0 0);
+  border-top: 1px solid var(--border);
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.04);
 }
 
 /* Coach floating action button */
 .coach-fab {
-  background: linear-gradient(135deg, #10b981, #14b8a6);
-  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3),
-    0 0 0 0 rgba(16, 185, 129, 0.4);
+  background: var(--primary);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
 }
 
 .coach-fab-pulse {
@@ -364,11 +414,11 @@
 
   0%,
   100% {
-    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3), 0 0 0 0 rgba(16, 185, 129, 0.4);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18), 0 0 0 0 rgba(0, 0, 0, 0);
   }
 
   50% {
-    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3), 0 0 0 8px rgba(16, 185, 129, 0);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18), 0 0 0 8px rgba(0, 0, 0, 0);
   }
 }
 
@@ -495,35 +545,35 @@
 
 /* Score color bands */
 .score-color-red {
-  color: #ef4444;
+  color: var(--danger);
 }
 
 .score-color-amber {
-  color: #f59e0b;
+  color: var(--warning);
 }
 
 .score-color-blue {
-  color: #3b82f6;
+  color: var(--info);
 }
 
 .score-color-green {
-  color: #10b981;
+  color: var(--success);
 }
 
 .score-stroke-red {
-  stroke: #ef4444;
+  stroke: var(--danger);
 }
 
 .score-stroke-amber {
-  stroke: #f59e0b;
+  stroke: var(--warning);
 }
 
 .score-stroke-blue {
-  stroke: #3b82f6;
+  stroke: var(--info);
 }
 
 .score-stroke-green {
-  stroke: #10b981;
+  stroke: var(--success);
 }
 
 /* Waveform bar animation */
@@ -594,11 +644,11 @@
 
   0%,
   100% {
-    text-shadow: 0 0 4px rgba(16, 185, 129, 0.2);
+    text-shadow: 0 0 4px color-mix(in srgb, var(--brand-accent) 20%, transparent);
   }
 
   50% {
-    text-shadow: 0 0 16px rgba(16, 185, 129, 0.5);
+    text-shadow: 0 0 16px color-mix(in srgb, var(--brand-accent) 50%, transparent);
   }
 }
 
@@ -731,7 +781,7 @@
   justify-content: center;
   column-gap: 0.34em;
   row-gap: 0.1em;
-  font-size: clamp(1.375rem, 3.4vw, 2.375rem);
+  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
   line-height: 1.6;
   letter-spacing: -0.02em;
 }
@@ -794,7 +844,7 @@
   font-weight: 500;
   font-size: 0.82em;
   letter-spacing: 0.01em;
-  color: var(--tf-green-strong);
+  color: var(--tf-mint);
 }
 
 /* Words the scorer flagged: same roll, but the spelling carries a marker. */
@@ -806,7 +856,7 @@
 }
 
 .phoneme-slot-focus .phoneme-sound {
-  color: var(--tf-green);
+  color: var(--tf-mint);
 }
 
 /* Stage legend under the line */
@@ -825,26 +875,16 @@
 .phoneme-stage[data-active="true"] {
   border-color: color-mix(in srgb, var(--tf-green) 40%, transparent);
   background: var(--tf-green-light);
-  color: var(--tf-green-strong);
-}
-
-/* ── Phoneme ticker band ─────────────────────────────────────
-   Replaces the old curved SVG marquee: a straight, legible strip of
-   word → IPA pairs on the deep-forest brand colour. */
-
-.phoneme-ticker {
-  background: var(--tf-deep);
-  color: var(--tf-deep-text);
-}
-
-.phoneme-ticker-pair {
-  font-family: var(--font-phonetic);
+  color: var(--tf-mint);
 }
 
 /* ── Landing page primitives ─────────────────────────────────── */
 
-/* Page background, set by a body class rather than JS style mutation */
-body.landing-page {
+/* Page background. `.landing-page` is a div wrapping the marketing page; the
+   global `.dark` class (set on <html> by the theme provider) drives its palette
+   through the shared semantic tokens. */
+body:has(.landing-page),
+.landing-page {
   background-color: var(--tf-bg);
   color: var(--tf-text);
 }

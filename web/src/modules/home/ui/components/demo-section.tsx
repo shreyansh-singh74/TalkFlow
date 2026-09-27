@@ -30,7 +30,6 @@ export function DemoSection() {
 
       <div className="relative mx-auto max-w-3xl">
         <SectionHeading
-          eyebrow="Live feedback"
           title="See the sentence, the sounds,"
           accent="and the fix."
           accentOnNewLine
@@ -55,7 +54,7 @@ export function DemoSection() {
               className={cn(
                 "rounded-full px-4 py-2 text-[13px] font-medium transition-colors",
                 sample.id === activeId
-                  ? "bg-tf-green text-white shadow-[0_6px_18px_-8px_rgba(24,164,75,0.9)]"
+                  ? "bg-tf-green text-primary-foreground shadow-[0_6px_18px_-8px_rgba(24,164,75,0.5)]"
                   : "text-tf-muted hover:bg-tf-green-tint hover:text-tf-text",
               )}
             >

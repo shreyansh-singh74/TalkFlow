@@ -62,9 +62,7 @@ export function SectionHeading({
         {accent ? (
           <>
             {accentOnNewLine ? <br /> : " "}
-            <span
-              className={cn("h-accent", deep ? "text-tf-mint" : "text-tf-green-strong")}
-            >
+            <span className="h-accent text-tf-mint">
               {accent}
             </span>
           </>

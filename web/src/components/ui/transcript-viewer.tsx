@@ -325,9 +325,9 @@ export function TranscriptViewerWords({
             className={cn(
               "cursor-pointer transition-all duration-150 rounded-md px-1.5 py-0.5 select-none",
               status === "current" &&
-                "bg-emerald-100 text-emerald-900 font-extrabold scale-105 border-b-2 border-emerald-600 shadow-2xs",
-              status === "spoken" && "text-neutral-900 font-bold",
-              status === "unspoken" && "text-neutral-400 font-medium hover:text-neutral-600",
+                "bg-success/15 text-primary font-extrabold scale-105 border-b-2 border-primary shadow-2xs",
+              status === "spoken" && "text-foreground font-bold",
+              status === "unspoken" && "text-muted-foreground font-medium hover:text-muted-foreground",
               wordClassNames
             )}
           >
@@ -347,7 +347,7 @@ export function TranscriptViewerPlayPauseButton({ className, ...props }: React.B
       type="button"
       onClick={() => (isPlaying ? pause() : void play())}
       className={cn(
-        "flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-xs cursor-pointer shrink-0",
+        "flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary-hover active:scale-95 transition-all shadow-xs cursor-pointer shrink-0",
         className
       )}
       title={isPlaying ? "Pause audio" : "Play target sentence"}
@@ -390,7 +390,7 @@ export function TranscriptViewerScrubBar({
   return (
     <div className="flex flex-1 items-center gap-2 w-full">
       {showTimeLabels && (
-        <span className={cn("text-[10px] font-mono font-semibold text-neutral-400 w-8 text-right", labelsClassName)}>
+        <span className={cn("text-[10px] font-mono font-semibold text-muted-foreground w-8 text-right", labelsClassName)}>
           {formatTime(currentTime)}
         </span>
       )}
@@ -409,16 +409,16 @@ export function TranscriptViewerScrubBar({
           onChange={handleSliderChange}
           className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
         />
-        <div className="w-full h-1.5 rounded-full bg-neutral-200 overflow-hidden relative">
+        <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden relative">
           <div
-            className={cn("h-full bg-emerald-600 transition-all duration-75", progressClassName)}
+            className={cn("h-full bg-primary transition-all duration-75", progressClassName)}
             style={{ width: `${progressPct}%` }}
           />
         </div>
       </div>
 
       {showTimeLabels && (
-        <span className={cn("text-[10px] font-mono font-semibold text-neutral-400 w-8", labelsClassName)}>
+        <span className={cn("text-[10px] font-mono font-semibold text-muted-foreground w-8", labelsClassName)}>
           {formatTime(duration)}
         </span>
       )}

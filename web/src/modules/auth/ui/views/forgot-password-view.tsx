@@ -112,8 +112,8 @@ export const ForgotPasswordView = () => {
                 </div>
 
                 {success && (
-                  <Alert className="bg-green-500/10 border-green-500/50">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <Alert className="bg-success/10 border-success/30">
+                    <CheckCircle2 className="w-4 h-4 text-success" />
                     <AlertTitle>Check your email!</AlertTitle>
                     <AlertDescription>
                       We&apos;ve sent a password reset link to your email address.
@@ -144,13 +144,12 @@ export const ForgotPasswordView = () => {
 
           <div className="bg-radial from-sidebar-accent to-sidebar p-10 relative hidden md:flex flex-col gap-y-4 items-center justify-center">
             <Image
-              src="/logo.svg"
-              alt="TalkFlow Logo"
-              width={92}
-              height={92}
-              className="h-[92px] w-[92px]"
+              src="/Talkflow_logo.svg"
+              alt="TalkFlow"
+              width={128}
+              height={128}
+              className="h-[128px] w-[128px] object-contain"
             />
-            <p className="text-2xl font-semibold text-white">TalkFlow</p>
           </div>
         </CardContent>
       </Card>

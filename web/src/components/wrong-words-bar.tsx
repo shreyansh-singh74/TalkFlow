@@ -31,9 +31,9 @@ export function WrongWordsBar({ pairs, activeKey, onSelectExpected }: Props) {
   if (!unique.length) return null;
 
   return (
-    <div className="w-full border-b border-neutral-100 pb-2">
+    <div className="w-full border-b border-border pb-2">
       <div className="flex items-center gap-3 py-0.5">
-        <p className="shrink-0 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-700">
+        <p className="shrink-0 text-[11px] font-bold uppercase tracking-[0.18em] text-warning">
           Practice these words
         </p>
         <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto">
@@ -49,8 +49,8 @@ export function WrongWordsBar({ pairs, activeKey, onSelectExpected }: Props) {
                   "shrink-0 rounded-full px-3.5 py-1 text-sm font-semibold transition-all duration-200 border cursor-pointer",
                   "hover:scale-105 active:scale-95 shadow-2xs",
                   isActive
-                    ? "bg-emerald-50 text-emerald-800 border-emerald-300 ring-2 ring-emerald-400/30"
-                    : "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
+                    ? "bg-success/10 text-primary border-success/40 ring-2 ring-success/30"
+                    : "bg-warning/10 text-warning border-warning/40 hover:bg-warning/15"
                 )}
               >
                 {p.expected}

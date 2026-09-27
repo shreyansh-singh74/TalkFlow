@@ -11,48 +11,30 @@ interface Props {
 }
 
 export default async function Page({ params }: Props) {
-  try {
-    const { sessionId } = await params;
+  // The auth check stays outside the try below on purpose: redirect() works
+  // by throwing NEXT_REDIRECT, and a catch-all here used to swallow it and
+  // render "Something went wrong" to the very visitor it was sending to
+  // sign-in.
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) {
+    redirect("/sign-in");
+  }
 
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session) {
-      redirect("/sign-in");
-    }
-
-    // Validate sessionId format (optional but good practice)
-    if (!sessionId || typeof sessionId !== 'string') {
-      return (
-        <div className="flex-1 py-4 px-4 md:px-8">
-          <ErrorState
-            title="Invalid Session ID"
-            description="The session ID provided is not valid."
-          />
-        </div>
-      );
-    }
-
-    return (
-      <div>
-        <Suspense fallback={<SessionsViewLoading />}>
-          <SessionIdView sessionId={sessionId} />
-        </Suspense>
-      </div>
-    );
-    
-  } catch (error) {
-    console.error("Page error:", error);
-    
-    // Catch-all error handler
+  const { sessionId } = await params;
+  if (!sessionId || typeof sessionId !== "string") {
     return (
       <div className="flex-1 py-4 px-4 md:px-8">
         <ErrorState
-          title="Something went wrong"
-          description="An unexpected error occurred while loading the session page."
+          title="Invalid Session ID"
+          description="The session ID provided is not valid."
         />
       </div>
     );
   }
+
+  return (
+    <Suspense fallback={<SessionsViewLoading />}>
+      <SessionIdView sessionId={sessionId} />
+    </Suspense>
+  );
 }

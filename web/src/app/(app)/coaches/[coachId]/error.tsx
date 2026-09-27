@@ -10,10 +10,10 @@ export default function Error({ error, reset }: { error: Error; reset: () => voi
   return (
     <div className="flex flex-col items-center justify-center p-6">
       <h2 className="text-xl font-semibold">Something went wrong</h2>
-      <p className="text-gray-600">{error.message}</p>
+      <p className="text-muted-foreground">{error.message}</p>
       <button
         onClick={() => reset()}
-        className="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white"
+        className="mt-4 px-4 py-2 rounded-lg bg-primary text-primary-foreground"
       >
         Try again
       </button>

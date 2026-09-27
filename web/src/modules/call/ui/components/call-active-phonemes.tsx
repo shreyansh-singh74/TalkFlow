@@ -33,8 +33,8 @@ export function CallActivePhonemes({ perPhoneme }: CallActivePhonemesProps) {
   );
 
   return (
-    <div className="w-full border-t border-neutral-200 pt-3">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-500">
+    <div className="w-full border-t border-border pt-3">
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
         Sounds
       </p>
 
@@ -50,11 +50,11 @@ export function CallActivePhonemes({ perPhoneme }: CallActivePhonemesProps) {
             className={cn(
               "rounded px-1.5 py-0.5 font-mono text-xs tabular-nums",
               phone.accuracy >= 80
-                ? "bg-emerald-50 text-emerald-800"
+                ? "bg-success/10 text-primary"
                 : phone.accuracy >= 55
-                  ? "bg-amber-50 text-amber-800"
-                  : "bg-red-50 text-red-800",
-              phone === weakest && phone.accuracy < 80 && "ring-1 ring-red-300"
+                  ? "bg-warning/10 text-warning"
+                  : "bg-danger/10 text-danger",
+              phone === weakest && phone.accuracy < 80 && "ring-1 ring-danger/40"
             )}
           >
             {phone.expected}
@@ -63,7 +63,7 @@ export function CallActivePhonemes({ perPhoneme }: CallActivePhonemesProps) {
       </div>
 
       {weakest.accuracy < 80 && (
-        <p className="mt-2 text-xs font-medium text-neutral-600">
+        <p className="mt-2 text-xs font-medium text-muted-foreground">
           Weakest sound: <span className="font-mono">{weakest.expected}</span> at{" "}
           {Math.round(weakest.accuracy)}%
           {weakest.actual && weakest.actual !== weakest.expected

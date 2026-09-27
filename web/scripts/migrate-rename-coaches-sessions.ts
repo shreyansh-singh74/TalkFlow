@@ -12,8 +12,8 @@
  *
  *   npx tsx scripts/migrate-rename-coaches-sessions.ts
  */
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { sql } from "drizzle-orm";
 import * as dotenv from "dotenv";
 import * as path from "path";
@@ -25,14 +25,14 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const db = drizzle({ client: neon(process.env.DATABASE_URL) });
+const db = drizzle({ client: postgres(process.env.DATABASE_URL, { max: 1 }) });
 
 async function tableExists(name: string): Promise<boolean> {
   const rows = await db.execute(sql`
     select 1 from information_schema.tables
     where table_schema = 'public' and table_name = ${name}
   `);
-  return rows.rows.length > 0;
+  return rows.length > 0;
 }
 
 async function columnExists(table: string, column: string): Promise<boolean> {
@@ -40,7 +40,7 @@ async function columnExists(table: string, column: string): Promise<boolean> {
     select 1 from information_schema.columns
     where table_schema = 'public' and table_name = ${table} and column_name = ${column}
   `);
-  return rows.rows.length > 0;
+  return rows.length > 0;
 }
 
 async function typeExists(name: string): Promise<boolean> {
@@ -49,7 +49,7 @@ async function typeExists(name: string): Promise<boolean> {
     join pg_namespace n on n.oid = t.typnamespace
     where n.nspname = 'public' and t.typname = ${name}
   `);
-  return rows.rows.length > 0;
+  return rows.length > 0;
 }
 
 async function main() {

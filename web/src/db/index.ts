@@ -1,44 +1,25 @@
-import { neon, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 
-// Configure neonConfig.fetchFunction to retry on transient connection failures/timeouts (e.g. database cold start)
-if (typeof window === 'undefined') {
-  const originalFetch = globalThis.fetch;
+/**
+ * Pooled TCP client speaking the standard Postgres wire protocol, so it works
+ * against any Postgres: the compose `db` service, a local instance, and Neon
+ * cloud alike (Neon accepts plain TCP; the URL's sslmode=require is honoured
+ * by postgres.js).
+ *
+ * This used to be `@neondatabase/serverless`, which sends queries as HTTPS
+ * calls to Neon's proxy — it could never reach a local Postgres, which is why
+ * `docker compose up` produced a web container whose migrations silently
+ * no-op'd and whose first request failed. The neon driver only pays off on
+ * edge runtimes; this app runs in Node, so the wire protocol is strictly more
+ * portable.
+ */
+const client = postgres(process.env.DATABASE_URL!, {
+  // Next.js can burst with concurrent requests; 10 connections covers it
+  // without exhausting Postgres's default 100-connection budget.
+  max: 10,
+  idle_timeout: 20,
+  connect_timeout: 10,
+});
 
-  neonConfig.fetchFunction = async (
-    input: Parameters<typeof globalThis.fetch>[0],
-    init?: Parameters<typeof globalThis.fetch>[1]
-  ) => {
-    let retries = 3;
-    let delay = 1000;
-
-    while (true) {
-      try {
-        return await originalFetch(input, init);
-      } catch (error) {
-        const isTransient =
-          error instanceof TypeError ||
-          (error instanceof Error && error.message?.includes('fetch failed')) ||
-          (error && typeof error === 'object' && 'code' in error && (error as { code?: unknown }).code === 'ETIMEDOUT') ||
-          (error && typeof error === 'object' && 'code' in error && (error as { code?: unknown }).code === 'ECONNRESET') ||
-          (error && typeof error === 'object' && 'name' in error && (error as { name?: unknown }).name === 'ConnectTimeoutError');
-
-        if (isTransient && retries > 0) {
-          retries--;
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          console.warn(
-            `Neon database query failed (remaining retries: ${retries}, delay: ${delay}ms). Error: ${errorMessage}`
-          );
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          delay *= 2;
-        } else {
-          throw error;
-        }
-      }
-    }
-  };
-}
-
-const sql = neon(process.env.DATABASE_URL!);
-export const db = drizzle({ client: sql });
-
+export const db = drizzle({ client });

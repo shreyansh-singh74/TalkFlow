@@ -42,36 +42,36 @@ export function CallActiveCoach({
   }, [transcripts.length, streamingAIText]);
 
   return (
-    <div className="flex h-full w-full flex-col bg-neutral-50/90 border-l border-neutral-200/80 shadow-2xs">
+    <div className="flex h-full w-full flex-col bg-muted/90 border-l border-border/80 shadow-2xs">
       {/* Header */}
-      <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-neutral-200/80 px-5 bg-white/60">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20">
-          <Bot className="h-4 w-4 text-emerald-600" />
+      <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border/80 px-5 bg-card/60">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 border border-brand-accent/30">
+          <Bot className="h-4 w-4 text-brand-accent" />
         </div>
-        <span className="text-sm font-bold text-neutral-900">Coach</span>
+        <span className="text-sm font-bold text-foreground">Coach</span>
       </div>
 
       {/* Messages */}
       <ScrollArea data-call-pane="coach" className="flex-1 min-h-0" ref={scrollRef}>
         <div className="flex flex-col gap-3.5 p-5">
           {isConnected && !isTalking && !isAISpeaking && !streamingAIText && isMicEnabled && (
-            <div className="mx-auto rounded-full px-4 py-1.5 text-xs font-semibold text-center bg-neutral-100 text-neutral-600 border border-neutral-200/80">
+            <div className="mx-auto rounded-full px-4 py-1.5 text-xs font-semibold text-center bg-secondary text-muted-foreground border border-border/80">
               {practiceMode === "word" ? "Repeat the word" : "Repeat the sentence"} — hold SPACE
             </div>
           )}
 
           {isTalking && (
-            <div className="mx-auto rounded-full px-4 py-1.5 text-xs font-semibold text-center bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+            <div className="mx-auto rounded-full px-4 py-1.5 text-xs font-semibold text-center bg-success/10 text-primary border border-success/30">
               Listening… release SPACE when done
             </div>
           )}
 
           {transcripts.length === 0 && !partialTranscript && !streamingAIText && !isTalking && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 border border-neutral-200">
-                <Mic className="h-5 w-5 text-neutral-400" />
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-secondary border border-border">
+                <Mic className="h-5 w-5 text-muted-foreground" />
               </div>
-              <p className="text-xs font-medium text-neutral-500 max-w-[200px] leading-relaxed">
+              <p className="text-xs font-medium text-muted-foreground max-w-[200px] leading-relaxed">
                 {isMicEnabled
                   ? "Your turns and coach replies will appear here."
                   : "Turn on the mic to start."}
@@ -84,10 +84,10 @@ export function CallActiveCoach({
               {/* User transcript */}
               <div className="flex justify-end">
                 <div className="flex items-start gap-2 max-w-[88%]">
-                  <div className="rounded-2xl rounded-tr-xs px-4 py-2.5 text-sm bg-emerald-600 text-white shadow-xs">
+                  <div className="rounded-2xl rounded-tr-xs px-4 py-2.5 text-sm bg-primary text-primary-foreground shadow-xs">
                     <p className="leading-relaxed font-medium">{t.text}</p>
                   </div>
-                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-200/80 border border-neutral-300/80 text-neutral-600">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/80 border border-border/80 text-muted-foreground">
                     <User className="h-3 w-3" />
                   </div>
                 </div>
@@ -97,10 +97,10 @@ export function CallActiveCoach({
               {t.reply && (
                 <div className="flex justify-start">
                   <div className="flex items-start gap-2 max-w-[88%]">
-                    <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600">
+                    <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 border border-brand-accent/30 text-brand-accent">
                       <Bot className="h-3 w-3" />
                     </div>
-                    <div className="rounded-2xl rounded-tl-xs px-4 py-2.5 text-sm bg-white text-neutral-800 border border-neutral-200 shadow-2xs">
+                    <div className="rounded-2xl rounded-tl-xs px-4 py-2.5 text-sm bg-card text-foreground border border-border shadow-2xs">
                       <p className="leading-relaxed font-normal">{t.reply}</p>
                     </div>
                   </div>
@@ -113,17 +113,17 @@ export function CallActiveCoach({
           {(isAISpeaking || streamingAIText) && (
             <div className="flex justify-start">
               <div className="flex items-start gap-2 max-w-[88%]">
-                <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600">
+                <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 border border-brand-accent/30 text-brand-accent">
                   <Bot className="h-3 w-3" />
                 </div>
-                <div className="rounded-2xl rounded-tl-xs px-4 py-2.5 text-sm bg-white text-neutral-800 border border-neutral-200 shadow-2xs">
+                <div className="rounded-2xl rounded-tl-xs px-4 py-2.5 text-sm bg-card text-foreground border border-border shadow-2xs">
                   {streamingAIText ? (
                     <p className="leading-relaxed">{streamingAIText}</p>
                   ) : (
                     <div className="flex items-center gap-1.5 py-1">
-                      <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse delay-75" />
-                      <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse delay-150" />
+                      <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                      <div className="h-2 w-2 rounded-full bg-primary animate-pulse delay-75" />
+                      <div className="h-2 w-2 rounded-full bg-primary animate-pulse delay-150" />
                     </div>
                   )}
                 </div>
@@ -134,7 +134,7 @@ export function CallActiveCoach({
           {/* Partial transcript */}
           {partialTranscript && (
             <div className="flex justify-end">
-              <p className="max-w-[88%] rounded-2xl rounded-tr-xs px-4 py-2.5 text-sm italic bg-neutral-100 text-neutral-500 border border-neutral-200">
+              <p className="max-w-[88%] rounded-2xl rounded-tr-xs px-4 py-2.5 text-sm italic bg-secondary text-muted-foreground border border-border">
                 {partialTranscript}
               </p>
             </div>

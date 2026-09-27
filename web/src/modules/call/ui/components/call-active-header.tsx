@@ -32,11 +32,11 @@ function stateFor(
 }
 
 const SEGMENT_STYLES: Record<StepState, string> = {
-  done: "bg-emerald-600",
-  failed: "bg-red-400",
-  skipped: "bg-amber-400",
-  current: "bg-emerald-500 progress-shimmer",
-  pending: "bg-neutral-200",
+  done: "bg-primary",
+  failed: "bg-danger",
+  skipped: "bg-warning",
+  current: "bg-primary progress-shimmer",
+  pending: "bg-muted",
 };
 
 const SEGMENT_TITLES: Record<StepState, string> = {
@@ -92,22 +92,22 @@ export function CallActiveHeader({
   const currentIndex = practiceProgress.current - 1;
 
   return (
-    <header className="glass-panel-strong call-header relative z-20 flex shrink-0 items-center justify-between gap-3 px-4 sm:px-6 bg-white/90 border-b border-neutral-200 shadow-2xs">
+    <header className="glass-panel-strong call-header relative z-20 flex shrink-0 items-center justify-between gap-3 px-4 sm:px-6 bg-card/90 border-b border-border shadow-2xs">
       {/* Left: Coach name + what's being drilled */}
       <div className="flex items-center gap-2.5 min-w-0 shrink-0">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50 border border-emerald-200">
-          <span className="text-[11px] font-bold text-emerald-700">AI</span>
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-success/10 border border-success/30">
+          <span className="text-[11px] font-bold text-primary">AI</span>
         </div>
         <div className="min-w-0">
           <span
-            className="block truncate text-xs font-bold tracking-tight text-neutral-900"
+            className="block truncate text-xs font-bold tracking-tight text-foreground"
             title={coachName}
           >
             {coachName}
           </span>
           {sourceLabel && (
             <span
-              className="hidden truncate text-[10px] font-medium text-neutral-500 sm:block"
+              className="hidden truncate text-[10px] font-medium text-muted-foreground sm:block"
               title={sourceLabel}
             >
               {sourceLabel}
@@ -165,22 +165,22 @@ export function CallActiveHeader({
             })}
           </div>
         ) : (
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-200">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+              className="h-full rounded-full bg-primary transition-all duration-500"
               style={{ width: `${progressPct}%` }}
             />
           </div>
         )}
 
         {/* Step badge */}
-        <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-neutral-100 text-neutral-700 border border-neutral-300">
+        <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-secondary text-foreground border border-border">
           Step {practiceProgress.current}/{Math.max(1, segmentCount)}
         </span>
 
         {/* Difficulty + threshold */}
         <span
-          className="hidden shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-neutral-100 text-neutral-600 border border-neutral-300 lg:block"
+          className="hidden shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-secondary text-muted-foreground border border-border lg:block"
           title={`Score ${passThreshold}% or more to advance`}
         >
           {DIFFICULTY_LABELS[difficulty]} · {passThreshold}%
@@ -188,7 +188,7 @@ export function CallActiveHeader({
 
         {/* Skipped count badge */}
         {skippedCount > 0 && (
-          <span className="hidden shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 sm:inline">
+          <span className="hidden shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-warning/15 text-warning border border-warning/40 sm:inline">
             {skippedCount} Skipped
           </span>
         )}
@@ -200,7 +200,7 @@ export function CallActiveHeader({
         <button
           type="button"
           onClick={onLeave}
-          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all duration-150 bg-red-50 hover:bg-red-100 active:scale-95 cursor-pointer text-red-600 border border-red-200 shadow-2xs"
+          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all duration-150 bg-danger/10 hover:bg-danger/10 active:scale-95 cursor-pointer text-danger border border-danger/30 shadow-2xs"
         >
           <PhoneOff className="h-3 w-3" />
           <span className="hidden sm:inline">Leave</span>

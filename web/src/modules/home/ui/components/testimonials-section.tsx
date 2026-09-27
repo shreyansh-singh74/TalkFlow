@@ -33,52 +33,47 @@ export function TestimonialsSection() {
       <div className="mx-auto max-w-6xl">
         <Reveal>
           <SectionHeading
-            eyebrow="Where it helps"
             title="Practise English for"
             accent="the moments that matter."
             sub="Use TalkFlow before the call, session, class or interview where being understood changes the outcome."
           />
         </Reveal>
 
-        <div className="mt-14 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="mt-14 space-y-5">
           {USE_CASES.map(({ icon: Icon, title, desc, example, focus }, i) => (
-            <Reveal key={title} delay={((i % 3) + 1) as 1 | 2 | 3} className="h-full">
-              <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-tf-border bg-tf-surface p-6 transition-all duration-300 hover:-translate-y-0.5 hover:border-tf-green/40 hover:shadow-[0_18px_40px_-24px_rgba(8,32,26,0.35)] sm:p-7">
-                <span
-                  className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_90%_at_0%_0%,rgba(24,164,75,0.09),transparent_60%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                  aria-hidden="true"
-                />
-
-                <div className="relative flex flex-1 flex-col">
+            <Reveal key={title} delay={((i % 3) + 1) as 1 | 2 | 3}>
+              <article className="group grid gap-6 rounded-2xl border border-tf-border bg-tf-surface p-6 transition-colors hover:border-tf-green/40 md:grid-cols-2 md:items-center md:p-8">
+                <div className="flex gap-4">
                   <span
-                    className="mb-5 inline-flex size-10 items-center justify-center rounded-xl bg-tf-green-light ring-1 ring-inset ring-tf-green/20"
+                    className="mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-tf-green-light ring-1 ring-inset ring-tf-green/20"
                     aria-hidden="true"
                   >
-                    <Icon className="size-[18px] text-tf-green-strong" strokeWidth={1.8} />
+                    <Icon className="size-[18px] text-tf-mint" strokeWidth={1.8} />
                   </span>
-
-                  <h3 className="mb-2 text-[15.5px] font-semibold tracking-[-0.01em] text-tf-text">
-                    {title}
-                  </h3>
-                  <p className="flex-1 text-[13.5px] leading-relaxed text-tf-muted">
-                    {desc}
-                  </p>
-
-                  <div className="mt-6 rounded-xl border border-tf-border bg-tf-green-tint/60 p-4">
-                    <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-tf-subtle">
-                      Practice line
-                    </p>
-                    <p className="text-[14px] font-semibold leading-snug text-tf-text">
-                      “{example}”
-                    </p>
-                    <p className="mt-2.5 flex items-center gap-1.5 font-mono text-[11.5px] text-tf-green-strong">
-                      <span className="text-tf-subtle">{focus.word}</span>
-                      <span className="text-tf-subtle" aria-hidden="true">
-                        →
-                      </span>
-                      /{focus.ipa}/
+                  <div>
+                    <h3 className="mb-1.5 text-[15.5px] font-semibold tracking-[-0.01em] text-tf-text">
+                      {title}
+                    </h3>
+                    <p className="max-w-md text-[13.5px] leading-relaxed text-tf-muted">
+                      {desc}
                     </p>
                   </div>
+                </div>
+
+                <div className="rounded-xl border border-tf-border bg-tf-green-tint/60 p-4 md:justify-self-end md:p-5 md:text-right">
+                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-tf-subtle">
+                    Practice line
+                  </p>
+                  <p className="text-[14px] font-semibold leading-snug text-tf-text">
+                    “{example}”
+                  </p>
+                  <p className="mt-2.5 flex items-center gap-1.5 font-mono text-[11.5px] text-tf-mint md:justify-end">
+                    <span className="text-tf-subtle">{focus.word}</span>
+                    <span className="text-tf-subtle" aria-hidden="true">
+                      →
+                    </span>
+                    /{focus.ipa}/
+                  </p>
                 </div>
               </article>
             </Reveal>

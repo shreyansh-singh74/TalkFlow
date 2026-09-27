@@ -112,6 +112,19 @@ export function SettingsView({ catalog, billingConfigured }: Props) {
     }
   };
 
+  // Unsaved edits die silently on navigation — the form is seeded from the
+  // server once and nothing else tracks them. Warn on tab close; in-app links
+  // are covered by the visible hint next to the Save button.
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
   if (isLoading || !settings) {
     return <SettingsSkeleton />;
   }
@@ -356,6 +369,11 @@ export function SettingsView({ catalog, billingConfigured }: Props) {
         >
           {status}
         </span>
+        {dirty && !status && (
+          <span className="text-xs text-muted-foreground">
+            Unsaved changes — they only apply once you save.
+          </span>
+        )}
       </div>
     </div>
   );

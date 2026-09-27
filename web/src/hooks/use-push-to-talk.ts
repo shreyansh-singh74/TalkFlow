@@ -4,7 +4,7 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { AudioChunker } from "@/lib/audio-processing";
 import { StreamingAudioPlayer } from "@/lib/streaming-audio-player";
 import { getWebSocketUrl } from "@/lib/backend-config";
-import { fetchVoiceToken } from "@/lib/voice-token";
+import { fetchVoiceToken, isQuotaFailure } from "@/lib/voice-token";
 import { SentencePhonemeAnalysis } from "@/types/pronunciation";
 import type { PracticeTargetPayload, PronunciationResultPayload, SessionAnalysisReport } from "@/types/pronunciation";
 import type { Difficulty, PracticeStep, SessionSource } from "@/types/practice";
@@ -24,6 +24,17 @@ export interface TranscriptEntry {
   isPartial?: boolean;
 }
 
+/**
+ * A failure that ends the session — retrying cannot succeed. Only one kind
+ * today: the free quota is spent, so every reconnect attempt would be refused
+ * at the token mint (this used to surface as minutes of "Reconnecting…"
+ * instead of the one sentence the learner needed).
+ */
+export interface VoiceFatalError {
+  kind: "quota";
+  message: string;
+}
+
 export interface UsePushToTalkReturn {
   isConnected: boolean;
   isTalking: boolean;
@@ -33,6 +44,8 @@ export interface UsePushToTalkReturn {
   streamingAIText: string;
   conversationStatus: string;
   error: string | null;
+  /** A failure that ended the session and must not be retried (quota spent). */
+  fatalError: VoiceFatalError | null;
   phonemeAnalysis: SentencePhonemeAnalysis | null;
   lastPronunciation: PronunciationResultPayload | null;
   targetText: string;
@@ -53,6 +66,13 @@ export interface UsePushToTalkReturn {
   startTalking: () => void;
   stopTalking: () => void;
   clearTranscripts: () => void;
+  /** True once the server has sent the first real practice target. */
+  hasTarget: boolean;
+  /**
+   * Manual retry after the reconnect backoff gave up ("Connection lost.
+   * Please refresh."): resets the attempt counter and dials again.
+   */
+  retryConnection: () => void;
   sessionReport: SessionAnalysisReport | null;
   sendNextSentence: () => void;
   sendSkipSentence: () => void;
@@ -124,6 +144,16 @@ export function usePushToTalk({
   const [isConnected, setIsConnected] = useState(false);
   const [isTalking, setIsTalking] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
+  /**
+   * True once a real PRACTICE_TARGET has arrived. The server sends one at the
+   * end of SESSION_CONFIG, so this is the "session is actually ready" signal —
+   * one round trip after the socket opens. It stays true for the hook's
+   * lifetime: mid-call reconnects re-send a target for the resumed step, and
+   * "Practise Again" starts a fresh config, so neither should ever re-trigger
+   * an initial-connect gate built on this flag.
+   */
+  const [hasTarget, setHasTarget] = useState(false);
+  const [fatalError, setFatalError] = useState<VoiceFatalError | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [partialTranscript, setPartialTranscript] = useState("");
   const [streamingAIText, setStreamingAIText] = useState("");
@@ -154,6 +184,40 @@ export function usePushToTalk({
   useEffect(() => {
     targetTextRef.current = targetText;
   }, [targetText]);
+
+  // Mirrors for the message handler and resume builder, which are stable
+  // callbacks and can only read state through refs.
+  const stepIndexRef = useRef(stepIndex);
+  useEffect(() => {
+    stepIndexRef.current = stepIndex;
+  }, [stepIndex]);
+  const passThresholdRef = useRef(passThreshold);
+  useEffect(() => {
+    passThresholdRef.current = passThreshold;
+  }, [passThreshold]);
+
+  /**
+   * Progress ledger for reconnects, kept in the hook rather than the UI: the
+   * engine keeps its session per connection, so after a dropped socket (or a
+   * mic toggle, which also closes the socket) the next connection would start
+   * from step 1 with every score forgotten. Set `resume` on the next
+   * SESSION_CONFIG and the server seeks instead of resetting.
+   */
+  const resumeRecordRef = useRef({
+    skipped: new Set<number>(),
+    bestScores: {} as Record<number, number>,
+    completedTargets: [] as string[],
+  });
+  const hasConnectedOnceRef = useRef(false);
+  // Set when the closure is ours (mic toggle, unmount, leaving), so the close
+  // handler does not treat it as a drop and fight the very disconnect that
+  // caused it — that used to flap connect/disconnect for up to ten attempts.
+  const manualCloseRef = useRef(false);
+  // Mirror of `fatalError` for the stable `connect` callback.
+  const fatalErrorRef = useRef<VoiceFatalError | null>(null);
+  useEffect(() => {
+    fatalErrorRef.current = fatalError;
+  }, [fatalError]);
 
   /**
    * The config is rebuilt on every send rather than memoised, so a script that
@@ -186,8 +250,26 @@ export function usePushToTalk({
     retainAudio,
   };
 
-  const buildSessionConfig = useCallback(() => {
+  /**
+   * `withResume` is true only for a re-connection: it tells the server to seek
+   * to where this session left off instead of starting from step 1. A first
+   * connect and a deliberate "Practise Again" omit it and reset.
+   */
+  const buildSessionConfig = useCallback((withResume = false) => {
     const config = configRef.current;
+    const record = resumeRecordRef.current;
+    const resume =
+      withResume &&
+      (stepIndexRef.current > 0 ||
+        record.skipped.size > 0 ||
+        record.completedTargets.length > 0)
+        ? {
+            step_index: stepIndexRef.current,
+            skipped: Array.from(record.skipped),
+            best_scores: record.bestScores,
+            completed_targets: record.completedTargets,
+          }
+        : null;
     return {
       type: "SESSION_CONFIG",
       session_id: config.sessionId,
@@ -205,6 +287,7 @@ export function usePushToTalk({
         text: step.text,
         note: step.note ?? null,
       })),
+      ...(resume ? { resume } : {}),
     };
   }, []);
 
@@ -278,6 +361,17 @@ export function usePushToTalk({
         if (p.target_text) {
           setTargetText(p.target_text);
         }
+        // Ledger for the reconnect resume: best score per step, and the
+        // target text of every step passed, so a restored session's report
+        // still counts them as completed.
+        const record = resumeRecordRef.current;
+        const step = stepIndexRef.current;
+        if (typeof p.score === "number") {
+          record.bestScores[step] = Math.max(record.bestScores[step] ?? -1, p.score);
+          if (p.score >= passThresholdRef.current && p.target_text) {
+            record.completedTargets.push(p.target_text);
+          }
+        }
         break;
       }
 
@@ -309,6 +403,7 @@ export function usePushToTalk({
         setContextAfter(target.context_after ?? null);
         setStepNote(target.note ?? null);
         setIsTransitioning(false);
+        setHasTarget(true);
         break;
       }
 
@@ -347,24 +442,66 @@ export function usePushToTalk({
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
-    
+    // A fatal failure (quota spent) ends the session: every further attempt
+    // would be refused at the token mint, so there is nothing to reconnect to.
+    if (fatalErrorRef.current) {
+      return;
+    }
+    // The user is trying to connect — a close after this point is a real drop.
+    manualCloseRef.current = false;
+
     try {
       // A fresh token per attempt: it is short-lived, and `connect` is also the
       // reconnect path, so a token fetched once at mount would expire mid-usage
       // and turn every retry into a rejected handshake.
-      const token = await fetchVoiceToken(configRef.current.sessionId);
+      const tokenResult = await fetchVoiceToken(configRef.current.sessionId);
+      if (!tokenResult.ok) {
+        if (isQuotaFailure(tokenResult)) {
+          // Retry-proof failure: say why the session cannot continue instead
+          // of looping through "Reconnecting…" forever.
+          setFatalError({
+            kind: "quota",
+            message:
+              tokenResult.message ||
+              "You've used all the free sessions available this month. Upgrade to Pro for unlimited practice.",
+          });
+          setError(null);
+          return;
+        }
+        // Transient failure minting the token — same treatment as a dropped
+        // socket: capped exponential backoff.
+        setError("Could not reach the practice service. Retrying…");
+        if (reconnectAttemptsRef.current < 10) {
+          const delay = Math.min(
+            1000 * Math.pow(2, reconnectAttemptsRef.current),
+            30000
+          );
+          reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectAttemptsRef.current++;
+            connect();
+          }, delay);
+        } else {
+          setError("Connection lost. Please refresh.");
+        }
+        return;
+      }
+      const token = tokenResult.token;
       const wsUrl = token
         ? `${getWebSocketUrl()}?token=${encodeURIComponent(token)}`
         : getWebSocketUrl();
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
-      
+
       ws.onopen = () => {
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
-        ws.send(JSON.stringify(buildSessionConfig()));
+        // Resume only when this socket is a re-connection: a first connect
+        // (or "Practise Again") starts from step 1.
+        const isReconnect = hasConnectedOnceRef.current;
+        hasConnectedOnceRef.current = true;
+        ws.send(JSON.stringify(buildSessionConfig(isReconnect)));
         // Pre-warm the mic stream so that getUserMedia permission is handled
         // before the user presses the button. This ensures startTalking on the
         // first press has no async gap before creating AudioContext.
@@ -378,7 +515,7 @@ export function usePushToTalk({
           });
         }
       };
-      
+
       ws.onmessage = async (event) => {
         if (typeof event.data === "string") {
           // JSON message
@@ -391,20 +528,28 @@ export function usePushToTalk({
           await audioPlayerRef.current?.addChunk(uint8Array, false);
         }
       };
-      
+
       ws.onerror = (error) => {
         void error;
         setError("Connection error");
       };
-      
+
       ws.onclose = () => {
         setIsConnected(false);
-        
+
+        // The closure was ours (mic toggle, unmount, leaving) — reconnecting
+        // here would fight the disconnect that caused it and flap the socket
+        // for up to ten attempts.
+        if (manualCloseRef.current) {
+          manualCloseRef.current = false;
+          return;
+        }
+
         // Auto-reconnect with exponential backoff
         if (reconnectAttemptsRef.current < 10) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
           setError(`Reconnecting in ${delay / 1000}s...`);
-          
+
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttemptsRef.current++;
             connect();
@@ -548,20 +693,24 @@ export function usePushToTalk({
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
-    
+
+    // Mark the close as ours before triggering it, so onclose does not arm the
+    // reconnect timer against a disconnect the user asked for.
+    manualCloseRef.current = true;
+
     chunkerRef.current?.stop();
     audioPlayerRef.current?.stop();
-    
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    
+
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
-    
+
     setIsConnected(false);
     setIsTalking(false);
     setIsAISpeaking(false);
@@ -621,6 +770,8 @@ export function usePushToTalk({
    */
   const sendSkipSentence = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      // Recorded locally too, so a reconnect resumes with the skip intact.
+      resumeRecordRef.current.skipped.add(stepIndexRef.current);
       setIsTransitioning(true);
       wsRef.current.send(JSON.stringify({ type: "SKIP_SENTENCE" }));
     }
@@ -647,9 +798,27 @@ export function usePushToTalk({
       setGateMessage(null);
       setPendingTarget(null);
       setIsTransitioning(true);
-      wsRef.current.send(JSON.stringify(buildSessionConfig()));
+      // "Practise Again" is a deliberate restart, not a reconnect: the ledger
+      // clears so the next config starts from step 1.
+      resumeRecordRef.current = {
+        skipped: new Set<number>(),
+        bestScores: {},
+        completedTargets: [],
+      };
+      wsRef.current.send(JSON.stringify(buildSessionConfig(false)));
     }
   }, [buildSessionConfig, clearTranscripts]);
+
+  /**
+   * Manual retry after the automatic backoff gave up. `connect` replaces a
+   * closed socket (it only early-returns for an OPEN one), so this is safe to
+   * press at any time; resetting the attempt counter gives the learner a fresh
+   * series of retries instead of a refresh.
+   */
+  const retryConnection = useCallback(() => {
+    reconnectAttemptsRef.current = 0;
+    void connect();
+  }, [connect]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -657,16 +826,19 @@ export function usePushToTalk({
       disconnect();
     };
   }, [disconnect]);
-  
+
   return {
     isConnected,
     isTalking,
     isAISpeaking,
+    hasTarget,
+    retryConnection,
     transcripts,
     partialTranscript,
     streamingAIText,
     conversationStatus: getConversationStatus(),
     error,
+    fatalError,
     phonemeAnalysis,
     lastPronunciation,
     targetText,

@@ -4,7 +4,11 @@
 - Prefers the assistant to make the decisive technical recommendation rather than present a menu of options (e.g. "choose the best one"). Confidence: 0.8
 - Cost-conscious about cloud spend; wants minimal instance requirements and credit/runway estimates before deploying. Confidence: 0.8
 - Deploys the FastAPI backend to AWS Lightsail behind nginx, run as a systemd service with uvicorn on 127.0.0.1:8000. Confidence: 0.7
-- Cares about visual polish and uses reference sites (Wispr Flow, pyannote.ai, Google Dictionary) as design inspiration. Confidence: 0.7
+- Cares about visual polish and uses reference sites (Wispr Flow, pyannote.ai, Google Dictionary) as design inspiration. Confidence: 0.8
+- Prefers light-themed landing pages by default, with a light/dark toggle option; keeps premium, product-first hero designs (the product's transformation shown in the hero). Confidence: 0.9
+- Uses lime `#e6fac3` as the primary brand color for the light theme and wants it as the primary focus across the website and app. Confidence: 0.9
+- Keeps CTA buttons in the original brand green (`#18A44B`, white text) and uses lime (`#e6fac3`) as the page background/accent rather than as button fill. Confidence: 0.7
+- Prefers short, simple marketing copy/taglines (e.g. "Clarity, not accent") over longer slogans like "Speak clearer. Stay yourself." Confidence: 0.8
 - Wants runnable verification steps (scripts/tests) to check work themselves. Confidence: 0.7
 - Uses terse "continue" to resume long-running work without recap. Confidence: 0.6
 - Cares about mobile responsiveness; treats non-responsive layouts as bugs to fix. Confidence: 0.7
@@ -12,3 +16,13 @@
 - Values production-readiness: wants the codebase swept of unnecessary/dead code, debug logs, and typos for a polished, shippable product. Confidence: 0.7
 - Building for scale — cares about latency/performance optimization and app completeness because the product is intended for many users. Confidence: 0.7
 - Wants conceptual/advice explanations (e.g. SDE concepts) delivered at the end, after the practical work is done. Confidence: 0.8
+- Uses Claude Code skills/taste skills to guide frontend design work (e.g. `design-taste-frontend`) and prefers reusable skills installed globally (`~/.agents/skills`) so they work across projects. Confidence: 0.8
+- Prefers user-facing pronunciation/phonetic content as plain-English "sounds like" syllable respellings (e.g. `skeh · jool`) with the stressed syllable highlighted, rather than IPA notation that non-expert users can't read. Confidence: 0.8
+- Prefers semantic CSS variables/tokens (`--background`, `--primary`, `--card`, `--border`, etc.) over hardcoded colors throughout the UI, so theming is centralized in one place. Confidence: 0.9
+- Prefers light and dark themes to feel like one brand — dark mode as a re-tuned green variant rather than a simple inversion of the light palette. Confidence: 0.9
+- Avoids pure black (`#000000`) and pure white (`#FFFFFF`) as dominant page colors; prefers green-tinted neutrals to define the brand. Confidence: 0.8
+- Prefers cross-cutting changes (e.g. theming and the light/dark toggle) applied globally across every page and component, not scoped to the landing page or a subset. Confidence: 0.8
+- Dislikes muddy or "mixed" color states in the UI (e.g. gradient hover blends with hardcoded borders); prefers clean, solid, token-based hover/active states. Confidence: 0.7
+- Prefers the product logo/wordmark centered in the app header and laid out side by side (logo left, brand name right), with the brand name rendered in a cursive/script display typeface. Confidence: 0.8
+- Values legibility and strong text/background contrast in the UI; rejects layouts where text blends or "mixes" with the background color. Confidence: 0.7
+- Prefers a clean white sidebar background with dark text in light mode, reserving the brand tint for hover/active highlights rather than as the sidebar fill. Confidence: 0.7

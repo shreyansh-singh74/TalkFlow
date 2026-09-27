@@ -48,9 +48,22 @@ export const DashboardSidebar = () => {
   return (
     <Sidebar style={{ borderRightWidth: "0px" }}>
       <SidebarHeader>
-        <Link href="/home" className="flex items-center gap-2 px-2 pt-2">
-          <Image src="/logo.svg" height={36} width={36} alt="TalkFlow" />
-          <p className="text-2xl font-semibold ">TalkFlow</p>
+        <Link
+          href="/home"
+          className="flex items-center justify-center gap-2.5 px-4 py-5"
+        >
+          <Image
+            src="/Talkflow_logo.svg"
+            height={40}
+            width={40}
+            alt="TalkFlow"
+            className="shrink-0 object-contain"
+          />
+          {/* The wordmark uses the app's sans, not the landing page's serif
+              accent — the italic Playfair read as "cursive" next to the mark. */}
+          <span className="text-[22px] font-semibold leading-none tracking-tight text-sidebar-foreground">
+            TalkFlow
+          </span>
         </Link>
       </SidebarHeader>
       <div className="px-4 py-2">
@@ -65,14 +78,14 @@ export const DashboardSidebar = () => {
                   <SidebarMenuButton
                     asChild
                     className={cn(
-                      "h-10 hover:bg-linear-to-r/oklch border border-transparent hover:border-[#5D6B68]/10 from-sidebar-accent from-5% via-30% via-sidebar/50 to/sidebar/50",
-                      pathname === item.href &&
-                      "bg-linear-to-r/oklch border-[#5D6B68]/10"
+                      "h-10 hover:bg-sidebar-accent/40",
+                      pathname.startsWith(item.href) &&
+                        "bg-sidebar-accent text-sidebar-accent-foreground",
                     )}
-                    isActive={pathname === item.href}
+                    isActive={pathname.startsWith(item.href)}
                   >
                     <Link href={item.href}>
-                      <item.icon className="h-5 w-5 size-10" />
+                      <item.icon className="h-5 w-5" />
                       <span className="text-sm font-medium tracking-tight">
                         {item.label}
                       </span>

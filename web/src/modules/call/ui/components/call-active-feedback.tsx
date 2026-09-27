@@ -32,21 +32,21 @@ export function CallActiveFeedback({ lastPronunciation }: CallActiveFeedbackProp
     <div className="call-panel call-panel-t glass-panel flex min-h-0 min-w-0 flex-col gap-2.5 overflow-hidden rounded-2xl shadow-xs">
       {/* Header. Rendered in the empty state too, so it does not pop into
           existence and shove the body down when the first result lands. */}
-      <div className="flex shrink-0 items-baseline justify-between gap-2 border-b border-neutral-200/80 pb-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-500">
+      <div className="flex shrink-0 items-baseline justify-between gap-2 border-b border-border/80 pb-2">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
           Heard
         </p>
         {method && (
-          <span className="text-[10px] font-medium text-neutral-400">{method}</span>
+          <span className="text-[10px] font-medium text-muted-foreground">{method}</span>
         )}
       </div>
 
       {!lastPronunciation ? (
         <div className="my-auto flex flex-col items-center gap-1.5 px-2 text-center">
-          <p className="text-sm font-semibold text-neutral-500">
+          <p className="text-sm font-semibold text-muted-foreground">
             Read the sentence aloud.
           </p>
-          <p className="text-xs font-medium text-neutral-400">
+          <p className="text-xs font-medium text-muted-foreground">
             Your attempt and per-sound scores appear here.
           </p>
         </div>
@@ -58,7 +58,7 @@ export function CallActiveFeedback({ lastPronunciation }: CallActiveFeedbackProp
           className="min-h-0 animate-fade-in-up overflow-y-auto lg:flex-1"
         >
           <HeardTextHighlight
-            className="text-lg leading-relaxed font-semibold text-neutral-900"
+            className="text-lg leading-relaxed font-semibold text-foreground"
             text={lastPronunciation.heard_text || "—"}
             misalignedWords={lastPronunciation.misaligned_words}
           />
@@ -67,7 +67,7 @@ export function CallActiveFeedback({ lastPronunciation }: CallActiveFeedbackProp
           {lastPronunciation.feedback.slice(0, 2).map((line, i) => (
             <p
               key={i}
-              className="mt-2 text-sm leading-relaxed text-neutral-600 font-medium"
+              className="mt-2 text-sm leading-relaxed text-muted-foreground font-medium"
             >
               {line}
             </p>

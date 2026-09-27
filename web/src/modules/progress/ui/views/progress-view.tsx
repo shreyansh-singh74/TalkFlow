@@ -107,17 +107,17 @@ export const ProgressView = () => {
             <StatTile
               label="Sessions"
               value={data.totals.sessions.toString()}
-              icon={<TrendingUpIcon className="h-4 w-4 text-emerald-500" />}
+              icon={<TrendingUpIcon className="h-4 w-4 text-brand-accent" />}
             />
             <StatTile
               label="Practice time"
               value={`${data.totals.minutes} min`}
-              icon={<MinusIcon className="h-4 w-4 text-sky-500" />}
+              icon={<MinusIcon className="h-4 w-4 text-info" />}
             />
             <StatTile
               label="Streak"
               value={`${data.totals.streak} day${data.totals.streak === 1 ? "" : "s"}`}
-              icon={<FlameIcon className="h-4 w-4 text-orange-400" />}
+              icon={<FlameIcon className="h-4 w-4 text-warning" />}
             />
             <AccuracyTile
               accuracy={data.accuracy}
@@ -204,9 +204,9 @@ function AccuracyTile({
           <span
             className={`inline-flex items-center gap-0.5 text-xs font-semibold ${
               delta >= 1
-                ? "text-emerald-600"
+                ? "text-brand-accent"
                 : delta <= -1
-                  ? "text-red-600"
+                  ? "text-danger"
                   : "text-muted-foreground"
             }`}
           >
@@ -244,7 +244,7 @@ function DrillCard({
     return (
       <div className="rounded-2xl border bg-card p-5">
         <h3 className="flex items-center gap-2 text-base font-semibold">
-          <TargetIcon className="h-4 w-4 text-emerald-500" />
+          <TargetIcon className="h-4 w-4 text-brand-accent" />
           Targeted drills
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -257,29 +257,22 @@ function DrillCard({
   }
 
   return (
-    <div
-      className="rounded-2xl border p-5"
-      style={{
-        background:
-          "linear-gradient(135deg, hsl(160 40% 12%) 0%, hsl(160 30% 8%) 100%)",
-        borderColor: "hsl(160 30% 18%)",
-      }}
-    >
-      <p className="mb-1 text-xs uppercase tracking-wider text-emerald-400/70">
+    <div className="rounded-2xl bg-primary p-5 text-primary-foreground">
+      <p className="mb-1 text-xs uppercase tracking-wider text-primary-foreground/70">
         {drill.fromQueue ? "Due for review" : "Weakest sound"}
       </p>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-lg font-semibold text-white">
+          <h3 className="text-lg font-semibold">
             Drill{" "}
-            <span className="font-mono text-emerald-300">/{drill.phone}/</span>
+            <span className="font-mono text-primary-foreground/90">/{drill.phone}/</span>
           </h3>
-          <p className="mt-0.5 text-sm text-white/60">
+          <p className="mt-0.5 text-sm text-primary-foreground/60">
             A short session generated around this one sound, contrasted with the
             sounds people substitute for it.
           </p>
           {weakPhones.length > 1 && (
-            <p className="mt-2 text-xs text-white/40">
+            <p className="mt-2 text-xs text-primary-foreground/40">
               Also weak:{" "}
               {weakPhones
                 .filter((p) => p !== drill.phone)
@@ -292,7 +285,7 @@ function DrillCard({
           size="sm"
           disabled={isPending}
           onClick={() => onCreate(drill.phone)}
-          className="gap-2 bg-emerald-500 text-white hover:bg-emerald-600"
+          className="gap-2 bg-card text-primary hover:bg-card/90"
         >
           <PlayIcon className="h-3.5 w-3.5" />
           {isPending ? "Building…" : "Start drill"}
@@ -487,9 +480,9 @@ function TrendBadge({ trend }: { trend: AnalyticsData["phones"][number]["trend"]
     return <span className="text-[11px] text-muted-foreground">—</span>;
   }
   const styles: Record<string, string> = {
-    improving: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    steady: "bg-neutral-50 text-neutral-600 border-neutral-200",
-    worsening: "bg-amber-50 text-amber-800 border-amber-200",
+    improving: "bg-success/10 text-primary border-success/30",
+    steady: "bg-muted text-muted-foreground border-border",
+    worsening: "bg-warning/10 text-warning border-warning/30",
   };
   return (
     <span
@@ -514,7 +507,7 @@ function MasteredCard({ mastered }: { mastered: string[] }) {
           {mastered.map((phone) => (
             <span
               key={phone}
-              className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-mono text-xs font-semibold text-emerald-800"
+              className="rounded-full border border-success/30 bg-success/10 px-3 py-1 font-mono text-xs font-semibold text-primary"
             >
               /{phone}/
             </span>

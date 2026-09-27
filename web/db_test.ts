@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless';
+import postgres from 'postgres';
 import 'dotenv/config';
 
 async function run() {
@@ -7,7 +7,7 @@ async function run() {
     console.error("DATABASE_URL is not set");
     return;
   }
-  const sql = neon(url);
+  const sql = postgres(url, { max: 1 });
   try {
     const result = await sql`
       select "id", "expires_at", "token", "created_at", "updated_at", "ip_address", "user_agent", "user_id" 

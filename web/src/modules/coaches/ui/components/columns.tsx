@@ -36,7 +36,7 @@ export const columns: ColumnDef<CoachGetMany[number]>[] = [
         variant="outline"
         className="flex items-center gap-x-2 [&>svg]:size-4"
       >
-        <VideoIcon className="text-blue-700" />
+        <VideoIcon className="text-info" />
         {row.original?.sessionCount}{" "}
         {row.original?.sessionCount === 1 ? "session" : "sessions"}
       </Badge>

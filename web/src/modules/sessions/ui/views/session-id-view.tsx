@@ -2,7 +2,7 @@
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { usePracticeSession, useDeletePracticeSession } from "@/hooks/use-api";
+import { usePracticeSession, useDeletePracticeSession, useUpdatePracticeSession } from "@/hooks/use-api";
 import { SessionIdViewHeader } from "../components/session-id-view-header";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -11,6 +11,7 @@ import { useState } from "react";
 import { UpcomingState } from "../components/upcoming-state";
 import { ActiveState } from "../components/active-state";
 import { CancelledState } from "../components/cancelled-state";
+import { ProcessingState } from "../components/processing-state";
 import { toast } from "sonner";
 import type { SessionPhonemeDataPersisted, SessionAnalysisReport } from "@/types/pronunciation";
 import Link from "next/link";
@@ -25,10 +26,16 @@ export const SessionIdView = ({ sessionId }: Props) => {
   const { data, isLoading, error } = usePracticeSession(sessionId);
   const [updateSessionDialogOpen, setUpdateSessionDialogOpen] = useState(false);
   const removeSession = useDeletePracticeSession();
+  const updateSession = useUpdatePracticeSession();
 
   const [RemoveConfirmation, confirmRemove] = useConfirm(
     "Are you sure?",
     "The following action will remove this session"
+  );
+
+  const [CancelConfirmation, confirmCancel] = useConfirm(
+    "Cancel this session?",
+    "The session will be marked as cancelled. You can still read its transcript afterwards, but you won't be able to run it."
   );
 
   if (isLoading) {
@@ -40,7 +47,7 @@ export const SessionIdView = ({ sessionId }: Props) => {
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold">Failed to Load Practice Session</h2>
-          <p className="text-gray-600">Could not load session details. Please try again.</p>
+          <p className="text-muted-foreground">Could not load session details. Please try again.</p>
         </div>
       </div>
     );
@@ -60,9 +67,23 @@ export const SessionIdView = ({ sessionId }: Props) => {
     });
   };
 
+  const handleCancelSession = async () => {
+    const ok = await confirmCancel();
+    if (!ok) return;
+    updateSession.mutate(
+      { id: sessionId, status: "cancelled" },
+      {
+        onSuccess: () => toast.success("Session cancelled"),
+        onError: (err) =>
+          toast.error(err.message || "Failed to cancel the session"),
+      }
+    );
+  };
+
   const isActive = data.status === "active";
   const isUpcoming = data.status === "upcoming";
   const isCancelled = data.status === "cancelled";
+  const isProcessing = data.status === "processing";
   const isCompleted = data.status === "completed";
 
   const phonemeData = data.phonemeData as SessionPhonemeDataPersisted | null;
@@ -107,6 +128,7 @@ export const SessionIdView = ({ sessionId }: Props) => {
   return (
     <>
       <RemoveConfirmation />
+      <CancelConfirmation />
       <UpdateSessionDialog
         open={updateSessionDialogOpen}
         onOpenChange={setUpdateSessionDialogOpen}
@@ -121,11 +143,12 @@ export const SessionIdView = ({ sessionId }: Props) => {
         />
         {isCancelled && <CancelledState />}
         {isActive && <ActiveState sessionId={sessionId} />}
+        {isProcessing && <ProcessingState />}
         {isUpcoming && (
           <UpcomingState
             sessionId={sessionId}
-            onCancelSession={() => {}}
-            isCancelling={false}
+            onCancelSession={handleCancelSession}
+            isCancelling={updateSession.isPending}
           />
         )}
 
@@ -133,25 +156,25 @@ export const SessionIdView = ({ sessionId }: Props) => {
           <div className="space-y-6 animate-fade-in">
             {/* Report Header Card */}
             {report ? (
-              <div className="rounded-2xl border border-emerald-100 bg-linear-to-br from-emerald-50/50 via-white to-teal-50/30 p-6 md:p-8 shadow-sm">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-gray-100">
+              <div className="rounded-2xl border border-success/20 bg-linear-to-br from-success/10 via-card to-success/10 p-6 md:p-8 shadow-sm">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-6 border-b border-border">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-success/15 text-primary">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         Session Complete
                       </span>
                     </div>
-                    <h2 className="text-2xl font-extrabold text-gray-900">AI Speech Performance Analysis</h2>
-                    <p className="text-sm text-gray-500 mt-1">Generated by TalkFlow AI Coach</p>
+                    <h2 className="text-2xl font-extrabold text-foreground">AI Speech Performance Analysis</h2>
+                    <p className="text-sm text-muted-foreground mt-1">Generated by TalkFlow AI Coach</p>
                   </div>
 
                   {/* Overall Score Badge — omitted when nothing was scored */}
                   {report.overall_score !== null && (
-                    <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-emerald-200 shadow-xs">
+                    <div className="flex items-center gap-4 bg-card p-4 rounded-xl border border-success/30 shadow-xs">
                       <div className="text-right">
-                        <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Overall Score</p>
-                        <p className="text-3xl font-black text-emerald-600">{Math.round(report.overall_score)}%</p>
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Overall Score</p>
+                        <p className="text-3xl font-black text-brand-accent">{Math.round(report.overall_score)}%</p>
                       </div>
                     </div>
                   )}
@@ -163,9 +186,9 @@ export const SessionIdView = ({ sessionId }: Props) => {
                 {reportStats.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-6">
                     {reportStats.map((stat) => (
-                      <div key={stat.label} className="bg-white/80 backdrop-blur-xs p-4 rounded-xl border border-gray-100 text-center">
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{stat.label}</span>
-                        <p className="text-xl font-bold text-gray-800 mt-1">{stat.value}</p>
+                      <div key={stat.label} className="bg-card/80 backdrop-blur-xs p-4 rounded-xl border border-border text-center">
+                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{stat.label}</span>
+                        <p className="text-xl font-bold text-foreground mt-1">{stat.value}</p>
                       </div>
                     ))}
                   </div>
@@ -174,7 +197,7 @@ export const SessionIdView = ({ sessionId }: Props) => {
                 {/* Steps left behind without passing. Stated separately so the
                     "Steps Completed" tile can't be read as "all of them". */}
                 {(report.steps_skipped ?? 0) > 0 && (
-                  <p className="pb-4 text-xs font-semibold text-amber-700">
+                  <p className="pb-4 text-xs font-semibold text-warning">
                     {report.steps_skipped} step
                     {report.steps_skipped === 1 ? " was" : "s were"} skipped — not
                     counted as completed.
@@ -184,7 +207,7 @@ export const SessionIdView = ({ sessionId }: Props) => {
                 {/* Sounds that actually gave trouble, from per-phone data */}
                 {(report.phone_breakdown ?? []).length > 0 && (
                   <div className="pb-6">
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-400">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Sounds to work on
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -192,10 +215,10 @@ export const SessionIdView = ({ sessionId }: Props) => {
                         <span
                           key={entry.phone}
                           title={`${entry.observations} attempts · ${Math.round(entry.error_rate * 100)}% wrong`}
-                          className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-3 py-1 text-xs font-semibold text-warning"
                         >
                           <span className="font-mono">{entry.phone}</span>
-                          <span className="tabular-nums font-normal text-amber-700">
+                          <span className="tabular-nums font-normal text-warning">
                             {Math.round(entry.avg_accuracy)}%
                           </span>
                         </span>
@@ -209,16 +232,16 @@ export const SessionIdView = ({ sessionId }: Props) => {
                     produced nothing shows no panel at all. */}
                 {prosodyNotes.length > 0 && (
                   <div className="pb-6">
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-400">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Rhythm &amp; melody
                     </p>
                     <ul className="space-y-1">
                       {prosodyNotes.map((note) => (
                         <li
                           key={note}
-                          className="flex items-start gap-2 text-sm text-gray-700"
+                          className="flex items-start gap-2 text-sm text-muted-foreground"
                         >
-                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-500" />
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
                           {note}
                         </li>
                       ))}
@@ -228,8 +251,8 @@ export const SessionIdView = ({ sessionId }: Props) => {
 
                 {/* AI Coach Summary text */}
                 {report.coach_feedback && (
-                  <div className="bg-white p-5 rounded-xl border border-emerald-100 text-gray-700 text-sm leading-relaxed italic relative">
-                    <div className="flex items-center gap-2 mb-2 not-italic font-bold text-xs uppercase tracking-wider text-emerald-700">
+                  <div className="bg-card p-5 rounded-xl border border-success/20 text-muted-foreground text-sm leading-relaxed italic relative">
+                    <div className="flex items-center gap-2 mb-2 not-italic font-bold text-xs uppercase tracking-wider text-primary">
                       <Bot className="w-4 h-4" />
                       Coach Feedback
                     </div>
@@ -246,14 +269,14 @@ export const SessionIdView = ({ sessionId }: Props) => {
                  resolved it. A session that ended without a scored turn really
                  does have nothing to report, and saying so is the correct
                  answer. */
-              <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-8 text-center space-y-3">
-                <div className="inline-flex items-center justify-center p-3 bg-white rounded-full text-gray-500 mb-2 border border-gray-200">
+              <div className="rounded-2xl border border-border bg-muted/60 p-8 text-center space-y-3">
+                <div className="inline-flex items-center justify-center p-3 bg-card rounded-full text-muted-foreground mb-2 border border-border">
                   <Sparkles className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">
+                <h3 className="text-lg font-bold text-foreground">
                   No turns were scored in this session
                 </h3>
-                <p className="text-sm text-gray-600 max-w-md mx-auto">
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
                   The session ended before you spoke a full step, so there is
                   nothing to measure yet. Nothing is shown rather than a
                   placeholder score.
@@ -264,7 +287,7 @@ export const SessionIdView = ({ sessionId }: Props) => {
                   </Button>
                   <Link
                     href={`/call/${sessionId}`}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary-hover"
                   >
                     <Volume2 className="w-4 h-4" />
                     Practise this session
@@ -275,14 +298,14 @@ export const SessionIdView = ({ sessionId }: Props) => {
               /* Turns exist but the report never landed. The session is complete
                  but its analysis is missing, so give the learner an exit rather
                  than a bare transcript with no summary. */
-              <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-8 text-center space-y-3">
-                <div className="inline-flex items-center justify-center p-3 bg-white rounded-full text-gray-500 mb-2 border border-gray-200">
+              <div className="rounded-2xl border border-border bg-muted/60 p-8 text-center space-y-3">
+                <div className="inline-flex items-center justify-center p-3 bg-card rounded-full text-muted-foreground mb-2 border border-border">
                   <AlertCircle className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900">
+                <h3 className="text-lg font-bold text-foreground">
                   Analysis unavailable for this session
                 </h3>
-                <p className="text-sm text-gray-600 max-w-md mx-auto">
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
                   Your turns were recorded, but the AI analysis could not be
                   generated. Your practice is still saved below.
                 </p>
@@ -296,9 +319,9 @@ export const SessionIdView = ({ sessionId }: Props) => {
 
             {/* Turn-by-Turn Practice Transcript Timeline */}
             {entries.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-200 p-6 md:p-8 shadow-xs">
-                <h3 className="text-lg font-extrabold text-gray-900 mb-4 flex items-center gap-2">
-                  <Volume2 className="w-5 h-5 text-emerald-600" />
+              <div className="bg-card rounded-2xl border border-border p-6 md:p-8 shadow-xs">
+                <h3 className="text-lg font-extrabold text-foreground mb-4 flex items-center gap-2">
+                  <Volume2 className="w-5 h-5 text-brand-accent" />
                   Practice Transcript & Turn Analysis ({entries.length} turns)
                 </h3>
                 <div className="divide-y divide-gray-100">
@@ -307,28 +330,28 @@ export const SessionIdView = ({ sessionId }: Props) => {
                     return (
                       <div key={index} className="py-4 first:pt-0 last:pb-0 space-y-2">
                         <div className="flex items-center justify-between gap-4">
-                          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                             Sentence #{index + 1}
                           </span>
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${score >= 90 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${score >= 90 ? "bg-success/15 text-primary" : "bg-warning/15 text-warning"}`}>
                             Score: {Math.round(score)}%
                           </span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                          <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                            <span className="text-xs font-semibold text-gray-500 block mb-1">Target Sentence:</span>
-                            <span className="font-semibold text-gray-900">{e.target_text}</span>
+                          <div className="bg-muted p-3 rounded-lg border border-border">
+                            <span className="text-xs font-semibold text-muted-foreground block mb-1">Target Sentence:</span>
+                            <span className="font-semibold text-foreground">{e.target_text}</span>
                           </div>
-                          <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100">
-                            <span className="text-xs font-semibold text-emerald-700 block mb-1">Heard Speech:</span>
-                            <span className="font-semibold text-gray-900">{e.heard_text || "(Silence / Unclear)"}</span>
+                          <div className="bg-success/10 p-3 rounded-lg border border-success/20">
+                            <span className="text-xs font-semibold text-primary block mb-1">Heard Speech:</span>
+                            <span className="font-semibold text-foreground">{e.heard_text || "(Silence / Unclear)"}</span>
                           </div>
                         </div>
 
                         {/* Misaligned words / feedback */}
                         {e.misaligned_words && e.misaligned_words.length > 0 && (
-                          <div className="flex items-center gap-2 text-xs text-amber-800 pt-1">
-                            <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <div className="flex items-center gap-2 text-xs text-warning pt-1">
+                            <AlertCircle className="w-3.5 h-3.5 text-warning shrink-0" />
                             <span>Needs practice on: {e.misaligned_words.map(w => w.expected).join(", ")}</span>
                           </div>
                         )}

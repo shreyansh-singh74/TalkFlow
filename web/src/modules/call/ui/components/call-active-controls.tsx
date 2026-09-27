@@ -86,7 +86,7 @@ export function CallActiveControls({
       {/* Error banner */}
       {transcriptionError && (
         <div
-          className="mb-2 mx-auto max-w-md rounded-lg px-3.5 py-2 text-center text-sm font-semibold bg-red-50 text-red-700 border border-red-200"
+          className="mb-2 mx-auto max-w-md rounded-lg px-3.5 py-2 text-center text-sm font-semibold bg-danger/10 text-danger border border-danger/30"
           role="alert"
         >
           {transcriptionError}
@@ -96,9 +96,9 @@ export function CallActiveControls({
       {/* Connection warning banner if offline */}
       {!isConnected && !transcriptionError && (
         <div
-          className="mb-2 mx-auto max-w-md rounded-lg px-3.5 py-2 text-center text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center gap-2"
+          className="mb-2 mx-auto max-w-md rounded-lg px-3.5 py-2 text-center text-xs font-semibold bg-warning/10 text-warning border border-warning/30 flex items-center justify-center gap-2"
         >
-          <div className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+          <div className="h-2 w-2 rounded-full bg-warning/100 animate-ping" />
           <span>Connecting to voice server... (Make sure FastAPI backend is running on port 8000)</span>
         </div>
       )}
@@ -112,7 +112,7 @@ export function CallActiveControls({
               type="button"
               onClick={onPrevLevel}
               disabled={isTransitioning}
-              className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 transition-all duration-150 active:scale-95 disabled:opacity-40 cursor-pointer shadow-2xs"
+              className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold text-foreground bg-secondary hover:bg-muted border border-border transition-all duration-150 active:scale-95 disabled:opacity-40 cursor-pointer shadow-2xs"
               title="Go to previous level"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
@@ -125,10 +125,10 @@ export function CallActiveControls({
             type="button"
             onClick={onSkip}
             disabled={isTransitioning}
-            className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-all duration-150 active:scale-95 disabled:opacity-40 cursor-pointer shadow-2xs bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200"
+            className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-all duration-150 active:scale-95 disabled:opacity-40 cursor-pointer shadow-2xs bg-warning/15 text-warning border border-warning/40 hover:bg-warning/20"
             title="Skip this step without passing it. The report records the skip."
           >
-            <SkipForward className="h-3.5 w-3.5 text-amber-700" />
+            <SkipForward className="h-3.5 w-3.5 text-warning" />
             <span className="sm:hidden">Skip</span>
             <span className="hidden sm:inline">Skip Level</span>
           </button>
@@ -186,7 +186,7 @@ export function CallActiveControls({
               disabled={micDisabled || !isConnected}
               className={cn(
                 "call-mic relative flex items-center justify-center rounded-full transition-all duration-200 active:scale-90 disabled:opacity-40 disabled:pointer-events-none cursor-pointer shadow-md",
-                isTalking ? "ring-4 ring-red-400" : isMicEnabled ? "shadow-[0_0_24px_rgba(5,150,105,0.3)]" : ""
+                isTalking ? "ring-4 ring-danger" : isMicEnabled ? "shadow-[0_0_24px_rgba(5,150,105,0.3)]" : ""
               )}
               style={{
                 background: isTalking
@@ -203,7 +203,7 @@ export function CallActiveControls({
               }}
               title={isTalking ? "Click to stop recording" : !isMicEnabled ? "Enable mic" : "Click mic or Hold SPACE to talk"}
             >
-              {isTalking ? <MicOff className="h-7 w-7 text-white" /> : isMicEnabled ? <Mic className="h-7 w-7" /> : <MicOff className="h-7 w-7" />}
+              {isTalking ? <MicOff className="h-7 w-7 text-primary-foreground" /> : isMicEnabled ? <Mic className="h-7 w-7" /> : <MicOff className="h-7 w-7" />}
             </button>
           </div>
 
@@ -268,7 +268,7 @@ export function CallActiveControls({
             type="button"
             onClick={onContinue}
             disabled={!hasPendingNext || isTransitioning}
-            className="flex items-center gap-1.5 rounded-full px-4.5 py-2 text-xs font-bold text-white transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-md bg-emerald-600 hover:bg-emerald-700"
+            className="flex items-center gap-1.5 rounded-full px-4.5 py-2 text-xs font-bold text-primary-foreground transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-md bg-primary hover:bg-primary-hover"
             title={
               hasPendingNext
                 ? "Show the next step"
@@ -296,23 +296,23 @@ export function CallActiveControls({
           are gone: the static hint is `lg`-only, so on a phone they collapsed
           into a run of leading dots, and every remaining item already carries
           its own pill border. */}
-      <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] font-medium text-neutral-500">
+      <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] font-medium text-muted-foreground">
         {uiState === "Transitioning" ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-neutral-600 bg-neutral-100 border border-neutral-200">
-            <RotateCcw className="h-3 w-3 animate-spin text-neutral-500" />
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-muted-foreground bg-secondary border border-border">
+            <RotateCcw className="h-3 w-3 animate-spin text-muted-foreground" />
             Loading next level...
           </span>
         ) : uiState === "Evaluating" ? (
-          <span className="inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-blue-800 bg-blue-50 border border-blue-200 shadow-2xs">
+          <span className="inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-info bg-info/10 border border-info/30 shadow-2xs">
             <span className="inline-flex items-center gap-1.5">
-              <Sparkles className="h-3 w-3 animate-spin text-blue-600" />
+              <Sparkles className="h-3 w-3 animate-spin text-info" />
               Evaluating pronunciation...
             </span>
             {onCancelEvaluating && (
               <button
                 type="button"
                 onClick={onCancelEvaluating}
-                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 hover:bg-amber-200 transition-all cursor-pointer"
+                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-warning bg-warning/15 border border-warning/40 hover:bg-warning/20 transition-all cursor-pointer"
                 title="Cancel evaluation"
               >
                 <X className="h-3 w-3" />
@@ -323,27 +323,27 @@ export function CallActiveControls({
         ) : (
           <span className="hidden lg:inline">
             Click mic or Hold{" "}
-            <kbd className="rounded px-1.5 py-0.5 font-mono text-[10px] bg-neutral-100 border border-neutral-300 text-neutral-700 font-semibold shadow-2xs">
+            <kbd className="rounded px-1.5 py-0.5 font-mono text-[10px] bg-secondary border border-border text-foreground font-semibold shadow-2xs">
               SPACE
             </kbd>
             {" "}to talk
           </span>
         )}
-        <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold", isConnected ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-amber-50 text-amber-700 border border-amber-200")}>
-          <span className={cn("h-1.5 w-1.5 rounded-full", isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />
+        <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold", isConnected ? "bg-success/10 text-primary border border-success/30" : "bg-warning/10 text-warning border border-warning/30")}>
+          <span className={cn("h-1.5 w-1.5 rounded-full", isConnected ? "bg-primary animate-pulse" : "bg-warning/100")} />
           {isConnected ? "Voice Ready" : "Connecting..."}
         </span>
         <button
           type="button"
           onClick={onMicToggle}
           disabled={micDisabled}
-          className="rounded-full px-2.5 py-0.5 transition-colors hover:bg-neutral-100 text-neutral-600 disabled:opacity-40 cursor-pointer border border-neutral-200"
+          className="rounded-full px-2.5 py-0.5 transition-colors hover:bg-secondary text-muted-foreground disabled:opacity-40 cursor-pointer border border-border"
         >
           {isMicEnabled ? "Mic on" : "Mic off"}
         </button>
-        {coachStatus && <span className="text-neutral-500">{coachStatus}</span>}
+        {coachStatus && <span className="text-muted-foreground">{coachStatus}</span>}
         {gateMessage && !hasPendingNext && (
-          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold text-warning bg-warning/10 border border-warning/30">
             {gateMessage}
           </span>
         )}

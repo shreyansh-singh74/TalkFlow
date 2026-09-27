@@ -119,7 +119,7 @@ export function CallActiveComplete({
               boxShadow: "0 0 40px rgba(16,185,129,0.15)",
             }}
           >
-            <Trophy className="h-10 w-10 text-emerald-400" />
+            <Trophy className="h-10 w-10 text-brand-accent" />
           </div>
         </div>
 
@@ -135,7 +135,7 @@ export function CallActiveComplete({
           >
             Practice Complete!
           </h1>
-          <p className="text-sm text-neutral-400">
+          <p className="text-sm text-muted-foreground">
             You successfully completed the practice session
           </p>
         </div>
@@ -149,8 +149,8 @@ export function CallActiveComplete({
               strokeWidth={10}
             />
           ) : (
-            <div className="flex h-[130px] w-[130px] shrink-0 flex-col items-center justify-center rounded-full border border-dashed border-neutral-700 px-4 text-center">
-              <span className="text-xs font-medium text-neutral-500">
+            <div className="flex h-[130px] w-[130px] shrink-0 flex-col items-center justify-center rounded-full border border-dashed border-border px-4 text-center">
+              <span className="text-xs font-medium text-muted-foreground">
                 No scored attempts
               </span>
             </div>
@@ -163,12 +163,12 @@ export function CallActiveComplete({
                 title={title}
                 className="rounded-xl p-3 flex flex-col items-center glass-panel"
               >
-                <span className="text-[9px] text-neutral-500 font-bold tracking-wider uppercase">
+                <span className="text-[9px] text-muted-foreground font-bold tracking-wider uppercase">
                   {label}
                 </span>
                 <span
                   className={`text-lg font-bold mt-0.5 tabular-nums ${
-                    highlightAmber ? "text-amber-400" : "text-neutral-200"
+                    highlightAmber ? "text-warning" : "text-foreground"
                   }`}
                 >
                   {value}
@@ -181,27 +181,27 @@ export function CallActiveComplete({
         {/* Sounds that actually gave trouble, from the acoustic scorer */}
         {phoneBreakdown.length > 0 && (
           <div className="w-full rounded-xl p-4 text-left glass-panel">
-            <p className="mb-2.5 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+            <p className="mb-2.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               Sounds to work on
             </p>
             <div className="space-y-2">
               {phoneBreakdown.map((entry) => (
                 <div key={entry.phone} className="flex items-center gap-3">
-                  <span className="w-10 shrink-0 font-mono text-sm text-neutral-200">
+                  <span className="w-10 shrink-0 font-mono text-sm text-foreground">
                     {entry.phone}
                   </span>
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                     <div
-                      className="h-full rounded-full bg-amber-400"
+                      className="h-full rounded-full bg-warning"
                       style={{
                         width: `${Math.min(100, Math.max(2, entry.avg_accuracy))}%`,
                       }}
                     />
                   </div>
-                  <span className="shrink-0 text-xs tabular-nums text-neutral-400">
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                     {Math.round(entry.avg_accuracy)}%
                   </span>
-                  <span className="shrink-0 text-[10px] tabular-nums text-neutral-600">
+                  <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
                     ×{entry.observations}
                   </span>
                 </div>
@@ -212,8 +212,8 @@ export function CallActiveComplete({
 
         {/* Skipped sentences / words badge section in Yellow (Amber) */}
         {(skippedLevelsCount > 0 || skippedWords.length > 0) && (
-          <div className="w-full rounded-xl p-4 text-left bg-amber-500/10 border border-amber-500/20 text-amber-300">
-            <div className="flex items-center gap-2 mb-1.5 text-xs font-bold uppercase tracking-wider text-amber-400">
+          <div className="w-full rounded-xl p-4 text-left bg-warning/10 border border-warning/30 text-warning">
+            <div className="flex items-center gap-2 mb-1.5 text-xs font-bold uppercase tracking-wider text-warning">
               <SkipForward className="h-4 w-4" />
               <span>
                 Skipped in this session
@@ -225,7 +225,7 @@ export function CallActiveComplete({
                 {skippedWords.map((word, i) => (
                   <span
                     key={i}
-                    className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                    className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-warning/15 text-warning border border-warning/30"
                   >
                     {word}
                   </span>
@@ -243,7 +243,7 @@ export function CallActiveComplete({
                 {sessionReport.strengths.slice(0, 4).map((s, i) => (
                   <span
                     key={i}
-                    className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                    className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-success/10 text-primary border border-success/30"
                   >
                     ✓ {s}
                   </span>
@@ -255,7 +255,7 @@ export function CallActiveComplete({
                 {sessionReport.areas_to_improve.slice(0, 4).map((s, i) => (
                   <span
                     key={i}
-                    className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                    className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-warning/10 text-warning border border-warning/30"
                   >
                     ↑ {s}
                   </span>
@@ -268,12 +268,12 @@ export function CallActiveComplete({
         {/* Coach summary */}
         <div className="w-full rounded-xl p-5 text-left glass-panel">
           <div className="flex items-center gap-2 mb-2">
-            <Bot className="h-4 w-4 text-emerald-400" />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+            <Bot className="h-4 w-4 text-brand-accent" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               Coach Summary
             </span>
           </div>
-          <p className="text-sm text-neutral-300 leading-relaxed italic">
+          <p className="text-sm text-foreground leading-relaxed italic">
             &ldquo;{sessionReport.coach_feedback || "Excellent job completing your practice session!"}&rdquo;
           </p>
         </div>
@@ -283,7 +283,7 @@ export function CallActiveComplete({
           <button
             type="button"
             onClick={onRestart}
-            className="flex-1 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+            className="flex-1 py-3 rounded-xl text-sm font-semibold text-primary-foreground transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
             style={{
               background: "linear-gradient(135deg, #10b981, #14b8a6)",
               boxShadow: "0 4px 20px rgba(16,185,129,0.25)",
@@ -295,7 +295,7 @@ export function CallActiveComplete({
           <button
             type="button"
             onClick={onLeave}
-            className="flex-1 py-3 rounded-xl text-sm font-semibold text-neutral-300 hover:text-white transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 glass-panel hover:bg-white/5"
+            className="flex-1 py-3 rounded-xl text-sm font-semibold text-muted-foreground hover:text-foreground transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 glass-panel hover:bg-secondary"
           >
             <LogOut className="h-4 w-4" />
             Exit Session

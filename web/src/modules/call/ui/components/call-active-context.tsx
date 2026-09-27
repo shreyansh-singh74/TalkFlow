@@ -25,12 +25,12 @@ export function CallActiveContext({
   return (
     <div className="w-full shrink-0 space-y-0.5 text-center">
       {text && (
-        <p className="line-clamp-1 text-sm leading-snug text-neutral-400">
+        <p className="line-clamp-1 text-sm leading-snug text-muted-foreground">
           {position === "before" ? `…${text}` : `${text}…`}
         </p>
       )}
       {note && position === "before" && (
-        <p className="text-[11px] font-medium uppercase tracking-wider text-amber-600">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-warning">
           {note}
         </p>
       )}

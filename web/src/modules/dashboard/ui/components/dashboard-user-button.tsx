@@ -1,4 +1,5 @@
 import { authClient } from "@/lib/auth-client";
+import { useTheme } from "@/components/theme-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -10,21 +11,33 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   ChevronDownIcon,
+  Loader2Icon,
   LogOutIcon,
+  Moon,
+  Sun,
   User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export default function DashboardUserButton() {
   const router = useRouter();
-  
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const { theme, toggleTheme } = useTheme();
+
   const { data, isPending } = authClient.useSession();
 
   const onLogout = () => {
+    setIsSigningOut(true);
     authClient.signOut({
       fetchOptions: {
         onSuccess: () => {
           router.push("/sign-in");
+        },
+        onError: () => {
+          setIsSigningOut(false);
+          toast.error("Could not sign out. Please try again.");
         },
       },
     });
@@ -51,7 +64,7 @@ export default function DashboardUserButton() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="rounded-lg border border-border/10 p-3 w-full flex items-center gap-3 bg-white/5 hover:bg-white/10">
+      <DropdownMenuTrigger className="rounded-lg border border-border/40 p-3 w-full flex items-center gap-3 bg-secondary/60 hover:bg-secondary">
         <Avatar className="h-8 w-8">
           {hasProfileImage ? (
             <AvatarImage
@@ -90,10 +103,26 @@ export default function DashboardUserButton() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="cursor-pointer flex items-center justify-between"
-          onClick={onLogout}
+          onClick={toggleTheme}
         >
-          Logout
-          <LogOutIcon className="size-4" />
+          {theme === "light" ? "Dark mode" : "Light mode"}
+          {theme === "light" ? (
+            <Moon className="size-4" />
+          ) : (
+            <Sun className="size-4" />
+          )}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="cursor-pointer flex items-center justify-between"
+          onClick={onLogout}
+          disabled={isSigningOut}
+        >
+          {isSigningOut ? "Signing out…" : "Logout"}
+          {isSigningOut ? (
+            <Loader2Icon className="size-4 animate-spin" />
+          ) : (
+            <LogOutIcon className="size-4" />
+          )}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

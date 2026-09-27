@@ -66,7 +66,7 @@ export function PricingSection() {
             eyebrow="Pricing"
             title="Simple pricing."
             accent="No surprises."
-            sub="Start free. Upgrade when you want more. Cancel anytime — that’s a promise, not a footnote."
+            sub="Start free. Upgrade when you want more. Cancel anytime. That’s a promise, not a footnote."
           />
         </Reveal>
 
@@ -93,14 +93,14 @@ export function PricingSection() {
                   className={cn(
                     "relative flex h-full flex-col overflow-hidden rounded-2xl border p-7 transition-all duration-300",
                     featured
-                      ? "border-tf-deep bg-tf-deep shadow-[0_30px_70px_-30px_rgba(8,32,26,0.6)]"
+                      ? "border-tf-green bg-tf-surface shadow-[0_30px_70px_-30px_rgba(54,83,20,0.3)]"
                       : "border-tf-border bg-tf-surface hover:border-tf-green/40 hover:shadow-[0_18px_40px_-24px_rgba(8,32,26,0.3)]",
                   )}
                 >
                   {featured ? (
                     <>
                       <span
-                        className="tf-dots-deep pointer-events-none absolute inset-0 opacity-60"
+                        className="tf-dots pointer-events-none absolute inset-0 opacity-50"
                         aria-hidden="true"
                       />
                       <span
@@ -112,7 +112,7 @@ export function PricingSection() {
 
                   <div className="relative flex flex-1 flex-col">
                     {badge ? (
-                      <span className="mb-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-tf-green px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white">
+                      <span className="mb-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-tf-green px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-primary-foreground">
                         {badge}
                       </span>
                     ) : (
@@ -130,7 +130,7 @@ export function PricingSection() {
                     <h3
                       className={cn(
                         "text-[17px] font-semibold",
-                        featured ? "text-tf-deep-text" : "text-tf-text",
+                        "text-tf-text",
                       )}
                     >
                       {name}
@@ -140,7 +140,7 @@ export function PricingSection() {
                       <span
                         className={cn(
                           "text-[2.75rem] font-semibold tracking-[-0.04em]",
-                          featured ? "text-tf-deep-text" : "text-tf-text",
+                          "text-tf-text",
                         )}
                       >
                         {price}
@@ -148,7 +148,7 @@ export function PricingSection() {
                       <span
                         className={cn(
                           "text-sm",
-                          featured ? "text-tf-deep-muted" : "text-tf-subtle",
+                          featured ? "text-tf-muted" : "text-tf-subtle",
                         )}
                       >
                         {period}
@@ -158,7 +158,7 @@ export function PricingSection() {
                     <p
                       className={cn(
                         "mt-3 text-[13.5px] leading-relaxed",
-                        featured ? "text-tf-deep-muted" : "text-tf-muted",
+                        "text-tf-muted",
                       )}
                     >
                       {description}
@@ -167,7 +167,7 @@ export function PricingSection() {
                     <div
                       className={cn(
                         "my-6 h-px",
-                        featured ? "bg-tf-deep-line" : "bg-tf-border",
+                        "bg-tf-border",
                       )}
                       aria-hidden="true"
                     />
@@ -186,7 +186,7 @@ export function PricingSection() {
                           <span
                             className={cn(
                               "text-[13.5px] leading-snug",
-                              featured ? "text-tf-deep-text/85" : "text-tf-muted",
+                              featured ? "text-tf-text/85" : "text-tf-muted",
                             )}
                           >
                             {feature}
@@ -204,7 +204,7 @@ export function PricingSection() {
                         disabled={billing.isPending}
                         className={cn(
                           "inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-60",
-                          "bg-tf-green text-white shadow-[0_14px_34px_-12px_rgba(24,164,75,0.9)] hover:bg-tf-mint hover:text-tf-deep",
+                          "bg-tf-green text-primary-foreground shadow-[0_14px_34px_-12px_rgba(24,164,75,0.5)] hover:bg-tf-green-strong",
                         )}
                       >
                         {billing.isPending ? "Opening checkout…" : cta}
@@ -215,15 +215,15 @@ export function PricingSection() {
                         className={cn(
                           "inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition-all active:scale-[0.98]",
                           featured
-                            ? "bg-tf-green text-white shadow-[0_14px_34px_-12px_rgba(24,164,75,0.9)] hover:bg-tf-mint hover:text-tf-deep"
-                            : "border border-tf-text/15 bg-tf-text text-white hover:bg-tf-green-strong",
+                            ? "bg-tf-green text-primary-foreground shadow-[0_14px_34px_-12px_rgba(24,164,75,0.5)] hover:bg-tf-green-strong"
+                            : "border border-tf-border bg-tf-surface text-tf-text hover:bg-tf-green-tint",
                         )}
                       >
                         {signedIn ? "Go to dashboard" : cta}
                       </Link>
                     )}
                     {featured && signedIn && billing.isError && (
-                      <p className="mt-2 text-center text-[12px] text-tf-deep-text/80">
+                      <p className="mt-2 text-center text-[12px] text-tf-text/80">
                         {billing.error instanceof Error
                           ? billing.error.message
                           : "Billing is unavailable right now."}

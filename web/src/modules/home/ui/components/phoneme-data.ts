@@ -31,16 +31,86 @@ export const HERO_LINE: readonly PhonemeToken[] = [
 
 export const HERO_SENTENCE = "I’ll check the data and update the schedule.";
 
-/** Word → IPA pairs for the ticker band between sections. */
-export const TICKER_PAIRS: readonly { word: string; ipa: string }[] = [
-  { word: "schedule", ipa: "ˈskɛdʒuːl" },
-  { word: "thursday", ipa: "ˈθɜz.deɪ" },
-  { word: "pronunciation", ipa: "prəˌnʌn.siˈeɪ.ʃən" },
-  { word: "data", ipa: "ˈdeɪ.tə" },
-  { word: "comfortable", ipa: "ˈkʌmf.tə.bəl" },
-  { word: "algorithm", ipa: "ˈæl.ɡə.ˌrɪ.ðəm" },
-  { word: "vegetable", ipa: "ˈvɛdʒ.tə.bəl" },
-  { word: "particularly", ipa: "pəˈtɪk.jə.lə.li" },
-  { word: "entrepreneur", ipa: "ˌɒn.trə.prəˈnɜː" },
-  { word: "clothes", ipa: "kləʊðz" },
+/** Word → "sounds like" pairs for the ticker band between sections. Each word
+    is respelled into plain-English syllables, with the stressed syllable marked,
+    so a learner can read it aloud without knowing IPA. */
+export interface TickerSyllable {
+  text: string;
+  stress?: boolean;
+}
+
+export const TICKER_PAIRS: readonly {
+  word: string;
+  sounds: readonly TickerSyllable[];
+}[] = [
+  {
+    word: "schedule",
+    sounds: [{ text: "skeh", stress: true }, { text: "jool" }],
+  },
+  {
+    word: "thursday",
+    sounds: [{ text: "thurz", stress: true }, { text: "day" }],
+  },
+  {
+    word: "pronunciation",
+    sounds: [
+      { text: "pruh" },
+      { text: "nun" },
+      { text: "see" },
+      { text: "ay", stress: true },
+      { text: "shun" },
+    ],
+  },
+  {
+    word: "data",
+    sounds: [{ text: "day", stress: true }, { text: "tuh" }],
+  },
+  {
+    word: "comfortable",
+    sounds: [
+      { text: "kumf", stress: true },
+      { text: "tuh" },
+      { text: "bul" },
+    ],
+  },
+  {
+    word: "algorithm",
+    sounds: [
+      { text: "al", stress: true },
+      { text: "guh" },
+      { text: "rith" },
+      { text: "uhm" },
+    ],
+  },
+  {
+    word: "vegetable",
+    sounds: [
+      { text: "vej", stress: true },
+      { text: "tuh" },
+      { text: "bul" },
+    ],
+  },
+  {
+    word: "particularly",
+    sounds: [
+      { text: "par" },
+      { text: "tik", stress: true },
+      { text: "yuh" },
+      { text: "luh" },
+      { text: "lee" },
+    ],
+  },
+  {
+    word: "entrepreneur",
+    sounds: [
+      { text: "on" },
+      { text: "truh" },
+      { text: "pruh" },
+      { text: "nur", stress: true },
+    ],
+  },
+  {
+    word: "clothes",
+    sounds: [{ text: "klohz", stress: true }],
+  },
 ];

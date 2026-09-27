@@ -84,7 +84,7 @@ export const CoachIdView = ({ coachId }: Props) => {
           onEdit={() => setUpdateCoachDialogOpen(true)}
           onRemove={handleRemoveCoach}
         />
-        <div className="bg-white rounded-lg border">
+        <div className="bg-card rounded-lg border">
           <div className="px-4 py-5 gap-y-5 flex flex-col col-span-5">
             <div className="flex items-center gap-x-3">
               <NameAvatar name={data.name} size={40} />
@@ -94,7 +94,7 @@ export const CoachIdView = ({ coachId }: Props) => {
               variant="outline"
               className="flex items-center gap-x-2 [&>svg]:size-4 w-fit"
             >
-              <VideoIcon className="text-blue-700" />
+              <VideoIcon className="text-info" />
               {data.sessionCount}{" "}
               {data.sessionCount === 1 ? "session" : "sessions"}
             </Badge>
@@ -103,7 +103,7 @@ export const CoachIdView = ({ coachId }: Props) => {
                 <dt className="text-sm font-medium text-muted-foreground">
                   Drill topic
                 </dt>
-                <dd className="text-neutral-900">
+                <dd className="text-foreground">
                   {data.topic || "—"}
                 </dd>
               </div>
@@ -111,7 +111,7 @@ export const CoachIdView = ({ coachId }: Props) => {
                 <dt className="text-sm font-medium text-muted-foreground">
                   Difficulty
                 </dt>
-                <dd className="text-neutral-900 capitalize">
+                <dd className="text-foreground capitalize">
                   {data.difficulty
                     ? (DIFFICULTY_LABELS[
                         data.difficulty as keyof typeof DIFFICULTY_LABELS
@@ -123,7 +123,7 @@ export const CoachIdView = ({ coachId }: Props) => {
                 <dt className="text-sm font-medium text-muted-foreground">
                   Target accent
                 </dt>
-                <dd className="text-neutral-900">
+                <dd className="text-foreground">
                   {ACCENT_OPTIONS.find((a) => a.value === data.accent)?.label ??
                     data.accent ??
                     "—"}
@@ -133,7 +133,7 @@ export const CoachIdView = ({ coachId }: Props) => {
                 <dt className="text-sm font-medium text-muted-foreground">
                   Focus sounds
                 </dt>
-                <dd className="text-neutral-900">
+                <dd className="text-foreground">
                   {data.focusSounds && data.focusSounds.length > 0 ? (
                     <span className="flex flex-wrap gap-1.5">
                       {data.focusSounds.map((sound: string) => (
@@ -150,7 +150,7 @@ export const CoachIdView = ({ coachId }: Props) => {
             </dl>
             <div className="flex flex-col gap-y-4 border-t pt-5">
               <p className="text-lg font-medium">Instructions</p>
-              <p className="text-neutral-800 whitespace-pre-wrap">
+              <p className="text-foreground whitespace-pre-wrap">
                 {data.instructions || "—"}
               </p>
             </div>
@@ -172,7 +172,7 @@ export const CoachesIdViewLoading = () => {
         </div>
         <Skeleton className="h-9 w-9 rounded-md" />
       </div>
-      <div className="bg-white rounded-lg border">
+      <div className="bg-card rounded-lg border">
         <div className="px-4 py-5 gap-y-5 flex flex-col">
           <div className="flex items-center gap-x-3">
             <Skeleton className="h-10 w-10 rounded-full" />

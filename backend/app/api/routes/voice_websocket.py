@@ -414,13 +414,47 @@ class VoiceSession:
         self.session_sentences = [text for text, _ in pairs]
         self.step_notes = [note for _, note in pairs]
         self.score_threshold = msg.pass_threshold or pass_threshold_for(self.difficulty)
-        self.completed_sentences = []
-        self.all_attempts = []
-        self.step_best_score = {}
-        self.skipped_steps = set()
-        self.report_generated = False
-        self.current_sentence_index = 0
-        self._set_sentence(self.session_sentences[0])
+
+        last_index = len(self.session_sentences) - 1
+        if msg.resume is not None and last_index >= 0:
+            # A reconnecting client told us where it left off. Restore the
+            # cursor and the step ledger so a dropped socket does not send the
+            # learner back to step 1 with every score forgotten. Per-turn
+            # attempt measurements are NOT restored -- they died with the old
+            # connection -- so the report's per-phone evidence only covers
+            # turns scored after the reconnect; the completed-step count is
+            # what stays honest.
+            resume = msg.resume
+            self.completed_sentences = [
+                text for text in resume.completed_targets if text.strip()
+            ]
+            self.step_best_score = {
+                index: score
+                for index, score in resume.best_scores.items()
+                if 0 <= index <= last_index
+            }
+            self.skipped_steps = {
+                index for index in resume.skipped if 0 <= index <= last_index
+            }
+            self.all_attempts = []
+            self.report_generated = False
+            self._go_to_step(resume.step_index)
+            logger.info(
+                "Session %s resumed at step %d (%d completed, %d skipped)",
+                self.connection_id,
+                self.current_sentence_index,
+                len(self.completed_sentences),
+                len(self.skipped_steps),
+            )
+        else:
+            # First connect, or a deliberate restart: start from the top.
+            self.completed_sentences = []
+            self.all_attempts = []
+            self.step_best_score = {}
+            self.skipped_steps = set()
+            self.report_generated = False
+            self.current_sentence_index = 0
+            self._set_sentence(self.session_sentences[0])
 
         logger.info(
             "Session %s configured: %d steps, source=%s, difficulty=%s, pass=%.0f%%, coach=%s",
@@ -777,19 +811,28 @@ class VoiceSession:
         # Keep last 10 turns
         self.conversation_history = self.conversation_history[-10:]
         
+        # Announce where the cursor ended up, *after* the coaching audio, so the
+        # learner hears (and can read) the feedback on the turn they just made
+        # before the next step appears. `advanced_from_pass` tells the client to
+        # keep that feedback on screen instead of clearing it.
+        #
+        # The one exception is the final step: the report is sent BEFORE the
+        # closing audio, not after. It used to wait for the whole spoken reply
+        # to finish streaming -- 10-20s of the practice screen sitting there
+        # with no "Practice Complete" popup -- and a learner who clicked Leave
+        # during that window raced their own report out of existence. The
+        # completion screen is visual; the spoken line can play over it.
+        if practice_update and practice_update.get("advanced"):
+            if practice_update.get("session_complete"):
+                await self._send_report()
+
         # Speak whole sentences, not streaming word-fragments: each TTS call
         # gets a complete prosodic unit, so pauses land on the punctuation.
         if not self.should_stop_tts:
             await self.stream_tts_batched(_split_into_sentences(full_response_text))
 
-        # Announce where the cursor ended up, *after* the coaching audio, so the
-        # learner hears (and can read) the feedback on the turn they just made
-        # before the next step appears. `advanced_from_pass` tells the client to
-        # keep that feedback on screen instead of clearing it.
         if practice_update and practice_update.get("advanced"):
-            if practice_update.get("session_complete"):
-                await self._send_report()
-            else:
+            if not practice_update.get("session_complete"):
                 await self._send_practice_target(advanced_from_pass=True)
     
     async def stream_tts_batched(self, text_batches: List[str]):
@@ -1161,6 +1204,22 @@ class VoiceSession:
         }
 
 
+def _learner_facing_error(error: Exception) -> str:
+    """One short, actionable sentence for the client's error banner.
+
+    Everything technical stays in the server log; the socket only ever carries
+    copy a learner can read and act on.
+    """
+    if isinstance(error, (TimeoutError, asyncio.TimeoutError)):
+        return "This turn took too long to process. Give it another go."
+    if isinstance(error, TurnScoringTimeout):
+        return "Scoring this turn took too long, so it was not measured. Try speaking again."
+    return (
+        "Something went wrong while processing your audio. Your progress so "
+        "far is saved — try again in a moment."
+    )
+
+
 @router.websocket("/ws/voice")
 async def voice_websocket(websocket: WebSocket):
     """Main WebSocket endpoint for voice conversation.
@@ -1253,7 +1312,15 @@ async def voice_websocket(websocket: WebSocket):
         logger.exception("WebSocket error")
         try:
             await websocket.send_text(
-                ErrorMessage(type="ERROR", message=str(e), recoverable=False).model_dump_json()
+                ErrorMessage(
+                    type="ERROR",
+                    # str(e) used to go straight to the learner's screen --
+                    # tracebacks and internals as the error banner. The detail
+                    # lives in the log line above; the client gets one sentence
+                    # it can act on.
+                    message=_learner_facing_error(e),
+                    recoverable=False,
+                ).model_dump_json()
             )
         except Exception as send_err:
             logger.warning("Failed to send error message to client: %s", send_err)

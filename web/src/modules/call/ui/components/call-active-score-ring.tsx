@@ -39,7 +39,7 @@ export function ScoreRing({ score, size = 120, strokeWidth = 8, className }: Sco
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(255,255,255,0.06)"
+          className="stroke-border"
           strokeWidth={strokeWidth}
         />
         {/* Fill */}
@@ -64,7 +64,7 @@ export function ScoreRing({ score, size = 120, strokeWidth = 8, className }: Sco
           {score}
           <span className="text-lg">%</span>
         </span>
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mt-0.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5">
           {colors.label}
         </span>
       </div>

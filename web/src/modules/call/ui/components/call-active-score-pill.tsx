@@ -12,7 +12,7 @@ interface CallActiveScorePillProps {
 }
 
 const PILL_BOX =
-  "pointer-events-none absolute -top-2 left-1/2 z-10 -translate-x-1/2 inline-flex items-center gap-1.5 rounded-full border bg-white/95 px-3 py-1 shadow-md backdrop-blur-sm";
+  "pointer-events-none absolute -top-2 left-1/2 z-10 -translate-x-1/2 inline-flex items-center gap-1.5 rounded-full border bg-card/95 px-3 py-1 shadow-md backdrop-blur-sm";
 
 /**
  * The single authoritative score readout on the call page.
@@ -30,9 +30,9 @@ export function CallActiveScorePill({
 }: CallActiveScorePillProps) {
   if (uiState === "Recording") {
     return (
-      <div className={cn(PILL_BOX, "border-emerald-300")}>
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+      <div className={cn(PILL_BOX, "border-success/40")}>
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primary">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
           Listening…
         </span>
       </div>
@@ -41,9 +41,9 @@ export function CallActiveScorePill({
 
   if (uiState === "Evaluating") {
     return (
-      <div className={cn(PILL_BOX, "border-blue-300")}>
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+      <div className={cn(PILL_BOX, "border-info/40")}>
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-info">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-info/100" />
           Evaluating…
         </span>
       </div>
@@ -52,8 +52,8 @@ export function CallActiveScorePill({
 
   if (score === null) {
     return (
-      <div className={cn(PILL_BOX, "border-neutral-200")}>
-        <span className="whitespace-nowrap text-[11px] font-semibold text-neutral-500">
+      <div className={cn(PILL_BOX, "border-border")}>
+        <span className="whitespace-nowrap text-[11px] font-semibold text-muted-foreground">
           Speak to score · need {passThreshold}%
         </span>
       </div>
@@ -62,19 +62,19 @@ export function CallActiveScorePill({
 
   const passed = score >= passThreshold;
   const band = passed
-    ? "border-emerald-300 text-emerald-700"
+    ? "border-success/40 text-primary"
     : score >= passThreshold - 15
-      ? "border-blue-300 text-blue-700"
+      ? "border-info/40 text-info"
       : score >= passThreshold - 35
-        ? "border-amber-300 text-amber-700"
-        : "border-red-300 text-red-600";
+        ? "border-warning/40 text-warning"
+        : "border-danger/40 text-danger";
 
   return (
     <div className={cn(PILL_BOX, band)}>
       <span className="text-base font-bold tabular-nums leading-none">
         {Math.round(score)}%
       </span>
-      <span className="text-[10px] font-semibold text-neutral-500">
+      <span className="text-[10px] font-semibold text-muted-foreground">
         {passed ? "passed" : `need ${passThreshold}%`}
       </span>
     </div>

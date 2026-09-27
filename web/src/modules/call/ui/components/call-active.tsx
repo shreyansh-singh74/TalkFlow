@@ -19,6 +19,9 @@ import { usePushToTalk } from "@/hooks/use-push-to-talk";
 import { useSpacebarControl } from "@/hooks/use-spacebar-control";
 import { useUpdatePracticeSession } from "@/hooks/use-api";
 import { SessionStatus } from "@/modules/sessions/types";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { CreditCardIcon, ListIcon } from "lucide-react";
 import {
   DIFFICULTY_PASS_THRESHOLDS,
   type Difficulty,
@@ -35,6 +38,7 @@ import { CallActiveHeader } from "./call-active-header";
 import { CallActiveControls } from "./call-active-controls";
 import { CallActiveCoach } from "./call-active-coach";
 import { CallActiveComplete } from "./call-active-complete";
+import { CallConnecting } from "./call-connecting";
 import { CallActiveSentence } from "./call-active-sentence";
 import { CallActiveFeedback } from "./call-active-feedback";
 import { CallActiveScorePill } from "./call-active-score-pill";
@@ -85,12 +89,28 @@ export const CallActive = ({
   // even if a persist path runs twice for one turn, the entry is stored once.
   const recordedTurnIdsRef = useRef<Set<string>>(new Set());
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const router = useRouter();
 
   const scriptSteps = useMemo(() => script?.steps ?? [], [script]);
 
+  /**
+   * Leave from the completion screen: the report effect has already persisted
+   * status + analysis, so a confirmation dialog (and the second "session
+   * complete" screen it led to) only added clicks. Mid-session — no report yet
+   * — the confirm still matters, because leaving there is what saves progress.
+   */
+  const requestLeave = () => {
+    if (sessionReport) {
+      router.push(`/sessions/${sessionId}`);
+      return;
+    }
+    setShowLeaveConfirm(true);
+  };
+
   const {
     isConnected, isTalking, isAISpeaking, transcripts, partialTranscript,
-    streamingAIText, conversationStatus, error: transcriptionError,
+    streamingAIText, conversationStatus, error: transcriptionError, fatalError,
+    hasTarget, retryConnection,
     lastPronunciation, targetText,
     practiceMode, practiceSentence, practiceProgress,
     passThreshold, stepIndex, contextBefore, contextAfter, stepNote,
@@ -366,8 +386,11 @@ export const CallActive = ({
     else if (!isMicEnabled && isConnected) disconnect();
   }, [isMicEnabled, isConnected, connect, disconnect]);
 
-  // Warn on page unload/close
+  // Warn on page unload/close — but only once there is something to lose.
+  // During the initial connect there is no persisted progress yet, and the
+  // browser's "leave site?" dialog there is pure friction.
   useEffect(() => {
+    if (!hasTarget) return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (!sessionReport) {
         e.preventDefault();
@@ -376,7 +399,7 @@ export const CallActive = ({
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [sessionReport]);
+  }, [sessionReport, hasTarget]);
 
   const [leavePending, setLeavePending] = useState(false);
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -409,8 +432,16 @@ export const CallActive = ({
       {
         // Navigate away only once the report is actually stored. Leaving first
         // was how a finished session ended up saved without its analysis.
+        //
+        // When the report landed because the learner clicked Leave (finalize),
+        // go straight to the session report — that is the analytics page they
+        // asked for. Routing through the old onLeave re-marked the session
+        // completed and swapped this screen for a dead-end error card once the
+        // refetch saw the new status.
         onSettled: () => {
-          if (leavePending) onLeave();
+          if (leavePending) {
+            router.push(`/sessions/${sessionId}`);
+          }
         },
       }
     );
@@ -421,7 +452,7 @@ export const CallActive = ({
     appendPronunciationEntry,
     persistSession,
     leavePending,
-    onLeave,
+    router,
   ]);
 
   useEffect(
@@ -496,10 +527,23 @@ export const CallActive = ({
         passThreshold={passThreshold}
         difficulty={difficulty}
         sourceLabel={script?.source_label ?? null}
-        onLeave={() => setShowLeaveConfirm(true)}
+        onLeave={requestLeave}
       />
 
-      {sessionReport ? (
+      {fatalError ? (
+        /* Retry-proof failure (free quota spent): the socket is gone for
+           good, so offer the two exits that actually resolve it. */
+        <FatalErrorScreen message={fatalError.message} />
+      ) : !hasTarget ? (
+        /* The session is not ready yet — no real target has arrived. Wait
+           here instead of rendering the practice UI around a placeholder
+           sentence, a phantom audio player, and disabled controls. */
+        <CallConnecting
+          error={transcriptionError}
+          onRetry={retryConnection}
+          onCancel={beginLeave}
+        />
+      ) : sessionReport ? (
         /* Session Complete */
         <CallActiveComplete
           sessionReport={sessionReport}
@@ -511,7 +555,7 @@ export const CallActive = ({
             setScoreByStep({});
             restartSession();
           }}
-          onLeave={() => setShowLeaveConfirm(true)}
+          onLeave={requestLeave}
         />
       ) : (
         /* Main Practice Area — practice grid + full-height chat rail */
@@ -600,7 +644,7 @@ export const CallActive = ({
       )}
 
       {/* Fixed bottom controls */}
-      {!sessionReport && (
+      {!sessionReport && !fatalError && hasTarget && (
         <CallActiveControls
           uiState={uiState}
           isConnected={isConnected}
@@ -631,15 +675,15 @@ export const CallActive = ({
 
       {/* Leave Confirmation Dialog */}
       <Dialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
-        <DialogContent className="max-w-md bg-white border border-neutral-200 shadow-xl rounded-2xl p-6">
+        <DialogContent className="max-w-md bg-card border border-border shadow-xl rounded-2xl p-6">
           <DialogHeader className="flex flex-col items-center text-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 border border-red-200 text-red-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-danger/10 border border-danger/30 text-danger">
               <PhoneOff className="h-6 w-6" />
             </div>
-            <DialogTitle className="text-xl font-bold text-neutral-900">
+            <DialogTitle className="text-xl font-bold text-foreground">
               Are you sure you want to leave?
             </DialogTitle>
-            <DialogDescription className="text-sm font-medium text-neutral-600 leading-relaxed">
+            <DialogDescription className="text-sm font-medium text-muted-foreground leading-relaxed">
               Your practice progress and pronunciation analysis will be saved automatically before closing.
             </DialogDescription>
           </DialogHeader>
@@ -648,23 +692,62 @@ export const CallActive = ({
             <button
               type="button"
               onClick={() => setShowLeaveConfirm(false)}
-              className="w-full sm:w-auto rounded-full px-5 py-2.5 text-xs font-bold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 transition-all cursor-pointer"
+              className="w-full sm:w-auto rounded-full px-5 py-2.5 text-xs font-bold text-foreground bg-secondary hover:bg-muted border border-border transition-all cursor-pointer"
             >
               Stay in Call
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowLeaveConfirm(false);
-                beginLeave();
-              }}
-              className="w-full sm:w-auto rounded-full px-5 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-all cursor-pointer shadow-md"
-            >
-              Yes, Leave Call
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <button
+            type="button"
+            onClick={() => {
+              setShowLeaveConfirm(false);
+              beginLeave();
+            }}
+            className="w-full sm:w-auto rounded-full px-5 py-2.5 text-xs font-bold text-primary-foreground bg-danger hover:bg-danger/90 transition-all cursor-pointer shadow-md"
+          >
+            Yes, Leave Call
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </div>
   );
 };
+
+/**
+ * A failure that cannot be retried (quota spent). Rendered instead of the
+ * practice area: with no socket there is nothing to practise, and the old
+ * "Reconnecting…" banner hid the one message that explained why.
+ */
+function FatalErrorScreen({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-12">
+      <div className="w-full max-w-md rounded-2xl border border-warning/30 bg-warning/10 p-8 text-center space-y-4">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-warning/40 bg-card text-warning">
+          <CreditCardIcon className="h-6 w-6" />
+        </div>
+        <div className="space-y-1.5">
+          <h2 className="text-lg font-bold text-foreground">
+            Session limit reached
+          </h2>
+          <p className="text-sm text-warning/80">{message}</p>
+        </div>
+        <div className="flex flex-col-reverse items-center justify-center gap-2 pt-1 sm:flex-row">
+          <Link
+            href="/sessions"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-xs font-bold text-foreground hover:bg-secondary"
+          >
+            <ListIcon className="h-4 w-4" />
+            Back to sessions
+          </Link>
+          <Link
+            href="/settings"
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary-hover"
+          >
+            <CreditCardIcon className="h-4 w-4" />
+            Upgrade to Pro
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
